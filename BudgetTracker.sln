@@ -1,0 +1,33 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36623.8 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "budgettracker.client", "budgettracker.client\budgettracker.client.esproj", "{7229D5E1-7961-E972-9A51-C77C5EF2E61D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BudgetTracker.Server", "BudgetTracker.Server\BudgetTracker.Server.csproj", "{F71C8494-37C2-443E-B706-64D62C1F8C58}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7229D5E1-7961-E972-9A51-C77C5EF2E61D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7229D5E1-7961-E972-9A51-C77C5EF2E61D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7229D5E1-7961-E972-9A51-C77C5EF2E61D}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{7229D5E1-7961-E972-9A51-C77C5EF2E61D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7229D5E1-7961-E972-9A51-C77C5EF2E61D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7229D5E1-7961-E972-9A51-C77C5EF2E61D}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{F71C8494-37C2-443E-B706-64D62C1F8C58}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F71C8494-37C2-443E-B706-64D62C1F8C58}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F71C8494-37C2-443E-B706-64D62C1F8C58}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F71C8494-37C2-443E-B706-64D62C1F8C58}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FB1C3790-DB07-4274-98EF-CF4B39463E68}
+	EndGlobalSection
+EndGlobal
