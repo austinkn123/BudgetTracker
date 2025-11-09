@@ -1,8 +1,8 @@
+using BudgetTracker.Server.Endpoints;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
-builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -21,7 +21,8 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
-app.MapControllers();
+// Map endpoints
+app.MapWeatherEndpoints();
 
 app.MapFallbackToFile("/index.html");
 
