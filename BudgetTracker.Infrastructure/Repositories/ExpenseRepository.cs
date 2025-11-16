@@ -5,15 +5,8 @@ using Dapper;
 
 namespace BudgetTracker.Infrastructure.Repositories
 {
-    public class ExpenseRepository : IExpenseRepository
+    public class ExpenseRepository(DapperContext _context) : IExpenseRepository
     {
-        private readonly DapperContext _context;
-
-        public ExpenseRepository(DapperContext context)
-        {
-            _context = context;
-        }
-
         public async Task<int> CreateAsync(Expense expense)
         {
             var sql = "INSERT INTO Expenses (UserId, CategoryId, Amount, Date, Merchant, Notes) VALUES (@UserId, @CategoryId, @Amount, @Date, @Merchant, @Notes); SELECT CAST(SCOPE_IDENTITY() as int)";
