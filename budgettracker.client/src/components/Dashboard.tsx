@@ -67,7 +67,7 @@ const mockExpenses: Expense[] = [
     categoryId: 1,
     amount: 52.30,
     date: new Date('2024-12-05').toISOString(),
-    merchant: 'Trader Joes',
+    merchant: "Trader Joe's",
     notes: 'Fresh produce',
     createdAt: new Date('2024-12-05').toISOString(),
   },
