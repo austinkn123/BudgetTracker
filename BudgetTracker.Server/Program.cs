@@ -42,12 +42,6 @@ var apiGroup = app.MapGroup("/api")
     // .RequireAuthorization(); // Uncomment to require authentication for all API endpoints
     // .AddEndpointFilter<LoggingFilter>(); // Add custom filters
 
-// Weather endpoints group
-apiGroup.MapGroup("/weather")
-    .MapWeatherEndpoints()
-    .WithTags("Weather");
-    // .RequireAuthorization(); // Uncomment to require authentication for weather endpoints only
-
 // Expense endpoints group
 var expenseGroup = apiGroup.MapGroup("/expenses")
     .WithTags("Expenses");
