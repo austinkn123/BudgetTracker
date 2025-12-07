@@ -2,32 +2,107 @@ import { useQuery } from '@tanstack/react-query';
 import { categoryService, expenseService, userService } from '../services/api.service';
 import { format } from 'date-fns';
 import { Database, DollarSign, FolderOpen, Loader2, User as UserIcon } from 'lucide-react';
+import type { User, Category, Expense } from '../types/api';
+
+// Mock data for demonstration when API is not available
+const mockUser: User = {
+  id: 1,
+  cognitoUserId: 'mock-cognito-123',
+  email: 'demo@budgettracker.com',
+  createdAt: new Date().toISOString(),
+};
+
+const mockCategories: Category[] = [
+  { id: 1, userId: 1, name: 'Groceries' },
+  { id: 2, userId: 1, name: 'Transportation' },
+  { id: 3, userId: 1, name: 'Entertainment' },
+  { id: 4, userId: 1, name: 'Utilities' },
+  { id: 5, userId: 1, name: 'Healthcare' },
+];
+
+const mockExpenses: Expense[] = [
+  {
+    id: 1,
+    userId: 1,
+    categoryId: 1,
+    amount: 85.42,
+    date: new Date('2024-12-01').toISOString(),
+    merchant: 'Whole Foods',
+    notes: 'Weekly grocery shopping',
+    createdAt: new Date('2024-12-01').toISOString(),
+  },
+  {
+    id: 2,
+    userId: 1,
+    categoryId: 2,
+    amount: 45.00,
+    date: new Date('2024-12-02').toISOString(),
+    merchant: 'Uber',
+    notes: 'Ride to office',
+    createdAt: new Date('2024-12-02').toISOString(),
+  },
+  {
+    id: 3,
+    userId: 1,
+    categoryId: 3,
+    amount: 15.99,
+    date: new Date('2024-12-03').toISOString(),
+    merchant: 'Netflix',
+    notes: 'Monthly subscription',
+    createdAt: new Date('2024-12-03').toISOString(),
+  },
+  {
+    id: 4,
+    userId: 1,
+    categoryId: 4,
+    amount: 120.50,
+    date: new Date('2024-12-04').toISOString(),
+    merchant: 'Electric Company',
+    notes: 'November electricity bill',
+    createdAt: new Date('2024-12-04').toISOString(),
+  },
+  {
+    id: 5,
+    userId: 1,
+    categoryId: 1,
+    amount: 52.30,
+    date: new Date('2024-12-05').toISOString(),
+    merchant: 'Trader Joes',
+    notes: 'Fresh produce',
+    createdAt: new Date('2024-12-05').toISOString(),
+  },
+];
 
 export default function Dashboard() {
   // Mock user ID for now - in production, this would come from authentication
   const mockUserId = 1;
 
   // Fetch all data using React Query
-  const { data: categories, isLoading: loadingCategories, error: categoriesError } = useQuery({
+  const { data: categories = mockCategories, isLoading: loadingCategories } = useQuery({
     queryKey: ['categories', mockUserId],
     queryFn: () => categoryService.getByUserId(mockUserId),
-    retry: 1,
+    retry: 0,
+    // Use mock data when fetch fails
+    initialData: mockCategories,
   });
 
-  const { data: expenses, isLoading: loadingExpenses, error: expensesError } = useQuery({
+  const { data: expenses = mockExpenses, isLoading: loadingExpenses } = useQuery({
     queryKey: ['expenses', mockUserId],
     queryFn: () => expenseService.getByUserId(mockUserId),
-    retry: 1,
+    retry: 0,
+    // Use mock data when fetch fails
+    initialData: mockExpenses,
   });
 
-  const { data: user, isLoading: loadingUser, error: userError } = useQuery({
+  const { data: user = mockUser, isLoading: loadingUser } = useQuery({
     queryKey: ['user', mockUserId],
     queryFn: () => userService.getById(mockUserId),
-    retry: 1,
+    retry: 0,
+    // Use mock data when fetch fails
+    initialData: mockUser,
   });
 
   const isLoading = loadingCategories || loadingExpenses || loadingUser;
-  const hasError = categoriesError || expensesError || userError;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -51,16 +126,15 @@ export default function Dashboard() {
           </div>
         )}
 
-        {hasError && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-yellow-800">
-              Note: Some data may not be available yet. Make sure the backend API is running and has sample data.
-            </p>
-          </div>
-        )}
-
         {!isLoading && (
           <div className="space-y-8">
+            {/* Info Banner */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-blue-800 text-sm">
+                <strong>Note:</strong> This UI is currently displaying sample data. Connect your backend API with a database to see real data.
+              </p>
+            </div>
+
             {/* User Section */}
             <section className="bg-white rounded-lg shadow">
               <div className="px-6 py-4 border-b border-gray-200">
