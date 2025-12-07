@@ -4,8 +4,6 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
-        
         {
             "name": "C#: BudgetTracker.Server [https]",
             "type": "dotnet",
@@ -14,9 +12,25 @@
             "launchConfigurationId": "TargetFramework=;https"
         },
         {
+            "name": "Run Client Dev Server",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "npm run dev",
+            "cwd": "${workspaceFolder}/budgettracker.client"
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Debug Dev Environment",
+            "configurations": [
+                "C#: BudgetTracker.Server [https]",
+                "Run Client Dev Server"
+            ]
         }
     ]
 }
