@@ -197,3 +197,4 @@ Expenses
 ---
 
 **For detailed architecture information, design decisions, and improvement recommendations, see [ARCHITECTURE.md](ARCHITECTURE.md)**
+>>>>>>> main
