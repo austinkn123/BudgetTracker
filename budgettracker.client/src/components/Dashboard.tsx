@@ -1,30 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
-import { categoryService, expenseService, userService } from '../services/api.service';
 import { format } from 'date-fns';
 import { Database, DollarSign, FolderOpen, Loader2, User as UserIcon } from 'lucide-react';
+import { useUser, useCategories, useExpenses } from '../lib/hooks';
 
 export default function Dashboard() {
   // User ID for now - in production, this would come from authentication
   const userId = 1;
 
-  // Fetch all data using React Query
-  const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useQuery({
-    queryKey: ['categories', userId],
-    queryFn: () => categoryService.getByUserId(userId),
-    retry: 1,
-  });
-
-  const { data: expenses = [], isLoading: loadingExpenses, error: expensesError } = useQuery({
-    queryKey: ['expenses', userId],
-    queryFn: () => expenseService.getByUserId(userId),
-    retry: 1,
-  });
-
-  const { data: user, isLoading: loadingUser, error: userError } = useQuery({
-    queryKey: ['user', userId],
-    queryFn: () => userService.getById(userId),
-    retry: 1,
-  });
+  // Fetch all data using custom hooks
+  const { data: user, isLoading: loadingUser, error: userError } = useUser(userId);
+  const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories(userId);
+  const { data: expenses = [], isLoading: loadingExpenses, error: expensesError } = useExpenses(userId);
 
   const isLoading = loadingCategories || loadingExpenses || loadingUser;
   const hasErrors = categoriesError || expensesError || userError;
