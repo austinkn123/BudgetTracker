@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
 import { Database, DollarSign, FolderOpen, Loader2, User as UserIcon } from 'lucide-react';
-import { useUser, useCategories, useExpenses } from '../lib/hooks';
+import { useUser } from '../lib/useUser';
+import { useCategories } from '../lib/useCategories';
+import { useExpenses } from '../lib/useExpenses';
 
 
 export default function Dashboard() {
