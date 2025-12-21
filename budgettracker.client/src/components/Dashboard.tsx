@@ -2,107 +2,32 @@ import { useQuery } from '@tanstack/react-query';
 import { categoryService, expenseService, userService } from '../services/api.service';
 import { format } from 'date-fns';
 import { Database, DollarSign, FolderOpen, Loader2, User as UserIcon } from 'lucide-react';
-import type { User, Category, Expense } from '../types/api';
-
-// Mock data for demonstration when API is not available
-const mockUser: User = {
-  id: 1,
-  cognitoUserId: 'mock-cognito-123',
-  email: 'demo@budgettracker.com',
-  createdAt: new Date().toISOString(),
-};
-
-const mockCategories: Category[] = [
-  { id: 1, userId: 1, name: 'Groceries' },
-  { id: 2, userId: 1, name: 'Transportation' },
-  { id: 3, userId: 1, name: 'Entertainment' },
-  { id: 4, userId: 1, name: 'Utilities' },
-  { id: 5, userId: 1, name: 'Healthcare' },
-];
-
-const mockExpenses: Expense[] = [
-  {
-    id: 1,
-    userId: 1,
-    categoryId: 1,
-    amount: 85.42,
-    date: new Date('2024-12-01').toISOString(),
-    merchant: 'Whole Foods',
-    notes: 'Weekly grocery shopping',
-    createdAt: new Date('2024-12-01').toISOString(),
-  },
-  {
-    id: 2,
-    userId: 1,
-    categoryId: 2,
-    amount: 45.00,
-    date: new Date('2024-12-02').toISOString(),
-    merchant: 'Uber',
-    notes: 'Ride to office',
-    createdAt: new Date('2024-12-02').toISOString(),
-  },
-  {
-    id: 3,
-    userId: 1,
-    categoryId: 3,
-    amount: 15.99,
-    date: new Date('2024-12-03').toISOString(),
-    merchant: 'Netflix',
-    notes: 'Monthly subscription',
-    createdAt: new Date('2024-12-03').toISOString(),
-  },
-  {
-    id: 4,
-    userId: 1,
-    categoryId: 4,
-    amount: 120.50,
-    date: new Date('2024-12-04').toISOString(),
-    merchant: 'Electric Company',
-    notes: 'November electricity bill',
-    createdAt: new Date('2024-12-04').toISOString(),
-  },
-  {
-    id: 5,
-    userId: 1,
-    categoryId: 1,
-    amount: 52.30,
-    date: new Date('2024-12-05').toISOString(),
-    merchant: "Trader Joe's",
-    notes: 'Fresh produce',
-    createdAt: new Date('2024-12-05').toISOString(),
-  },
-];
 
 export default function Dashboard() {
-  // Mock user ID for now - in production, this would come from authentication
-  const mockUserId = 1;
+  // User ID for now - in production, this would come from authentication
+  const userId = 1;
 
   // Fetch all data using React Query
-  const { data: categories = mockCategories, isLoading: loadingCategories } = useQuery({
-    queryKey: ['categories', mockUserId],
-    queryFn: () => categoryService.getByUserId(mockUserId),
-    retry: 0,
-    // Use mock data when fetch fails
-    initialData: mockCategories,
+  const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useQuery({
+    queryKey: ['categories', userId],
+    queryFn: () => categoryService.getByUserId(userId),
+    retry: 1,
   });
 
-  const { data: expenses = mockExpenses, isLoading: loadingExpenses } = useQuery({
-    queryKey: ['expenses', mockUserId],
-    queryFn: () => expenseService.getByUserId(mockUserId),
-    retry: 0,
-    // Use mock data when fetch fails
-    initialData: mockExpenses,
+  const { data: expenses = [], isLoading: loadingExpenses, error: expensesError } = useQuery({
+    queryKey: ['expenses', userId],
+    queryFn: () => expenseService.getByUserId(userId),
+    retry: 1,
   });
 
-  const { data: user = mockUser, isLoading: loadingUser } = useQuery({
-    queryKey: ['user', mockUserId],
-    queryFn: () => userService.getById(mockUserId),
-    retry: 0,
-    // Use mock data when fetch fails
-    initialData: mockUser,
+  const { data: user, isLoading: loadingUser, error: userError } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => userService.getById(userId),
+    retry: 1,
   });
 
   const isLoading = loadingCategories || loadingExpenses || loadingUser;
+  const hasErrors = categoriesError || expensesError || userError;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -122,16 +47,35 @@ export default function Dashboard() {
         {isLoading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <span className="ml-2 text-gray-600">Loading data...</span>
+            <span className="ml-2 text-gray-600">Loading data from database...</span>
           </div>
         )}
 
-        {!isLoading && (
+        {!isLoading && hasErrors && (
           <div className="space-y-8">
-            {/* Info Banner */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-800 text-sm">
-                <strong>Note:</strong> This UI is currently displaying sample data. Connect your backend API with a database to see real data.
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-800 text-sm">
+                <strong>Error:</strong> Unable to connect to the database. Please ensure the database is running and properly configured.
+              </p>
+              {userError && (
+                <p className="text-red-700 text-xs mt-2">User service: {String(userError)}</p>
+              )}
+              {categoriesError && (
+                <p className="text-red-700 text-xs mt-2">Category service: {String(categoriesError)}</p>
+              )}
+              {expensesError && (
+                <p className="text-red-700 text-xs mt-2">Expense service: {String(expensesError)}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!isLoading && !hasErrors && (
+          <div className="space-y-8">
+            {/* Success Banner */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-green-800 text-sm">
+                <strong>Connected:</strong> Successfully connected to the database. Displaying live data.
               </p>
             </div>
 
@@ -164,7 +108,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-gray-500 italic">No user data found for ID {mockUserId}</p>
+                  <p className="text-gray-500 italic">No user data found for ID {userId}</p>
                 )}
               </div>
             </section>
