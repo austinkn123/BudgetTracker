@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { expenseService } from '../services/api.service';
+import { expenseService } from '../services/expense.service';
 import type { Expense } from '../types/api';
 
 export function useExpenses(userId: number) {
