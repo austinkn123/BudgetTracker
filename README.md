@@ -5,9 +5,9 @@ A full-stack budget tracking application built with React, TypeScript, .NET Core
 ## 📋 Documentation
 
 ### Product Requirements
-- **[AWS Cognito Authentication - Executive Summary](./AWS-COGNITO-EXECUTIVE-SUMMARY.md)** - Business overview and high-level feature summary for AWS Cognito authentication with Gmail sign-in
-- **[AWS Cognito Authentication - Requirements](./REQUIREMENTS-AWS-COGNITO-AUTH.md)** - Detailed user stories, acceptance criteria, and technical specifications
-- **[AWS Cognito Authentication - Implementation Guide](./IMPLEMENTATION-GUIDE-AWS-COGNITO.md)** - Step-by-step technical guide for developers
+- **[AWS Cognito Authentication - Executive Summary](./docs/AWS-COGNITO-EXECUTIVE-SUMMARY.md)** - Business overview and high-level feature summary for AWS Cognito authentication with Gmail sign-in
+- **[AWS Cognito Authentication - Requirements](./docs/REQUIREMENTS-AWS-COGNITO-AUTH.md)** - Detailed user stories, acceptance criteria, and technical specifications
+- **[AWS Cognito Authentication - Implementation Guide](./docs/IMPLEMENTATION-GUIDE-AWS-COGNITO.md)** - Step-by-step technical guide for developers
 
 ### Technical Documentation
 - **[Developer Instructions](./.instructions.md)** - Senior developer role definition and tech stack details

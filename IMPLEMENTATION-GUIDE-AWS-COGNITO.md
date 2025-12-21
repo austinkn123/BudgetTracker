@@ -8,7 +8,7 @@
 
 This guide provides a high-level implementation roadmap for adding AWS Cognito authentication with Google/Gmail sign-in to the BudgetTracker application.
 
-For complete requirements, see [REQUIREMENTS-AWS-COGNITO-AUTH.md](./REQUIREMENTS-AWS-COGNITO-AUTH.md)
+For complete requirements, see [REQUIREMENTS-AWS-COGNITO-AUTH.md](./docs/REQUIREMENTS-AWS-COGNITO-AUTH.md)
 
 ---
 

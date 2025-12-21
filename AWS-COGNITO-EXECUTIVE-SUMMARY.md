@@ -218,10 +218,10 @@ We'll measure success by:
 ## Documentation
 
 ### For Developers
-📘 **[Implementation Guide](./IMPLEMENTATION-GUIDE-AWS-COGNITO.md)** - Step-by-step technical instructions
+📘 **[Implementation Guide](./docs/IMPLEMENTATION-GUIDE-AWS-COGNITO.md)** - Step-by-step technical instructions
 
 ### For Product Team
-📋 **[Requirements Document](./REQUIREMENTS-AWS-COGNITO-AUTH.md)** - Detailed user stories and acceptance criteria
+📋 **[Requirements Document](./docs/REQUIREMENTS-AWS-COGNITO-AUTH.md)** - Detailed user stories and acceptance criteria
 
 ### For Stakeholders
 📊 **This Document** - Executive summary and business overview
