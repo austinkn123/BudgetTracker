@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { Database, DollarSign, FolderOpen, Loader2, User as UserIcon } from 'lucide-react';
 import { useUser, useCategories, useExpenses } from '../lib/hooks';
 
+
 export default function Dashboard() {
   // User ID for now - in production, this would come from authentication
   const userId = 1;
