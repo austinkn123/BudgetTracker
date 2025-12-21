@@ -72,13 +72,6 @@ export default function Dashboard() {
 
         {!isLoading && !hasErrors && (
           <div className="space-y-8">
-            {/* Success Banner */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-green-800 text-sm">
-                <strong>Connected:</strong> Successfully connected to the database. Displaying live data.
-              </p>
-            </div>
-
             {/* User Section */}
             <section className="bg-white rounded-lg shadow">
               <div className="px-6 py-4 border-b border-gray-200">
