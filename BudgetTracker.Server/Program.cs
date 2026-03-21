@@ -1,18 +1,32 @@
-using BudgetTracker.Infrastructure.Data;
-using BudgetTracker.Infrastructure.Repositories;
+using BudgetTracker.Domain.Accessors;
+using BudgetTracker.Domain.Data;
+using BudgetTracker.Domain.Engines;
 using BudgetTracker.Server.Endpoints;
+using BudgetTracker.Server.Managers;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddSingleton<DapperContext>();
-// builder.Services.AddScoped<IExpenseRepository, ExpenseRepository>();
-// builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
-// builder.Services.AddScoped<IUserRepository, UserRepository>();
 
+// Accessors (data access)
 builder.Services.Scan(scan => scan
-    .FromAssemblies(typeof(ExpenseRepository).Assembly)
-        .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Repository")))
+    .FromAssemblies(typeof(ExpenseAccessor).Assembly)
+        .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Accessor")))
+        .AsImplementedInterfaces()
+        .WithScopedLifetime());
+
+// Engines (business logic)
+builder.Services.Scan(scan => scan
+    .FromAssemblies(typeof(ExpenseEngine).Assembly)
+        .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Engine")))
+        .AsImplementedInterfaces()
+        .WithScopedLifetime());
+
+// Managers (orchestration)
+builder.Services.Scan(scan => scan
+    .FromAssemblies(typeof(ExpenseManager).Assembly)
+        .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Manager")))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
 

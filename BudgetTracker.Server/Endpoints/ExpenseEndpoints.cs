@@ -1,48 +1,48 @@
-using BudgetTracker.Application.Interfaces;
-using BudgetTracker.Core.Models;
+using BudgetTracker.Domain.Interfaces.Managers;
+using BudgetTracker.Domain.Models;
 using Microsoft.AspNetCore.Mvc;
 
-namespace BudgetTracker.Server.Endpoints
+namespace BudgetTracker.Server.Endpoints;
+
+public static class ExpenseEndpoints
 {
-    public static class ExpenseEndpoints
+    public static IEndpointRouteBuilder MapExpenseEndpoints(this IEndpointRouteBuilder expenseGroup)
     {
-        public static IEndpointRouteBuilder MapExpenseEndpoints(this IEndpointRouteBuilder expenseGroup)
+        expenseGroup.MapGet("/{id}", async (int id, IExpenseManager manager) =>
         {
-            expenseGroup.MapGet("/{id}", async (int id, IExpenseRepository repo) =>
-            {
-                var expense = await repo.GetByIdAsync(id);
-                return expense is not null ? Results.Ok(expense) : Results.NotFound();
-            });
+            var result = await manager.GetByIdAsync(id);
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound();
+        });
 
-            expenseGroup.MapGet("/user/{userId}", async (int userId, IExpenseRepository repo) =>
-            {
-                var expenses = await repo.GetByUserIdAsync(userId);
-                return Results.Ok(expenses);
-            });
+        expenseGroup.MapGet("/user/{userId}", async (int userId, IExpenseManager manager) =>
+        {
+            var result = await manager.GetByUserIdAsync(userId);
+            return Results.Ok(result.Value);
+        });
 
-            expenseGroup.MapPost("/", async ([FromBody] Expense expense, IExpenseRepository repo) =>
-            {
-                var id = await repo.CreateAsync(expense);
-                return Results.Created($"/api/expenses/{id}", expense);
-            });
+        expenseGroup.MapPost("/", async ([FromBody] Expense expense, IExpenseManager manager) =>
+        {
+            var result = await manager.CreateAsync(expense);
+            return result.IsSuccess
+                ? Results.Created($"/api/expenses/{result.Value}", expense)
+                : Results.BadRequest(result.Error);
+        });
 
-            expenseGroup.MapPut("/{id}", async (int id, [FromBody] Expense expense, IExpenseRepository repo) =>
-            {
-                if (id != expense.Id)
-                {
-                    return Results.BadRequest("ID mismatch");
-                }
-                var updated = await repo.UpdateAsync(expense);
-                return updated ? Results.Ok(expense) : Results.NotFound();
-            });
+        expenseGroup.MapPut("/{id}", async (int id, [FromBody] Expense expense, IExpenseManager manager) =>
+        {
+            if (id != expense.Id)
+                return Results.BadRequest("ID mismatch");
 
-            expenseGroup.MapDelete("/{id}", async (int id, IExpenseRepository repo) =>
-            {
-                var deleted = await repo.DeleteAsync(id);
-                return deleted ? Results.NoContent() : Results.NotFound();
-            });
+            var result = await manager.UpdateAsync(expense);
+            return result.IsSuccess ? Results.Ok(expense) : Results.NotFound();
+        });
 
-            return expenseGroup;
-        }
+        expenseGroup.MapDelete("/{id}", async (int id, IExpenseManager manager) =>
+        {
+            var result = await manager.DeleteAsync(id);
+            return result.IsSuccess ? Results.NoContent() : Results.NotFound();
+        });
+
+        return expenseGroup;
     }
 }
