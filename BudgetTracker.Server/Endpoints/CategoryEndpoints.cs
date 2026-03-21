@@ -1,48 +1,48 @@
-using BudgetTracker.Application.Interfaces;
-using BudgetTracker.Core.Models;
+using BudgetTracker.Domain.Interfaces.Managers;
+using BudgetTracker.Domain.Models;
 using Microsoft.AspNetCore.Mvc;
 
-namespace BudgetTracker.Server.Endpoints
+namespace BudgetTracker.Server.Endpoints;
+
+public static class CategoryEndpoints
 {
-    public static class CategoryEndpoints
+    public static IEndpointRouteBuilder MapCategoryEndpoints(this IEndpointRouteBuilder categoryGroup)
     {
-        public static IEndpointRouteBuilder MapCategoryEndpoints(this IEndpointRouteBuilder categoryGroup)
+        categoryGroup.MapGet("/{id}", async (int id, ICategoryManager manager) =>
         {
-            categoryGroup.MapGet("/{id}", async (int id, ICategoryRepository repo) =>
-            {
-                var category = await repo.GetByIdAsync(id);
-                return category is not null ? Results.Ok(category) : Results.NotFound();
-            });
+            var result = await manager.GetByIdAsync(id);
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound();
+        });
 
-            categoryGroup.MapGet("/user/{userId}", async (int userId, ICategoryRepository repo) =>
-            {
-                var categories = await repo.GetByUserIdAsync(userId);
-                return Results.Ok(categories);
-            });
+        categoryGroup.MapGet("/user/{userId}", async (int userId, ICategoryManager manager) =>
+        {
+            var result = await manager.GetByUserIdAsync(userId);
+            return Results.Ok(result.Value);
+        });
 
-            categoryGroup.MapPost("/", async ([FromBody] Category category, ICategoryRepository repo) =>
-            {
-                var id = await repo.CreateAsync(category);
-                return Results.Created($"/api/categories/{id}", category);
-            });
+        categoryGroup.MapPost("/", async ([FromBody] Category category, ICategoryManager manager) =>
+        {
+            var result = await manager.CreateAsync(category);
+            return result.IsSuccess
+                ? Results.Created($"/api/categories/{result.Value}", category)
+                : Results.BadRequest(result.Error);
+        });
 
-            categoryGroup.MapPut("/{id}", async (int id, [FromBody] Category category, ICategoryRepository repo) =>
-            {
-                if (id != category.Id)
-                {
-                    return Results.BadRequest("ID mismatch");
-                }
-                var updated = await repo.UpdateAsync(category);
-                return updated ? Results.Ok(category) : Results.NotFound();
-            });
+        categoryGroup.MapPut("/{id}", async (int id, [FromBody] Category category, ICategoryManager manager) =>
+        {
+            if (id != category.Id)
+                return Results.BadRequest("ID mismatch");
 
-            categoryGroup.MapDelete("/{id}", async (int id, ICategoryRepository repo) =>
-            {
-                var deleted = await repo.DeleteAsync(id);
-                return deleted ? Results.NoContent() : Results.NotFound();
-            });
+            var result = await manager.UpdateAsync(category);
+            return result.IsSuccess ? Results.Ok(category) : Results.NotFound();
+        });
 
-            return categoryGroup;
-        }
+        categoryGroup.MapDelete("/{id}", async (int id, ICategoryManager manager) =>
+        {
+            var result = await manager.DeleteAsync(id);
+            return result.IsSuccess ? Results.NoContent() : Results.NotFound();
+        });
+
+        return categoryGroup;
     }
 }
