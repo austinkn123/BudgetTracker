@@ -7,8 +7,8 @@ export const expenseService = {
     return response.data;
   },
   
-  getByUserId: async (userId: number): Promise<Expense[]> => {
-    const response = await api.get<Expense[]>(`/expenses/user/${userId}`);
+  getCurrentUserExpenses: async (): Promise<Expense[]> => {
+    const response = await api.get<Expense[]>('/expenses');
     return response.data;
   },
   

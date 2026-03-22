@@ -7,8 +7,8 @@ export const categoryService = {
     return response.data;
   },
   
-  getByUserId: async (userId: number): Promise<Category[]> => {
-    const response = await api.get<Category[]>(`/categories/user/${userId}`);
+  getCurrentUserCategories: async (): Promise<Category[]> => {
+    const response = await api.get<Category[]>('/categories');
     return response.data;
   },
   

@@ -1,6 +1,5 @@
 export interface User {
   id: number;
-  cognitoUserId: string;
   email: string;
   createdAt: string;
 }

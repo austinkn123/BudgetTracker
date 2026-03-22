@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { categoryService } from '../services/category.service';
 import type { Category } from '../types/api';
 
-export const useCategories = (userId: number) => {
+export const useCategories = () => {
   return useQuery<Category[], Error>({
-    queryKey: ['categories', userId],
-    queryFn: () => categoryService.getByUserId(userId),
+    queryKey: ['categories'],
+    queryFn: () => categoryService.getCurrentUserCategories(),
     retry: 1,
   });
 };

@@ -6,13 +6,10 @@ import { useExpenses } from '../lib/useExpenses';
 
 
 export default function Dashboard() {
-  // User ID for now - in production, this would come from authentication
-  const userId = 1;
-
   // Fetch all data using custom hooks
-  const { data: user, isLoading: loadingUser, error: userError } = useUser(userId);
-  const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories(userId);
-  const { data: expenses = [], isLoading: loadingExpenses, error: expensesError } = useExpenses(userId);
+  const { data: user, isLoading: loadingUser, error: userError } = useUser();
+  const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories();
+  const { data: expenses = [], isLoading: loadingExpenses, error: expensesError } = useExpenses();
 
   const isLoading = loadingCategories || loadingExpenses || loadingUser;
   const hasErrors = categoriesError || expensesError || userError;
@@ -80,16 +77,12 @@ export default function Dashboard() {
                       <p className="mt-1 text-gray-900">{user.email}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Cognito User ID:</span>
-                      <p className="mt-1 text-gray-900">{user.cognitoUserId}</p>
-                    </div>
-                    <div>
                       <span className="text-sm font-medium text-gray-500">Created At:</span>
                       <p className="mt-1 text-gray-900">{format(new Date(user.createdAt), 'PPP')}</p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-gray-500 italic">No user data found for ID {userId}</p>
+                  <p className="text-gray-500 italic">No user data found</p>
                 )}
               </div>
             </section>

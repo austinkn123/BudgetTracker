@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { expenseService } from '../services/expense.service';
 import type { Expense } from '../types/api';
 
-export const useExpenses = (userId: number) => {
+export const useExpenses = () => {
   return useQuery<Expense[], Error>({
-    queryKey: ['expenses', userId],
-    queryFn: () => expenseService.getByUserId(userId),
+    queryKey: ['expenses'],
+    queryFn: () => expenseService.getCurrentUserExpenses(),
     retry: 1,
   });
 };
