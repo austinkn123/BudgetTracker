@@ -9,7 +9,6 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Users' AND xtype='U')
 BEGIN
     CREATE TABLE Users (
         Id INT PRIMARY KEY IDENTITY(1,1),
-        CognitoUserId NVARCHAR(255) NOT NULL,
         Email NVARCHAR(255) NOT NULL,
         CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
     );
@@ -54,8 +53,8 @@ GO
 IF NOT EXISTS (SELECT * FROM Users WHERE Id = 1)
 BEGIN
     SET IDENTITY_INSERT Users ON;
-    INSERT INTO Users (Id, CognitoUserId, Email, CreatedAt) 
-    VALUES (1, 'test-cognito-123', 'test@budgettracker.com', GETDATE());
+    INSERT INTO Users (Id, Email, CreatedAt) 
+    VALUES (1, 'me@budgettracker.com', GETDATE());
     SET IDENTITY_INSERT Users OFF;
     PRINT 'Sample user inserted';
 END

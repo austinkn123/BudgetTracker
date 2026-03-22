@@ -16,14 +16,6 @@ public class UserManager(IUserEngine engine, IUserAccessor accessor) : IUserMana
             : Result<User>.Failure("User not found");
     }
 
-    public async Task<Result<User>> GetByCognitoIdAsync(string cognitoId)
-    {
-        var user = await accessor.GetByCognitoIdAsync(cognitoId);
-        return user is not null
-            ? Result<User>.Success(user)
-            : Result<User>.Failure("User not found");
-    }
-
     public async Task<Result<int>> CreateAsync(User user)
     {
         var error = engine.ValidateUser(user);

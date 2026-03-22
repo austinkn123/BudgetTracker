@@ -1,4 +1,5 @@
 using BudgetTracker.Domain.Interfaces.Managers;
+using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Domain.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,31 +9,33 @@ public static class CategoryEndpoints
 {
     public static IEndpointRouteBuilder MapCategoryEndpoints(this IEndpointRouteBuilder categoryGroup)
     {
+        categoryGroup.MapGet("/", async (ICategoryManager manager, ICurrentUserProvider currentUser) =>
+        {
+            var result = await manager.GetByUserIdAsync(currentUser.UserId);
+            return Results.Ok(result.Value);
+        });
+
         categoryGroup.MapGet("/{id}", async (int id, ICategoryManager manager) =>
         {
             var result = await manager.GetByIdAsync(id);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound();
         });
 
-        categoryGroup.MapGet("/user/{userId}", async (int userId, ICategoryManager manager) =>
+        categoryGroup.MapPost("/", async ([FromBody] Category category, ICategoryManager manager, ICurrentUserProvider currentUser) =>
         {
-            var result = await manager.GetByUserIdAsync(userId);
-            return Results.Ok(result.Value);
-        });
-
-        categoryGroup.MapPost("/", async ([FromBody] Category category, ICategoryManager manager) =>
-        {
+            category.UserId = currentUser.UserId;
             var result = await manager.CreateAsync(category);
             return result.IsSuccess
                 ? Results.Created($"/api/categories/{result.Value}", category)
                 : Results.BadRequest(result.Error);
         });
 
-        categoryGroup.MapPut("/{id}", async (int id, [FromBody] Category category, ICategoryManager manager) =>
+        categoryGroup.MapPut("/{id}", async (int id, [FromBody] Category category, ICategoryManager manager, ICurrentUserProvider currentUser) =>
         {
             if (id != category.Id)
                 return Results.BadRequest("ID mismatch");
 
+            category.UserId = currentUser.UserId;
             var result = await manager.UpdateAsync(category);
             return result.IsSuccess ? Results.Ok(category) : Results.NotFound();
         });

@@ -9,7 +9,7 @@ public class UserAccessor(DapperContext context) : IUserAccessor
 {
     public async Task<int> CreateAsync(User user)
     {
-        var sql = "INSERT INTO Users (CognitoUserId, Email) VALUES (@CognitoUserId, @Email); SELECT CAST(SCOPE_IDENTITY() as int)";
+        var sql = "INSERT INTO Users (Email) VALUES (@Email); SELECT CAST(SCOPE_IDENTITY() as int)";
         using var connection = context.CreateConnection();
         return await connection.QuerySingleAsync<int>(sql, user);
     }
@@ -20,13 +20,6 @@ public class UserAccessor(DapperContext context) : IUserAccessor
         using var connection = context.CreateConnection();
         var affectedRows = await connection.ExecuteAsync(sql, new { Id = id });
         return affectedRows > 0;
-    }
-
-    public async Task<User> GetByCognitoIdAsync(string cognitoId)
-    {
-        var sql = "SELECT * FROM Users WHERE CognitoUserId = @CognitoId";
-        using var connection = context.CreateConnection();
-        return await connection.QuerySingleOrDefaultAsync<User>(sql, new { CognitoId = cognitoId });
     }
 
     public async Task<User> GetByIdAsync(int id)
