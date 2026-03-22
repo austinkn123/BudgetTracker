@@ -1,200 +1,139 @@
 # BudgetTracker
 
-A modern, full-stack budget tracking application built with Clean Architecture principles.
+BudgetTracker is a full-stack personal finance application with a React frontend and an ASP.NET Core backend. The backend has been consolidated into a simpler 2-project structure built around a clear separation of responsibilities for API orchestration, business rules, and data access.
 
-## 🏗️ Architecture
+## Overview
 
-This project follows Clean Architecture with a clear separation of concerns across multiple layers:
+- Frontend: React + TypeScript + Vite
+- Backend: ASP.NET Core Minimal APIs on .NET 9
+- Database: SQL Server
+- Data access: Dapper
+- Backend structure: BudgetTracker.Domain + BudgetTracker.Server
 
-- **Frontend**: React 19 + TypeScript + Vite
-- **Backend**: ASP.NET Core 9.0 (Minimal APIs)
-- **Database**: SQL Server with Dapper ORM
-- **Authentication**: AWS Cognito (planned)
+## Current Architecture
 
-### 📚 Documentation
+The backend is organized into two projects:
 
-- **[Architecture Documentation](ARCHITECTURE.md)** - Comprehensive architecture guide, tech stack analysis, and improvement recommendations
-- **[Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md)** - Visual diagrams showing system architecture, data flow, and component interactions
+- `BudgetTracker.Domain`
+  - Models
+  - Interfaces
+  - Engines for business rules
+  - Accessors for Dapper-based data access
+  - Shared types such as `Result<T>`
+- `BudgetTracker.Server`
+  - ASP.NET Core host
+  - Minimal API endpoint mappings
+  - Managers for orchestration
+  - App-level utilities
 
-### 🎯 Quick Start
+Request flow follows a consistent path:
 
-#### Prerequisites
-- .NET 9.0 SDK
+`Endpoints -> Managers -> Engines + Accessors`
+
+This keeps business rules out of the HTTP layer and keeps data access out of the engine layer.
+
+## Repository Layout
+
+```text
+BudgetTracker/
+|-- budgettracker.client/      React SPA
+|-- BudgetTracker.Domain/      Domain models, interfaces, engines, accessors
+|-- BudgetTracker.Server/      API host, endpoints, managers, utilities
+|-- DatabaseSetup.sql          Database bootstrap script
+`-- BudgetTracker.sln          Solution file
+```
+
+## Getting Started
+
+### Prerequisites
+
+- .NET 9 SDK
 - Node.js 18+
-- SQL Server (LocalDB or full instance)
+- SQL Server
 
-#### Running Locally
+### 1. Configure the database
 
-**Backend:**
+Update the connection string in `BudgetTracker.Server/appsettings.Development.json` for your local SQL Server instance.
+
+Then run `DatabaseSetup.sql` against that database to create the schema and seed data.
+
+### 2. Run the backend
+
 ```bash
 cd BudgetTracker.Server
 dotnet restore
 dotnet run
 ```
 
-**Frontend:**
+By default, the API is available from the ASP.NET Core development URL configured for the server project. OpenAPI is exposed in development.
+
+### 3. Run the frontend
+
 ```bash
 cd budgettracker.client
 npm install
 npm run dev
 ```
 
-The application will be available at:
-- Frontend: `https://localhost:53608`
-- Backend API: `https://localhost:7134`
-- OpenAPI: `https://localhost:7134/openapi/v1.json` (in development mode)
+Vite will start the client development server and proxy API calls according to the client configuration.
 
-### 🏛️ Project Structure
+## API Surface
 
-```
-BudgetTracker/
-├── budgettracker.client/          # React SPA (TypeScript + Vite)
-├── BudgetTracker.Core/            # Domain models (no dependencies)
-├── BudgetTracker.Application/     # Repository interfaces
-├── BudgetTracker.Infrastructure/  # Data access with Dapper
-└── BudgetTracker.Server/          # ASP.NET Core Minimal APIs
-```
+The API is organized under `/api` with resource groups for:
 
-### 🔄 Clean Architecture Layers
+- `/api/expenses`
+- `/api/categories`
+- `/api/users`
 
-```
-┌─────────────────────────────────────┐
-│  Presentation (Server + Client)    │
-├─────────────────────────────────────┤
-│  Application (Interfaces)          │
-├─────────────────────────────────────┤
-│  Domain (Core Models)              │
-├─────────────────────────────────────┤
-│  Infrastructure (Data Access)      │
-└─────────────────────────────────────┘
-        Dependencies flow inward →
-```
+Endpoint mappings live in `BudgetTracker.Server/Endpoints/`.
 
-### 📡 API Endpoints
+## Technology Stack
 
-All endpoints are prefixed with `/api`:
+### Frontend
 
-**Expenses:**
-- `GET /api/expenses/{id}` - Get expense by ID
-- `GET /api/expenses/user/{userId}` - Get all expenses for a user
-- `POST /api/expenses` - Create new expense
-- `PUT /api/expenses/{id}` - Update expense
-- `DELETE /api/expenses/{id}` - Delete expense
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- Material UI
 
-**Categories:**
-- `GET /api/categories/{id}` - Get category by ID
-- `GET /api/categories/user/{userId}` - Get all categories for a user
-- `POST /api/categories` - Create new category
-- `PUT /api/categories/{id}` - Update category
-- `DELETE /api/categories/{id}` - Delete category
+### Backend
 
-**Users:**
-- `GET /api/users/{id}` - Get user by ID
-- `GET /api/users/cognito/{cognitoId}` - Get user by Cognito ID
-- `POST /api/users` - Create new user
-- `PUT /api/users/{id}` - Update user
-- `DELETE /api/users/{id}` - Delete user
+- ASP.NET Core Minimal APIs
+- .NET 9
+- Dapper
+- SQL Server
+- Scrutor for DI registration
 
-### 🛠️ Technology Stack
+## Status
 
-#### Frontend
-- **React 19.1.1** - UI framework
-- **TypeScript 5.9** - Type safety
-- **Vite 5.4** - Build tool and dev server
-- **TanStack Query 5.90** - Server state management
-- **Material UI 7.3** - Component library
-- **Tailwind CSS 3.4** - Utility-first CSS
-- **Axios 1.13** - HTTP client
-- **React Router 7.10** - Client-side routing
+The repository has already gone through a major backend simplification:
 
-#### Backend
-- **ASP.NET Core 9.0** - Web framework
-- **C# .NET 9.0** - Programming language
-- **Dapper 2.1** - Micro-ORM
-- **Microsoft SQL Server** - Database
-- **Scrutor 6.1** - Assembly scanning for DI
-- **OpenAPI/Swagger** - API documentation
+- The old multi-project backend split was consolidated into `BudgetTracker.Domain` and `BudgetTracker.Server`
+- Domain concerns are now separated into managers, engines, accessors, and utilities
+- The root README is now aligned to the current repository layout instead of the removed `Core`, `Application`, and `Infrastructure` projects
 
-### ⚠️ Current Status
+Authentication is not documented as active in the current setup. Treat the app as a development-focused local environment unless and until auth is wired back in.
 
-This application has a **solid architectural foundation** but requires several improvements for production readiness:
+## Development Notes
 
-**✅ Implemented:**
-- Clean Architecture structure
-- Repository pattern
-- Modern React with TypeScript
-- Minimal APIs with proper routing
-- Development environment with SPA proxy
+- Use raw SQL through Dapper for persistence work
+- Keep managers orchestration-only
+- Keep engines free of data access concerns
+- Keep accessors focused on database interaction
 
-**⚠️ To Be Implemented (High Priority):**
-- Authentication & Authorization (AWS Cognito)
-- Input validation
-- Error handling middleware
-- Structured logging
-- CORS configuration
-- Health checks
-- Unit tests
+## Related Files
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed recommendations.
+- `BudgetTracker.Server/Program.cs`
+- `BudgetTracker.Server/Endpoints/`
+- `BudgetTracker.Domain/Interfaces/`
+- `DatabaseSetup.sql`
+- `budgettracker.client/README.md`
 
-### 🚀 Deployment
+## Contributing
 
-The application can be deployed to:
-- **Azure**: Static Web Apps (frontend) + App Service (backend) + Azure SQL
-- **AWS**: S3 + CloudFront (frontend) + ECS Fargate (backend) + RDS SQL Server
-- **Containers**: Docker + Kubernetes
+When updating the backend:
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed deployment architectures.
-
-### 🔒 Security Notes
-
-**⚠️ WARNING**: The current implementation is **NOT production-ready** from a security perspective:
-- No authentication/authorization implemented
-- APIs are open without protection
-- Connection strings in plain text
-- No rate limiting
-- No CORS policy
-
-**Do not deploy to production** without implementing security measures outlined in the [Architecture Documentation](ARCHITECTURE.md).
-
-### 📊 Database Schema
-
-```
-Users
-  ├── Id (PK)
-  ├── CognitoUserId
-  ├── Email
-  └── CreatedAt
-
-Categories
-  ├── Id (PK)
-  ├── UserId (FK → Users)
-  └── Name
-
-Expenses
-  ├── Id (PK)
-  ├── UserId (FK → Users)
-  ├── CategoryId (FK → Categories)
-  ├── Amount
-  ├── Date
-  ├── Merchant
-  ├── Notes
-  └── CreatedAt
-```
-
-### 🤝 Contributing
-
-1. Review the [Architecture Documentation](ARCHITECTURE.md)
-2. Follow the Clean Architecture principles
-3. Maintain the existing project structure
-4. Add unit tests for new features
-5. Update documentation as needed
-
-### 📝 License
-
-[Add your license here]
-
----
-
-**For detailed architecture information, design decisions, and improvement recommendations, see [ARCHITECTURE.md](ARCHITECTURE.md)**
->>>>>>> main
+- Preserve the `Endpoints -> Managers -> Engines + Accessors` flow
+- Add new contracts in the domain project first
+- Keep documentation in sync with structural changes
