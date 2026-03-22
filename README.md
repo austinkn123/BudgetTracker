@@ -1,6 +1,6 @@
 # BudgetTracker
 
-BudgetTracker is a full-stack personal finance application with a React frontend and an ASP.NET Core backend. The backend has been consolidated into a simpler 2-project structure built around a clear separation of responsibilities for API orchestration, business rules, and data access.
+BudgetTracker is a full-stack personal finance application with a React frontend and an ASP.NET Core backend.
 
 ## Overview
 
