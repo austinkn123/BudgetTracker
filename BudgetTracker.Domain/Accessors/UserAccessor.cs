@@ -1,39 +1,38 @@
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Models;
-using Dapper;
+using Microsoft.EntityFrameworkCore;
 
 namespace BudgetTracker.Domain.Accessors;
 
-public class UserAccessor(DapperContext context) : IUserAccessor
+public class UserAccessor(BudgetTrackerDbContext context) : IUserAccessor
 {
     public async Task<int> CreateAsync(User user)
     {
-        var sql = "INSERT INTO Users (Email) VALUES (@Email); SELECT CAST(SCOPE_IDENTITY() as int)";
-        using var connection = context.CreateConnection();
-        return await connection.QuerySingleAsync<int>(sql, user);
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+        return user.Id;
     }
 
     public async Task<bool> DeleteAsync(int id)
     {
-        var sql = "DELETE FROM Users WHERE Id = @Id";
-        using var connection = context.CreateConnection();
-        var affectedRows = await connection.ExecuteAsync(sql, new { Id = id });
-        return affectedRows > 0;
+        var user = await context.Users.FindAsync(id);
+        if (user is null) return false;
+
+        context.Users.Remove(user);
+        return await context.SaveChangesAsync() > 0;
     }
 
     public async Task<User> GetByIdAsync(int id)
     {
-        var sql = "SELECT * FROM Users WHERE Id = @Id";
-        using var connection = context.CreateConnection();
-        return await connection.QuerySingleOrDefaultAsync<User>(sql, new { Id = id });
+        return await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == id);
     }
 
     public async Task<bool> UpdateAsync(User user)
     {
-        var sql = "UPDATE Users SET Email = @Email WHERE Id = @Id";
-        using var connection = context.CreateConnection();
-        var affectedRows = await connection.ExecuteAsync(sql, user);
-        return affectedRows > 0;
+        context.Users.Update(user);
+        return await context.SaveChangesAsync() > 0;
     }
 }

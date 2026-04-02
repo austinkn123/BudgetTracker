@@ -7,7 +7,7 @@ BudgetTracker is a full-stack personal finance application with a React frontend
 - Frontend: React + TypeScript + Vite
 - Backend: ASP.NET Core Minimal APIs on .NET 9
 - Database: SQL Server
-- Data access: Dapper
+- Data access: Entity Framework Core
 - Backend structure: BudgetTracker.Domain + BudgetTracker.Server
 
 ## Current Architecture
@@ -18,7 +18,9 @@ The backend is organized into two projects:
   - Models
   - Interfaces
   - Engines for business rules
-  - Accessors for Dapper-based data access
+  - Accessors for EF Core-based data access
+  - `BudgetTrackerDbContext` and Fluent API entity configurations
+  - EF migrations
   - Shared types such as `Result<T>`
 - `BudgetTracker.Server`
   - ASP.NET Core host
@@ -101,7 +103,7 @@ Endpoint mappings live in `BudgetTracker.Server/Endpoints/`.
 
 - ASP.NET Core Minimal APIs
 - .NET 9
-- Dapper
+- Entity Framework Core
 - SQL Server
 - Scrutor for DI registration
 
@@ -117,7 +119,9 @@ Authentication is not documented as active in the current setup. Treat the app a
 
 ## Development Notes
 
-- Use raw SQL through Dapper for persistence work
+- Use Entity Framework Core with LINQ for persistence work
+- Use `AsNoTracking()` for read-only queries
+- Manage schema changes through EF migrations (`dotnet ef migrations add`)
 - Keep managers orchestration-only
 - Keep engines free of data access concerns
 - Keep accessors focused on database interaction

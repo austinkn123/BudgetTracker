@@ -5,11 +5,13 @@ using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Server.Endpoints;
 using BudgetTracker.Server.Managers;
 using BudgetTracker.Server.Utilities;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddSingleton<DapperContext>();
+builder.Services.AddDbContext<BudgetTrackerDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("BudgetTrackerConnection")));
 
 // Current user provider (swap for CognitoCurrentUserProvider when auth is added)
 builder.Services.AddScoped<ICurrentUserProvider, HardcodedCurrentUserProvider>();
