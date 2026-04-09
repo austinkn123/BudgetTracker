@@ -8,15 +8,18 @@ export interface Category {
   id: number;
   userId: number;
   name: string;
+  categoryType: string;
 }
 
-export interface Expense {
+export interface Transaction {
   id: number;
-  userId: number;
+  accountId: number;
+  transactionType: string;
   categoryId: number;
   amount: number;
-  date: string;
-  merchant?: string;
+  occurredAt: string;
+  payee?: string;
+  transferAccountId?: number;
   notes?: string;
   createdAt: string;
 }

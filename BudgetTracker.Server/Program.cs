@@ -18,21 +18,21 @@ builder.Services.AddScoped<ICurrentUserProvider, HardcodedCurrentUserProvider>()
 
 // Accessors (data access)
 builder.Services.Scan(scan => scan
-    .FromAssemblies(typeof(ExpenseAccessor).Assembly)
+    .FromAssemblies(typeof(TransactionAccessor).Assembly)
         .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Accessor")))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
 
 // Engines (business logic)
 builder.Services.Scan(scan => scan
-    .FromAssemblies(typeof(ExpenseEngine).Assembly)
+    .FromAssemblies(typeof(TransactionEngine).Assembly)
         .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Engine")))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
 
 // Managers (orchestration)
 builder.Services.Scan(scan => scan
-    .FromAssemblies(typeof(ExpenseManager).Assembly)
+    .FromAssemblies(typeof(TransactionManager).Assembly)
         .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Manager")))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
@@ -63,10 +63,10 @@ var apiGroup = app.MapGroup("/api")
     // .RequireAuthorization(); // Uncomment to require authentication for all API endpoints
     // .AddEndpointFilter<LoggingFilter>(); // Add custom filters
 
-// Expense endpoints group
-var expenseGroup = apiGroup.MapGroup("/expenses")
-    .WithTags("Expenses");
-expenseGroup.MapExpenseEndpoints();
+// Transaction endpoints group
+var transactionGroup = apiGroup.MapGroup("/transactions")
+    .WithTags("Transactions");
+transactionGroup.MapTransactionEndpoints();
 
 // Category endpoints group
 var categoryGroup = apiGroup.MapGroup("/categories")

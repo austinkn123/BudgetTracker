@@ -2,17 +2,17 @@ import { format } from 'date-fns';
 import { Database, DollarSign, FolderOpen, Loader2, User as UserIcon } from 'lucide-react';
 import { useUser } from '../lib/useUser';
 import { useCategories } from '../lib/useCategories';
-import { useExpenses } from '../lib/useExpenses';
+import { useTransactions } from '../lib/useTransactions';
 
 
 export default function Dashboard() {
   // Fetch all data using custom hooks
   const { data: user, isLoading: loadingUser, error: userError } = useUser();
   const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories();
-  const { data: expenses = [], isLoading: loadingExpenses, error: expensesError } = useExpenses();
+  const { data: transactions = [], isLoading: loadingTransactions, error: transactionsError } = useTransactions();
 
-  const isLoading = loadingCategories || loadingExpenses || loadingUser;
-  const hasErrors = categoriesError || expensesError || userError;
+  const isLoading = loadingCategories || loadingTransactions || loadingUser;
+  const hasErrors = categoriesError || transactionsError || userError;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -48,8 +48,8 @@ export default function Dashboard() {
               {categoriesError && (
                 <p className="text-red-700 text-xs mt-2">Category service: {String(categoriesError)}</p>
               )}
-              {expensesError && (
-                <p className="text-red-700 text-xs mt-2">Expense service: {String(expensesError)}</p>
+              {transactionsError && (
+                <p className="text-red-700 text-xs mt-2">Transaction service: {String(transactionsError)}</p>
               )}
             </div>
           </div>
@@ -142,16 +142,16 @@ export default function Dashboard() {
               </div>
             </section>
 
-            {/* Expenses Section */}
+            {/* Transactions Section */}
             <section className="bg-white rounded-lg shadow">
               <div className="px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-5 h-5 text-purple-600" />
-                    <h2 className="text-xl font-semibold text-gray-900">Expenses</h2>
+                    <h2 className="text-xl font-semibold text-gray-900">Transactions</h2>
                   </div>
                   <span className="text-sm text-gray-500">
-                    {expenses?.length || 0} {expenses?.length === 1 ? 'expense' : 'expenses'}
+                    {transactions?.length || 0} {transactions?.length === 1 ? 'transaction' : 'transactions'}
                   </span>
                 </div>
               </div>
@@ -163,13 +163,19 @@ export default function Dashboard() {
                         ID
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Amount
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Merchant
+                        Payee
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Account ID
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Category ID
@@ -180,33 +186,39 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {expenses && expenses.length > 0 ? (
-                      expenses.map((expense) => (
-                        <tr key={expense.id} className="hover:bg-gray-50">
+                    {transactions && transactions.length > 0 ? (
+                      transactions.map((transaction) => (
+                        <tr key={transaction.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {expense.id}
+                            {transaction.id}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {transaction.transactionType}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                            ${expense.amount.toFixed(2)}
+                            ${transaction.amount.toFixed(2)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {format(new Date(expense.date), 'PP')}
+                            {format(new Date(transaction.occurredAt), 'PP')}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {expense.merchant || '-'}
+                            {transaction.payee || '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {expense.categoryId}
+                            {transaction.accountId}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {transaction.categoryId ?? '-'}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                            {expense.notes || '-'}
+                            {transaction.notes || '-'}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 italic">
-                          No expenses found
+                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500 italic">
+                          No transactions found
                         </td>
                       </tr>
                     )}

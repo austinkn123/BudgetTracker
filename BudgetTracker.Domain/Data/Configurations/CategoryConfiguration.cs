@@ -28,11 +28,6 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .IsUnique()
             .HasDatabaseName("UQ_Categories_User_Name");
 
-        builder.HasMany(c => c.Expenses)
-            .WithOne(e => e.Category)
-            .HasForeignKey(e => e.CategoryId)
-            .OnDelete(DeleteBehavior.NoAction);
-
         builder.HasMany(c => c.Transactions)
             .WithOne(t => t.Category)
             .HasForeignKey(t => t.CategoryId)

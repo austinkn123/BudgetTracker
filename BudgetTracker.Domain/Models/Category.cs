@@ -8,6 +8,5 @@ public class Category
     public string CategoryType { get; set; } = "Expense";
 
     public User User { get; set; } = null!;
-    public ICollection<Expense> Expenses { get; set; } = [];
     public ICollection<Transaction> Transactions { get; set; } = [];
 }

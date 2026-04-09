@@ -83,7 +83,7 @@ Vite will start the client development server and proxy API calls according to t
 
 The API is organized under `/api` with resource groups for:
 
-- `/api/expenses`
+- `/api/transactions`
 - `/api/categories`
 - `/api/users`
 

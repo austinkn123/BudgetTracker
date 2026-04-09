@@ -7,6 +7,5 @@ public class User
     public DateTime CreatedAt { get; set; }
 
     public ICollection<Category> Categories { get; set; } = [];
-    public ICollection<Expense> Expenses { get; set; } = [];
     public ICollection<Account> Accounts { get; set; } = [];
 }

@@ -85,23 +85,11 @@ BEGIN
 END
 GO
 
--- Compatibility table for the current application code.
--- The app still uses Expenses directly while the broader Transactions model is being introduced.
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Expenses' AND xtype='U')
+-- Drop legacy Expenses table if it exists.
+IF EXISTS (SELECT * FROM sysobjects WHERE name='Expenses' AND xtype='U')
 BEGIN
-    CREATE TABLE Expenses (
-        Id INT PRIMARY KEY IDENTITY(1,1),
-        UserId INT NOT NULL,
-        CategoryId INT NOT NULL,
-        Amount DECIMAL(18, 2) NOT NULL,
-        Date DATETIME2 NOT NULL,
-        Merchant NVARCHAR(255),
-        Notes NVARCHAR(1000),
-        CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
-        CONSTRAINT FK_Expenses_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE NO ACTION,
-        CONSTRAINT FK_Expenses_Categories FOREIGN KEY (CategoryId) REFERENCES Categories(Id) ON DELETE NO ACTION
-    );
-    PRINT 'Expenses table created successfully';
+    DROP TABLE Expenses;
+    PRINT 'Legacy Expenses table dropped';
 END
 GO
 
@@ -201,37 +189,6 @@ BEGIN
 END
 GO
 
--- Insert sample expenses for the current application tables
-IF NOT EXISTS (SELECT 1 FROM Expenses WHERE UserId = 1)
-BEGIN
-    DECLARE @LegacyGroceriesCategoryId INT;
-    DECLARE @LegacyTransportationCategoryId INT;
-    DECLARE @LegacyEntertainmentCategoryId INT;
-    DECLARE @LegacyUtilitiesCategoryId INT;
-    DECLARE @LegacyHealthcareCategoryId INT;
-
-    SELECT @LegacyGroceriesCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Groceries';
-    SELECT @LegacyTransportationCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Transportation';
-    SELECT @LegacyEntertainmentCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Entertainment';
-    SELECT @LegacyUtilitiesCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Utilities';
-    SELECT @LegacyHealthcareCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Healthcare';
-
-    INSERT INTO Expenses (UserId, CategoryId, Amount, Date, Merchant, Notes, CreatedAt) VALUES
-        (1, @LegacyGroceriesCategoryId, 85.42, '2024-12-01', 'Whole Foods', 'Weekly grocery shopping', '2024-12-01'),
-        (1, @LegacyTransportationCategoryId, 45.00, '2024-12-02', 'Uber', 'Ride to office', '2024-12-02'),
-        (1, @LegacyEntertainmentCategoryId, 15.99, '2024-12-03', 'Netflix', 'Monthly subscription', '2024-12-03'),
-        (1, @LegacyUtilitiesCategoryId, 120.50, '2024-12-04', 'Electric Company', 'November electricity bill', '2024-12-04'),
-        (1, @LegacyGroceriesCategoryId, 52.30, '2024-12-05', 'Trader Joe''s', 'Fresh produce', '2024-12-05'),
-        (1, @LegacyTransportationCategoryId, 30.00, '2024-12-06', 'Gas Station', 'Fill up the tank', '2024-12-06'),
-        (1, @LegacyEntertainmentCategoryId, 12.99, '2024-12-07', 'Spotify', 'Music streaming', '2024-12-07'),
-        (1, @LegacyHealthcareCategoryId, 75.00, '2024-12-08', 'Pharmacy', 'Prescription medication', '2024-12-08'),
-        (1, @LegacyGroceriesCategoryId, 95.23, '2024-12-09', 'Costco', 'Bulk shopping', '2024-12-09'),
-        (1, @LegacyUtilitiesCategoryId, 85.00, '2024-12-10', 'Water Company', 'Monthly water bill', '2024-12-10');
-
-    PRINT 'Sample expenses inserted';
-END
-GO
-
 PRINT 'Database setup completed successfully!';
 GO
 
@@ -241,8 +198,6 @@ UNION ALL
 SELECT 'Accounts', COUNT(*) FROM Accounts
 UNION ALL
 SELECT 'Categories', COUNT(*) FROM Categories
-UNION ALL
-SELECT 'Expenses', COUNT(*) FROM Expenses
 UNION ALL
 SELECT 'Transactions', COUNT(*) FROM Transactions;
 GO

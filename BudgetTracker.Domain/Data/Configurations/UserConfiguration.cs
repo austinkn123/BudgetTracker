@@ -24,11 +24,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey(c => c.UserId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        builder.HasMany(u => u.Expenses)
-            .WithOne(e => e.User)
-            .HasForeignKey(e => e.UserId)
-            .OnDelete(DeleteBehavior.NoAction);
-
         builder.HasMany(u => u.Accounts)
             .WithOne(a => a.User)
             .HasForeignKey(a => a.UserId)
