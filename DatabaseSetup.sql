@@ -93,8 +93,8 @@ BEGIN
 END
 GO
 
--- Insert sample data
--- Insert a test user
+-- Insert budget data
+-- Keep user Id 1 as the local seeded profile.
 IF NOT EXISTS (SELECT * FROM Users WHERE Id = 1)
 BEGIN
     SET IDENTITY_INSERT Users ON;
@@ -105,88 +105,93 @@ BEGIN
 END
 GO
 
--- Insert a default account for the test user
+-- Insert a default account for the seeded user
 IF NOT EXISTS (SELECT * FROM Accounts WHERE UserId = 1 AND Name = 'Checking')
 BEGIN
     INSERT INTO Accounts (UserId, Name, AccountType, CreatedAt)
     VALUES (1, 'Checking', 'Checking', GETDATE());
-    PRINT 'Sample account inserted';
+    PRINT 'Seed account inserted';
 END
 GO
 
--- Insert sample categories
-IF NOT EXISTS (SELECT * FROM Categories WHERE UserId = 1)
-BEGIN
-    INSERT INTO Categories (UserId, Name, CategoryType) VALUES 
-        (1, 'Groceries', 'Expense'),
-        (1, 'Transportation', 'Expense'),
-        (1, 'Entertainment', 'Expense'),
-        (1, 'Utilities', 'Expense'),
-        (1, 'Healthcare', 'Expense'),
-        (1, 'Salary', 'Income');
-    PRINT 'Sample categories inserted';
-END
+-- Reseed this profile on each run so data reflects this budget exactly.
+DELETE t
+FROM Transactions t
+INNER JOIN Accounts a ON a.Id = t.AccountId
+WHERE a.UserId = 1;
+
+DELETE FROM Categories
+WHERE UserId = 1;
 GO
 
--- Insert sample income transaction
-IF NOT EXISTS (
-    SELECT 1
-    FROM Transactions t
-    INNER JOIN Accounts a ON a.Id = t.AccountId
-    WHERE a.UserId = 1
-      AND t.TransactionType = 'Income'
-)
-BEGIN
-    DECLARE @IncomeCheckingAccountId INT;
-    DECLARE @SalaryCategoryId INT;
-
-    SELECT @IncomeCheckingAccountId = Id FROM Accounts WHERE UserId = 1 AND Name = 'Checking';
-    SELECT @SalaryCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Salary';
-
-    INSERT INTO Transactions (AccountId, CategoryId, TransactionType, Amount, OccurredAt, Payee, Notes, CreatedAt)
-    VALUES (@IncomeCheckingAccountId, @SalaryCategoryId, 'Income', 4200.00, '2024-12-01', 'Employer', 'Monthly paycheck', '2024-12-01');
-
-    PRINT 'Sample income transaction inserted';
-END
+-- Insert budget categories
+INSERT INTO Categories (UserId, Name, CategoryType) VALUES
+    (1, 'Net Income', 'Income'),
+    (1, 'Mortgage', 'Expense'),
+    (1, 'Bills / Utilities / pest control', 'Expense'),
+    (1, 'Car Insurance', 'Expense'),
+    (1, 'Food (Groceries + Eating Out)', 'Expense'),
+    (1, 'Gas + Tolls', 'Expense'),
+    (1, 'Miscellaneous (GitHub Copilot, Hims, Spotify)', 'Expense'),
+    (1, 'Car registration/inspection', 'Expense'),
+    (1, 'Home maintenance/repairs', 'Expense'),
+    (1, 'Health/dental co-pays', 'Expense'),
+    (1, 'Travel / Gifts / Holidays', 'Expense'),
+    (1, 'Gas/Tolls increase (visiting friends)', 'Expense'),
+    (1, 'Unexpected emergencies', 'Expense');
 GO
 
--- Insert sample expense transactions
-IF NOT EXISTS (
-    SELECT 1
-    FROM Transactions t
-    INNER JOIN Accounts a ON a.Id = t.AccountId
-    WHERE a.UserId = 1
-      AND t.TransactionType = 'Expense'
-)
-BEGIN
-    DECLARE @ExpenseCheckingAccountId INT;
-    DECLARE @GroceriesCategoryId INT;
-    DECLARE @TransportationCategoryId INT;
-    DECLARE @EntertainmentCategoryId INT;
-    DECLARE @UtilitiesCategoryId INT;
-    DECLARE @HealthcareCategoryId INT;
+DECLARE @CheckingAccountId INT;
+DECLARE @NetIncomeCategoryId INT;
+DECLARE @MortgageCategoryId INT;
+DECLARE @BillsCategoryId INT;
+DECLARE @CarInsuranceCategoryId INT;
+DECLARE @FoodCategoryId INT;
+DECLARE @GasTollsCategoryId INT;
+DECLARE @MiscCategoryId INT;
+DECLARE @RegInspectionCategoryId INT;
+DECLARE @MaintenanceCategoryId INT;
+DECLARE @CopaysCategoryId INT;
+DECLARE @TravelCategoryId INT;
+DECLARE @GasIncreaseCategoryId INT;
+DECLARE @EmergencyCategoryId INT;
 
-    SELECT @ExpenseCheckingAccountId = Id FROM Accounts WHERE UserId = 1 AND Name = 'Checking';
-    SELECT @GroceriesCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Groceries';
-    SELECT @TransportationCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Transportation';
-    SELECT @EntertainmentCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Entertainment';
-    SELECT @UtilitiesCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Utilities';
-    SELECT @HealthcareCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Healthcare';
+SELECT @CheckingAccountId = Id FROM Accounts WHERE UserId = 1 AND Name = 'Checking';
 
-    INSERT INTO Transactions (AccountId, CategoryId, TransactionType, Amount, OccurredAt, Payee, Notes, CreatedAt) VALUES 
-        (@ExpenseCheckingAccountId, @GroceriesCategoryId, 'Expense', 85.42, '2024-12-01', 'Whole Foods', 'Weekly grocery shopping', '2024-12-01'),
-        (@ExpenseCheckingAccountId, @TransportationCategoryId, 'Expense', 45.00, '2024-12-02', 'Uber', 'Ride to office', '2024-12-02'),
-        (@ExpenseCheckingAccountId, @EntertainmentCategoryId, 'Expense', 15.99, '2024-12-03', 'Netflix', 'Monthly subscription', '2024-12-03'),
-        (@ExpenseCheckingAccountId, @UtilitiesCategoryId, 'Expense', 120.50, '2024-12-04', 'Electric Company', 'November electricity bill', '2024-12-04'),
-        (@ExpenseCheckingAccountId, @GroceriesCategoryId, 'Expense', 52.30, '2024-12-05', 'Trader Joe''s', 'Fresh produce', '2024-12-05'),
-        (@ExpenseCheckingAccountId, @TransportationCategoryId, 'Expense', 30.00, '2024-12-06', 'Gas Station', 'Fill up the tank', '2024-12-06'),
-        (@ExpenseCheckingAccountId, @EntertainmentCategoryId, 'Expense', 12.99, '2024-12-07', 'Spotify', 'Music streaming', '2024-12-07'),
-        (@ExpenseCheckingAccountId, @HealthcareCategoryId, 'Expense', 75.00, '2024-12-08', 'Pharmacy', 'Prescription medication', '2024-12-08'),
-        (@ExpenseCheckingAccountId, @GroceriesCategoryId, 'Expense', 95.23, '2024-12-09', 'Costco', 'Bulk shopping', '2024-12-09'),
-        (@ExpenseCheckingAccountId, @UtilitiesCategoryId, 'Expense', 85.00, '2024-12-10', 'Water Company', 'Monthly water bill', '2024-12-10');
+SELECT @NetIncomeCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Net Income';
+SELECT @MortgageCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Mortgage';
+SELECT @BillsCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Bills / Utilities / pest control';
+SELECT @CarInsuranceCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Car Insurance';
+SELECT @FoodCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Food (Groceries + Eating Out)';
+SELECT @GasTollsCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Gas + Tolls';
+SELECT @MiscCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Miscellaneous (GitHub Copilot, Hims, Spotify)';
+SELECT @RegInspectionCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Car registration/inspection';
+SELECT @MaintenanceCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Home maintenance/repairs';
+SELECT @CopaysCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Health/dental co-pays';
+SELECT @TravelCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Travel / Gifts / Holidays';
+SELECT @GasIncreaseCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Gas/Tolls increase (visiting friends)';
+SELECT @EmergencyCategoryId = Id FROM Categories WHERE UserId = 1 AND Name = 'Unexpected emergencies';
 
-    PRINT 'Sample expense transactions inserted';
-END
+-- Insert income + monthly expenses + irregular expense buffer (monthly equivalent)
+INSERT INTO Transactions (AccountId, CategoryId, TransactionType, Amount, OccurredAt, Payee, Notes, CreatedAt) VALUES
+    (@CheckingAccountId, @NetIncomeCategoryId, 'Income', 5646.00, '2025-01-01', 'Net Income', 'Monthly net income', '2025-01-01'),
+
+    (@CheckingAccountId, @MortgageCategoryId, 'Expense', 3208.00, '2025-01-02', 'Mortgage', 'Monthly core expense', '2025-01-02'),
+    (@CheckingAccountId, @BillsCategoryId, 'Expense', 425.00, '2025-01-03', 'Utilities + Pest Control', 'Monthly core expense', '2025-01-03'),
+    (@CheckingAccountId, @CarInsuranceCategoryId, 'Expense', 391.00, '2025-01-04', 'Car Insurance', 'Monthly core expense', '2025-01-04'),
+    (@CheckingAccountId, @FoodCategoryId, 'Expense', 400.00, '2025-01-05', 'Food', 'Monthly core expense', '2025-01-05'),
+    (@CheckingAccountId, @GasTollsCategoryId, 'Expense', 50.00, '2025-01-06', 'Gas + Tolls', 'Monthly core expense', '2025-01-06'),
+    (@CheckingAccountId, @MiscCategoryId, 'Expense', 68.00, '2025-01-07', 'Subscriptions + Misc', 'Monthly core expense', '2025-01-07'),
+
+    (@CheckingAccountId, @RegInspectionCategoryId, 'Expense', 12.50, '2025-01-08', 'Car registration/inspection', 'Irregular expense monthly equivalent', '2025-01-08'),
+    (@CheckingAccountId, @MaintenanceCategoryId, 'Expense', 167.00, '2025-01-09', 'Home maintenance/repairs', 'Irregular expense monthly equivalent', '2025-01-09'),
+    (@CheckingAccountId, @CopaysCategoryId, 'Expense', 42.00, '2025-01-10', 'Health/dental co-pays', 'Irregular expense monthly equivalent', '2025-01-10'),
+    (@CheckingAccountId, @TravelCategoryId, 'Expense', 100.00, '2025-01-11', 'Travel / Gifts / Holidays', 'Irregular expense monthly equivalent', '2025-01-11'),
+    (@CheckingAccountId, @GasIncreaseCategoryId, 'Expense', 50.00, '2025-01-12', 'Gas/Tolls increase', 'Irregular expense monthly equivalent', '2025-01-12'),
+    (@CheckingAccountId, @EmergencyCategoryId, 'Expense', 42.00, '2025-01-13', 'Unexpected emergencies', 'Irregular expense monthly equivalent', '2025-01-13');
+GO
+
+PRINT 'Budget profile seed data inserted';
 GO
 
 PRINT 'Database setup completed successfully!';

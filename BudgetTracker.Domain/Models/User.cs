@@ -8,4 +8,5 @@ public class User
 
     public ICollection<Category> Categories { get; set; } = [];
     public ICollection<Account> Accounts { get; set; } = [];
+    public ICollection<BudgetPlan> BudgetPlans { get; set; } = [];
 }

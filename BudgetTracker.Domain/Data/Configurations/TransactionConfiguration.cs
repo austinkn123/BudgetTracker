@@ -39,6 +39,14 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.Property(t => t.CreatedAt)
             .HasDefaultValueSql("GETDATE()");
 
+        builder.HasIndex(t => new { t.AccountId, t.OccurredAt })
+            .HasDatabaseName("IX_Transactions_AccountId_OccurredAt")
+            .IncludeProperties(t => new { t.TransactionType, t.Amount, t.CategoryId });
+
+        builder.HasIndex(t => new { t.CategoryId, t.OccurredAt })
+            .HasDatabaseName("IX_Transactions_CategoryId_OccurredAt")
+            .IncludeProperties(t => new { t.TransactionType, t.Amount, t.AccountId });
+
         builder.HasOne(t => t.TransferAccount)
             .WithMany()
             .HasForeignKey(t => t.TransferAccountId)

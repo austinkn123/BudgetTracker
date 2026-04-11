@@ -9,6 +9,8 @@ public class BudgetTrackerDbContext(DbContextOptions<BudgetTrackerDbContext> opt
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<BudgetPlan> BudgetPlans => Set<BudgetPlan>();
+    public DbSet<BudgetPlanLine> BudgetPlanLines => Set<BudgetPlanLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
