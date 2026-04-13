@@ -23,3 +23,31 @@ export interface Transaction {
   notes?: string;
   createdAt: string;
 }
+
+export interface BudgetPlanLine {
+  id: number;
+  budgetPlanId: number;
+  categoryId?: number | null;
+  lineType: 'Income' | 'Expense';
+  bucket: 'Core' | 'Buffer';
+  cadence: 'Monthly' | 'Annual';
+  amount: number;
+  monthlyEquivalent: number;
+  isStressFactor: boolean;
+  notes?: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface BudgetPlan {
+  id: number;
+  userId: number;
+  name: string;
+  planMonth: string;
+  netIncomeMonthly: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string | null;
+  lines: BudgetPlanLine[];
+}

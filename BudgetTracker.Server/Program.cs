@@ -73,6 +73,11 @@ var categoryGroup = apiGroup.MapGroup("/categories")
     .WithTags("Categories");
 categoryGroup.MapCategoryEndpoints();
 
+// Budget plan endpoints group
+var budgetPlanGroup = apiGroup.MapGroup("/budget-plans")
+    .WithTags("Budget Plans");
+budgetPlanGroup.MapBudgetPlanEndpoints();
+
 // User endpoints group
 var userGroup = apiGroup.MapGroup("/users")
     .WithTags("Users");
