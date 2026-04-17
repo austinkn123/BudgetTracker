@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
-import { Database } from 'lucide-react';
+import Typography from '@mui/material/Typography';
 import { useBudgetPlans } from './hooks/useBudgetPlans';
 import { useBudgetPlanForm } from './hooks/useBudgetPlanForm';
 import { useCategories } from '../categories/hooks/useCategories';
-import { AddPlanExpenseForm } from './components/AddPlanExpenseForm';
-import { EditPlanExpenseForm } from './components/EditPlanExpenseForm';
-import { BudgetPlanCard } from './components/BudgetPlanCard';
+import BudgetPlanCard from './components/BudgetPlanCard';
+import PlanLineDialog from './components/PlanLineDialog';
 
 type BudgetPlansSectionProps = {
   isLoading: boolean;
@@ -13,11 +12,11 @@ type BudgetPlansSectionProps = {
   setStatusError: (msg: string | null) => void;
 };
 
-export default function BudgetPlansSection({
+const BudgetPlansSection = ({
   isLoading,
   setStatusMessage,
   setStatusError,
-}: BudgetPlansSectionProps) {
+}: BudgetPlansSectionProps) => {
   const { data: budgetPlans = [] } = useBudgetPlans();
   const { data: categories = [] } = useCategories();
 
@@ -31,60 +30,43 @@ export default function BudgetPlansSection({
     [categories],
   );
 
-  const form = useBudgetPlanForm(budgetPlans, expenseCategories, categoryNameById, setStatusMessage, setStatusError);
+  const form = useBudgetPlanForm(budgetPlans, expenseCategories, setStatusMessage, setStatusError);
 
   if (isLoading) return null;
 
   return (
-    <section className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-xl font-semibold text-gray-900">Budget Plans</h2>
-          </div>
-          <span className="text-sm text-gray-500">
-            {budgetPlans.length} {budgetPlans.length === 1 ? 'plan' : 'plans'}
-          </span>
-        </div>
-      </div>
-
-      <div className="px-6 py-4 border-b border-gray-200 space-y-6 bg-gray-50">
-        <AddPlanExpenseForm
-          budgetPlans={budgetPlans}
-          newPlanExpensePlanId={form.newPlanExpensePlanId}
-          setNewPlanExpensePlanId={form.setNewPlanExpensePlanId}
-          newPlanExpense={form.newPlanExpense}
-          setNewPlanExpense={form.setNewPlanExpense}
-          expenseCategories={expenseCategories}
-          onSave={form.addBudgetPlanExpenseLine}
-          isSaving={form.isSaving}
-        />
-        <EditPlanExpenseForm
-          budgetPlans={budgetPlans}
-          expensePlanLines={form.expensePlanLines}
-          getExpenseLineOptionLabel={form.getExpenseLineOptionLabel}
-          editPlanExpensePlanId={form.editPlanExpensePlanId}
-          editPlanExpenseLineId={form.editPlanExpenseLineId}
-          editPlanExpense={form.editPlanExpense}
-          setEditPlanExpense={form.setEditPlanExpense}
-          expenseCategories={expenseCategories}
-          onEditPlanSelection={form.onEditPlanSelection}
-          onEditPlanLineSelection={form.onEditPlanLineSelection}
-          onSave={form.saveEditedBudgetPlanExpenseLine}
-          isSaving={form.isSaving}
-        />
-      </div>
-
-      <div className="px-6 py-4 space-y-6">
+    <>
+      <div className="space-y-4">
         {budgetPlans.length > 0 ? (
           budgetPlans.map((plan) => (
-            <BudgetPlanCard key={plan.id} plan={plan} categoryNameById={categoryNameById} />
+            <BudgetPlanCard
+              key={plan.id}
+              plan={plan}
+              categoryNameById={categoryNameById}
+              onAddLine={form.openForAdd}
+              onEditLine={form.openForEdit}
+            />
           ))
         ) : (
-          <p className="text-gray-500 italic">No budget plans found</p>
+          <Typography color="text.secondary" fontStyle="italic">
+            No budget plans found
+          </Typography>
         )}
       </div>
-    </section>
+
+      <PlanLineDialog
+        open={form.dialogOpen}
+        mode={form.dialogMode}
+        formData={form.formData}
+        categories={expenseCategories}
+        isSaving={form.isSaving}
+        onClose={form.closeDialog}
+        onChange={form.updateField}
+        onSave={form.save}
+        onDelete={form.deleteLine}
+      />
+    </>
   );
-}
+};
+
+export default BudgetPlansSection;

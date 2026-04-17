@@ -1,172 +1,43 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan, BudgetPlanLine, Category } from '../../../shared/types/api';
+import type { PlanLineFormData } from '../components/PlanLineDialog';
 
-type PlanExpenseFormState = {
-  categoryId: number;
-  bucket: 'Core' | 'Buffer';
-  cadence: 'Monthly' | 'Annual';
-  amount: number;
-  isStressFactor: boolean;
-  notes: string;
-};
+const emptyForm = (defaultCategoryId: number): PlanLineFormData => ({
+  categoryId: defaultCategoryId,
+  bucket: 'Core',
+  cadence: 'Monthly',
+  amount: 0,
+  isStressFactor: false,
+  notes: '',
+});
 
-export function useBudgetPlanForm(
+export const useBudgetPlanForm = (
   budgetPlans: BudgetPlan[],
   expenseCategories: Category[],
-  categoryNameById: Map<number, string>,
   setStatusMessage: (msg: string | null) => void,
   setStatusError: (msg: string | null) => void,
-) {
+) => {
   const queryClient = useQueryClient();
+  const defaultCategoryId = expenseCategories[0]?.id ?? 0;
 
-  const getExpenseLineOptionLabel = (line: BudgetPlanLine) => {
-    const categoryName = line.categoryId
-      ? (categoryNameById.get(line.categoryId) ?? `Unknown (${line.categoryId})`)
-      : 'No Category';
-    return `${categoryName} | ${line.bucket} ${line.cadence} | $${line.amount.toFixed(2)} ($${line.monthlyEquivalent.toFixed(2)}/mo)`;
-  };
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
+  const [activePlanId, setActivePlanId] = useState<number | null>(null);
+  const [editingLineId, setEditingLineId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<PlanLineFormData>(emptyForm(defaultCategoryId));
 
-  const expensePlanLines = useMemo(
-    () => budgetPlans.flatMap((plan) =>
-      plan.lines
-        .filter((line) => line.lineType === 'Expense')
-        .map((line) => ({ planId: plan.id, line })),
-    ),
-    [budgetPlans],
-  );
+  const openForAdd = useCallback((planId: number) => {
+    setFormData(emptyForm(defaultCategoryId));
+    setActivePlanId(planId);
+    setEditingLineId(null);
+    setDialogMode('add');
+    setDialogOpen(true);
+  }, [defaultCategoryId]);
 
-  const [newPlanExpensePlanId, setNewPlanExpensePlanId] = useState<number | ''>('');
-  const [newPlanExpense, setNewPlanExpense] = useState<PlanExpenseFormState>({
-    categoryId: 0,
-    bucket: 'Core',
-    cadence: 'Monthly',
-    amount: 0,
-    isStressFactor: false,
-    notes: '',
-  });
-
-  const [editPlanExpensePlanId, setEditPlanExpensePlanId] = useState<number | ''>('');
-  const [editPlanExpenseLineId, setEditPlanExpenseLineId] = useState<number | ''>('');
-  const [editPlanExpense, setEditPlanExpense] = useState<PlanExpenseFormState>({
-    categoryId: 0,
-    bucket: 'Core',
-    cadence: 'Monthly',
-    amount: 0,
-    isStressFactor: false,
-    notes: '',
-  });
-
-  useEffect(() => {
-    if (expenseCategories.length === 0) return;
-    if (newPlanExpense.categoryId <= 0) {
-      setNewPlanExpense((prev) => ({ ...prev, categoryId: expenseCategories[0].id }));
-    }
-    if (editPlanExpense.categoryId <= 0) {
-      setEditPlanExpense((prev) => ({ ...prev, categoryId: expenseCategories[0].id }));
-    }
-  }, [editPlanExpense.categoryId, expenseCategories, newPlanExpense.categoryId]);
-
-  const updateBudgetPlanMutation = useMutation({
-    mutationFn: async ({ id, payload }: { id: number; payload: BudgetPlan }) => budgetPlanService.update(id, payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['budgetPlans'] });
-      setStatusError(null);
-      setStatusMessage('Budget plan expense updated.');
-    },
-    onError: (error: Error) => {
-      setStatusMessage(null);
-      setStatusError(`Unable to update budget plan expense: ${error.message}`);
-    },
-  });
-
-  const addBudgetPlanExpenseLine = () => {
-    if (newPlanExpensePlanId === '') {
-      setStatusMessage(null);
-      setStatusError('Select a budget plan before adding a planned expense line.');
-      return;
-    }
-
-    if (newPlanExpense.categoryId <= 0 || newPlanExpense.amount <= 0) {
-      setStatusMessage(null);
-      setStatusError('Category and amount are required for a planned expense line.');
-      return;
-    }
-
-    const plan = budgetPlans.find((item) => item.id === newPlanExpensePlanId);
-    if (!plan) {
-      setStatusMessage(null);
-      setStatusError('Selected budget plan was not found.');
-      return;
-    }
-
-    const maxSortOrder = plan.lines.length > 0
-      ? Math.max(...plan.lines.map((line) => line.sortOrder))
-      : 0;
-
-    const newLine: BudgetPlanLine = {
-      id: 0,
-      budgetPlanId: plan.id,
-      categoryId: newPlanExpense.categoryId,
-      lineType: 'Expense',
-      bucket: newPlanExpense.bucket,
-      cadence: newPlanExpense.cadence,
-      amount: newPlanExpense.amount,
-      monthlyEquivalent: newPlanExpense.cadence === 'Annual'
-        ? Number((newPlanExpense.amount / 12).toFixed(2))
-        : newPlanExpense.amount,
-      isStressFactor: newPlanExpense.isStressFactor,
-      notes: newPlanExpense.notes || null,
-      sortOrder: maxSortOrder + 10,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const payload: BudgetPlan = {
-      ...plan,
-      lines: [...plan.lines, newLine],
-    };
-
-    updateBudgetPlanMutation.mutate({ id: plan.id, payload });
-  };
-
-  const onEditPlanSelection = (planId: number | '') => {
-    setEditPlanExpensePlanId(planId);
-    setEditPlanExpenseLineId('');
-
-    if (planId === '') return;
-
-    const firstLine = budgetPlans
-      .find((plan) => plan.id === planId)
-      ?.lines
-      .find((line) => line.lineType === 'Expense');
-
-    if (!firstLine) return;
-
-    setEditPlanExpenseLineId(firstLine.id);
-    setEditPlanExpense({
-      categoryId: firstLine.categoryId ?? 0,
-      bucket: firstLine.bucket,
-      cadence: firstLine.cadence,
-      amount: firstLine.amount,
-      isStressFactor: firstLine.isStressFactor,
-      notes: firstLine.notes || '',
-    });
-  };
-
-  const onEditPlanLineSelection = (lineId: number | '') => {
-    setEditPlanExpenseLineId(lineId);
-    if (lineId === '' || editPlanExpensePlanId === '') return;
-
-    const line = budgetPlans
-      .find((plan) => plan.id === editPlanExpensePlanId)
-      ?.lines
-      .find((item) => item.id === lineId && item.lineType === 'Expense');
-
-    if (!line) return;
-
-    setEditPlanExpense({
+  const openForEdit = useCallback((planId: number, line: BudgetPlanLine) => {
+    setFormData({
       categoryId: line.categoryId ?? 0,
       bucket: line.bucket,
       cadence: line.cadence,
@@ -174,75 +45,123 @@ export function useBudgetPlanForm(
       isStressFactor: line.isStressFactor,
       notes: line.notes || '',
     });
-  };
+    setActivePlanId(planId);
+    setEditingLineId(line.id);
+    setDialogMode('edit');
+    setDialogOpen(true);
+  }, []);
 
-  const saveEditedBudgetPlanExpenseLine = () => {
-    if (editPlanExpensePlanId === '' || editPlanExpenseLineId === '') {
+  const closeDialog = useCallback(() => {
+    setDialogOpen(false);
+  }, []);
+
+  const updateField = useCallback((field: keyof PlanLineFormData, value: string | number | boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: number; payload: BudgetPlan }) =>
+      budgetPlanService.update(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['budgetPlans'] });
+      setStatusError(null);
+      setStatusMessage('Budget plan updated.');
+      closeDialog();
+    },
+    onError: (error: Error) => {
       setStatusMessage(null);
-      setStatusError('Select a budget plan and expense line to update.');
+      setStatusError(`Unable to update budget plan: ${error.message}`);
+    },
+  });
+
+  const save = useCallback(() => {
+    if (activePlanId === null) return;
+
+    if (formData.categoryId <= 0 || formData.amount <= 0) {
+      setStatusMessage(null);
+      setStatusError('Category and amount are required.');
       return;
     }
 
-    if (editPlanExpense.categoryId <= 0 || editPlanExpense.amount <= 0) {
-      setStatusMessage(null);
-      setStatusError('Category and amount are required to update a planned expense line.');
-      return;
-    }
+    const plan = budgetPlans.find((p) => p.id === activePlanId);
+    if (!plan) return;
 
-    const plan = budgetPlans.find((item) => item.id === editPlanExpensePlanId);
-    if (!plan) {
-      setStatusMessage(null);
-      setStatusError('Selected budget plan was not found.');
-      return;
-    }
+    if (dialogMode === 'add') {
+      const maxSortOrder = plan.lines.length > 0
+        ? Math.max(...plan.lines.map((l) => l.sortOrder))
+        : 0;
 
-    const lineExists = plan.lines.some((line) => line.id === editPlanExpenseLineId && line.lineType === 'Expense');
-    if (!lineExists) {
-      setStatusMessage(null);
-      setStatusError('Selected budget expense line was not found.');
-      return;
-    }
+      const newLine: BudgetPlanLine = {
+        id: 0,
+        budgetPlanId: plan.id,
+        categoryId: formData.categoryId,
+        lineType: 'Expense',
+        bucket: formData.bucket,
+        cadence: formData.cadence,
+        amount: formData.amount,
+        monthlyEquivalent: formData.cadence === 'Annual'
+          ? Number((formData.amount / 12).toFixed(2))
+          : formData.amount,
+        isStressFactor: formData.isStressFactor,
+        notes: formData.notes || null,
+        sortOrder: maxSortOrder + 10,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-    const payload: BudgetPlan = {
-      ...plan,
-      lines: plan.lines.map((line) => {
-        if (line.id !== editPlanExpenseLineId) return line;
+      updateMutation.mutate({
+        id: plan.id,
+        payload: { ...plan, lines: [...plan.lines, newLine] },
+      });
+    } else if (editingLineId !== null) {
+      const updatedLines = plan.lines.map((line) => {
+        if (line.id !== editingLineId) return line;
         return {
           ...line,
-          categoryId: editPlanExpense.categoryId,
-          bucket: editPlanExpense.bucket,
-          cadence: editPlanExpense.cadence,
-          amount: editPlanExpense.amount,
-          monthlyEquivalent: editPlanExpense.cadence === 'Annual'
-            ? Number((editPlanExpense.amount / 12).toFixed(2))
-            : editPlanExpense.amount,
-          isStressFactor: editPlanExpense.isStressFactor,
-          notes: editPlanExpense.notes || null,
+          categoryId: formData.categoryId,
+          bucket: formData.bucket,
+          cadence: formData.cadence,
+          amount: formData.amount,
+          monthlyEquivalent: formData.cadence === 'Annual'
+            ? Number((formData.amount / 12).toFixed(2))
+            : formData.amount,
+          isStressFactor: formData.isStressFactor,
+          notes: formData.notes || null,
           updatedAt: new Date().toISOString(),
         };
-      }),
-    };
+      });
 
-    updateBudgetPlanMutation.mutate({ id: plan.id, payload });
-  };
+      updateMutation.mutate({
+        id: plan.id,
+        payload: { ...plan, lines: updatedLines },
+      });
+    }
+  }, [formData, dialogMode, activePlanId, editingLineId, budgetPlans, updateMutation, setStatusMessage, setStatusError]);
 
-  const isSaving = updateBudgetPlanMutation.isPending;
+  const deleteLine = useCallback(() => {
+    if (activePlanId === null || editingLineId === null) return;
+
+    const plan = budgetPlans.find((p) => p.id === activePlanId);
+    if (!plan) return;
+
+    updateMutation.mutate({
+      id: plan.id,
+      payload: { ...plan, lines: plan.lines.filter((l) => l.id !== editingLineId) },
+    });
+  }, [activePlanId, editingLineId, budgetPlans, updateMutation]);
+
+  const isSaving = updateMutation.isPending;
 
   return {
-    expensePlanLines,
-    getExpenseLineOptionLabel,
-    newPlanExpensePlanId,
-    setNewPlanExpensePlanId,
-    newPlanExpense,
-    setNewPlanExpense,
-    editPlanExpensePlanId,
-    editPlanExpenseLineId,
-    editPlanExpense,
-    setEditPlanExpense,
-    addBudgetPlanExpenseLine,
-    onEditPlanSelection,
-    onEditPlanLineSelection,
-    saveEditedBudgetPlanExpenseLine,
+    dialogOpen,
+    dialogMode,
+    formData,
     isSaving,
+    openForAdd,
+    openForEdit,
+    closeDialog,
+    updateField,
+    save,
+    deleteLine,
   };
-}
+};
