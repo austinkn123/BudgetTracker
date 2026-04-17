@@ -1,63 +1,71 @@
-import { useState } from 'react';
-import { useUser } from '../../user/hooks/useUser';
+import { useMemo } from 'react';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { useBudgetPlans } from '../../budget-plans/hooks/useBudgetPlans';
-import { DashboardHeader } from '../components/DashboardHeader';
 import { DashboardLoadingState } from '../components/DashboardLoadingState';
 import { DashboardErrorState } from '../components/DashboardErrorState';
-import { StatusBanner } from '../../../shared/components/StatusBanner';
-import UserSection from '../../user/UserSection';
-import CategoriesSection from '../../categories/CategoriesSection';
-import TransactionsSection from '../../transactions/TransactionsSection';
-import BudgetPlansSection from '../../budget-plans/BudgetPlansSection';
+import { SummaryCards } from '../components/SummaryCards';
+import { SpendingByCategoryChart } from '../components/charts/SpendingByCategoryChart';
+import { SpendingOverTimeChart } from '../components/charts/SpendingOverTimeChart';
+import { BudgetVsActualChart } from '../components/charts/BudgetVsActualChart';
+import { RecentTransactions } from '../components/RecentTransactions';
+import { ActiveBudgetPlanSummary } from '../components/ActiveBudgetPlanSummary';
+import {
+  computeSummaryTotals,
+  aggregateByCategory,
+  aggregateByMonth,
+  budgetVsActual,
+} from '../utils/chartHelpers';
+import { useUser } from '../../user/hooks/useUser';
 
-export default function DashboardPage() {
+const DashboardPage = () => {
   const { isLoading: loadingUser, error: userError } = useUser();
-  const { isLoading: loadingCategories, error: categoriesError } = useCategories();
-  const { isLoading: loadingTransactions, error: transactionsError } = useTransactions();
-  const { isLoading: loadingBudgetPlans, error: budgetPlansError } = useBudgetPlans();
-
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [statusError, setStatusError] = useState<string | null>(null);
+  const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories();
+  const { data: transactions = [], isLoading: loadingTransactions, error: transactionsError } = useTransactions();
+  const { data: budgetPlans = [], isLoading: loadingBudgetPlans, error: budgetPlansError } = useBudgetPlans();
 
   const isLoading = loadingCategories || loadingTransactions || loadingUser || loadingBudgetPlans;
   const hasErrors = categoriesError || transactionsError || userError || budgetPlansError;
 
+  const summaryTotals = useMemo(() => computeSummaryTotals(transactions), [transactions]);
+  const categoryData = useMemo(() => aggregateByCategory(transactions, categories), [transactions, categories]);
+  const monthlyData = useMemo(() => aggregateByMonth(transactions), [transactions]);
+  const activePlan = useMemo(() => budgetPlans.find((p) => p.isActive), [budgetPlans]);
+  const budgetActualData = useMemo(
+    () => budgetVsActual(activePlan, transactions, categories),
+    [activePlan, transactions, categories],
+  );
+
+  if (isLoading) return <DashboardLoadingState />;
+
+  if (hasErrors) {
+    return (
+      <DashboardErrorState
+        userError={userError}
+        categoriesError={categoriesError}
+        transactionsError={transactionsError}
+        budgetPlansError={budgetPlansError}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DashboardHeader />
+    <div className="space-y-8">
+      <SummaryCards totals={summaryTotals} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {isLoading && <DashboardLoadingState />}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SpendingByCategoryChart data={categoryData} />
+        <SpendingOverTimeChart data={monthlyData} />
+      </div>
 
-        {!isLoading && hasErrors && (
-          <DashboardErrorState
-            userError={userError}
-            categoriesError={categoriesError}
-            transactionsError={transactionsError}
-            budgetPlansError={budgetPlansError}
-          />
-        )}
+      <BudgetVsActualChart data={budgetActualData} planName={activePlan?.name} />
 
-        {!isLoading && !hasErrors && (
-          <div className="space-y-8">
-            <StatusBanner statusMessage={statusMessage} statusError={statusError} />
-            <UserSection isLoading={isLoading} />
-            <CategoriesSection isLoading={isLoading} />
-            <TransactionsSection
-              isLoading={isLoading}
-              setStatusMessage={setStatusMessage}
-              setStatusError={setStatusError}
-            />
-            <BudgetPlansSection
-              isLoading={isLoading}
-              setStatusMessage={setStatusMessage}
-              setStatusError={setStatusError}
-            />
-          </div>
-        )}
-      </main>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RecentTransactions transactions={transactions} categories={categories} />
+        <ActiveBudgetPlanSummary plan={activePlan} />
+      </div>
     </div>
   );
-}
+};
+
+export default DashboardPage;
