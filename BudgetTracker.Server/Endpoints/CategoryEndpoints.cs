@@ -15,9 +15,9 @@ public static class CategoryEndpoints
             return Results.Ok(result.Value);
         });
 
-        categoryGroup.MapGet("/{id}", async (int id, ICategoryManager manager) =>
+        categoryGroup.MapGet("/{id}", async (int id, ICategoryManager manager, ICurrentUserProvider currentUser) =>
         {
-            var result = await manager.GetByIdAsync(id);
+            var result = await manager.GetByIdAsync(id, currentUser.UserId);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound();
         });
 
@@ -37,13 +37,23 @@ public static class CategoryEndpoints
 
             category.UserId = currentUser.UserId;
             var result = await manager.UpdateAsync(category);
-            return result.IsSuccess ? Results.Ok(category) : Results.NotFound();
+            if (result.IsSuccess)
+                return Results.Ok(category);
+
+            return result.Error == "Category not found"
+                ? Results.NotFound()
+                : Results.BadRequest(result.Error);
         });
 
-        categoryGroup.MapDelete("/{id}", async (int id, ICategoryManager manager) =>
+        categoryGroup.MapDelete("/{id}", async (int id, ICategoryManager manager, ICurrentUserProvider currentUser) =>
         {
-            var result = await manager.DeleteAsync(id);
-            return result.IsSuccess ? Results.NoContent() : Results.NotFound();
+            var result = await manager.DeleteAsync(id, currentUser.UserId);
+            if (result.IsSuccess)
+                return Results.NoContent();
+
+            return result.Error == "Category not found"
+                ? Results.NotFound()
+                : Results.BadRequest(result.Error);
         });
 
         return categoryGroup;

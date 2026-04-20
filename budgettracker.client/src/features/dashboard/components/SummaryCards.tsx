@@ -6,6 +6,7 @@ import type { SummaryTotals } from '../utils/chartHelpers';
 
 interface SummaryCardsProps {
   totals: SummaryTotals;
+  mode?: 'actual' | 'planned';
 }
 
 const formatter = new Intl.NumberFormat('en-US', {
@@ -15,10 +16,10 @@ const formatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
-export function SummaryCards({ totals }: SummaryCardsProps) {
+export function SummaryCards({ totals, mode = 'actual' }: SummaryCardsProps) {
   const cards = [
     {
-      label: 'Total Income',
+      label: mode === 'planned' ? 'Planned Income' : 'Total Income',
       value: totals.totalIncome,
       icon: TrendingUp,
       color: 'text-green-600',
@@ -26,7 +27,7 @@ export function SummaryCards({ totals }: SummaryCardsProps) {
       iconBg: 'bg-green-100',
     },
     {
-      label: 'Total Expenses',
+      label: mode === 'planned' ? 'Planned Expenses' : 'Total Expenses',
       value: totals.totalExpenses,
       icon: TrendingDown,
       color: 'text-red-600',
@@ -34,7 +35,7 @@ export function SummaryCards({ totals }: SummaryCardsProps) {
       iconBg: 'bg-red-100',
     },
     {
-      label: 'Net Balance',
+      label: mode === 'planned' ? 'Monthly Net' : 'Net Balance',
       value: totals.netBalance,
       icon: Wallet,
       color: totals.netBalance >= 0 ? 'text-blue-600' : 'text-red-600',

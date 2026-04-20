@@ -5,91 +5,153 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
 import type { Category } from '../../../shared/types/api';
+import {
+  transactionSchema,
+  type TransactionFormData,
+} from '../../../shared/validation/transactionSchema';
 
-export type TransactionFormData = {
-  accountId: number;
-  categoryId: number;
-  amount: number;
-  occurredAt: string;
-  payee: string;
-  notes: string;
-};
+export type { TransactionFormData };
 
 type TransactionDialogProps = {
   open: boolean;
   mode: 'add' | 'edit';
-  formData: TransactionFormData;
+  initialValues: TransactionFormData;
   categories: Category[];
   isSaving: boolean;
   onClose: () => void;
-  onChange: (field: keyof TransactionFormData, value: string | number) => void;
-  onSave: () => void;
+  onSave: (values: TransactionFormData) => Promise<void> | void;
   onDelete?: () => void;
 };
 
 const TransactionDialog = ({
   open,
   mode,
-  formData,
+  initialValues,
   categories,
   isSaving,
   onClose,
-  onChange,
   onSave,
   onDelete,
 }: TransactionDialogProps) => {
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<TransactionFormData>({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: initialValues,
+  });
+
+  useEffect(() => {
+    if (open) {
+      reset(initialValues);
+    }
+  }, [open, initialValues, reset]);
+
+  const submit = handleSubmit(async (values) => {
+    try {
+      await onSave(values);
+    } catch {
+      // Parent hook handles status messaging.
+    }
+  });
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{mode === 'add' ? 'Add Transaction' : 'Edit Transaction'}</DialogTitle>
       <DialogContent className="space-y-4 pt-4">
         <div className="grid grid-cols-2 gap-4 pt-2">
-          <TextField
-            label="Amount"
-            type="number"
-            inputProps={{ min: 0, step: '0.01' }}
-            value={formData.amount || ''}
-            onChange={(e) => onChange('amount', Number(e.target.value))}
-            fullWidth
-            required
+          <Controller
+            name="amount"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                label="Amount"
+                type="number"
+                inputProps={{ min: 0, step: '0.01' }}
+                value={field.value || ''}
+                onChange={(e) => field.onChange(Number(e.target.value))}
+                error={Boolean(errors.amount)}
+                helperText={errors.amount?.message}
+                fullWidth
+                required
+              />
+            )}
           />
-          <TextField
-            label="Category"
-            select
-            value={formData.categoryId || ''}
-            onChange={(e) => onChange('categoryId', Number(e.target.value))}
-            fullWidth
-            required
-          >
-            {categories.map((cat) => (
-              <MenuItem key={cat.id} value={cat.id}>
-                {cat.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            label="Date"
-            type="date"
-            value={formData.occurredAt}
-            onChange={(e) => onChange('occurredAt', e.target.value)}
-            fullWidth
-            required
-            slotProps={{ inputLabel: { shrink: true } }}
+          <Controller
+            name="categoryId"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                label="Category"
+                select
+                value={field.value || ''}
+                onChange={(e) => field.onChange(Number(e.target.value))}
+                error={Boolean(errors.categoryId)}
+                helperText={errors.categoryId?.message}
+                fullWidth
+                required
+              >
+                {categories.map((cat) => (
+                  <MenuItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
           />
-          <TextField
-            label="Payee"
-            value={formData.payee}
-            onChange={(e) => onChange('payee', e.target.value)}
-            fullWidth
+          <Controller
+            name="occurredAt"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                label="Date"
+                type="date"
+                value={field.value}
+                onChange={field.onChange}
+                error={Boolean(errors.occurredAt)}
+                helperText={errors.occurredAt?.message}
+                fullWidth
+                required
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            )}
+          />
+          <Controller
+            name="payee"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                label="Payee"
+                value={field.value}
+                onChange={field.onChange}
+                error={Boolean(errors.payee)}
+                helperText={errors.payee?.message}
+                fullWidth
+              />
+            )}
           />
         </div>
-        <TextField
-          label="Notes"
-          value={formData.notes}
-          onChange={(e) => onChange('notes', e.target.value)}
-          fullWidth
-          multiline
-          rows={2}
+        <Controller
+          name="notes"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              label="Notes"
+              value={field.value}
+              onChange={field.onChange}
+              error={Boolean(errors.notes)}
+              helperText={errors.notes?.message}
+              fullWidth
+              multiline
+              rows={2}
+            />
+          )}
         />
       </DialogContent>
       <DialogActions className="px-6 pb-4">
@@ -101,7 +163,7 @@ const TransactionDialog = ({
         <Button onClick={onClose} disabled={isSaving}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={onSave} disabled={isSaving}>
+        <Button variant="contained" onClick={submit} disabled={isSaving}>
           {isSaving ? 'Saving...' : mode === 'add' ? 'Add' : 'Save'}
         </Button>
       </DialogActions>

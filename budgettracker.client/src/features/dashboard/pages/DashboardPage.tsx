@@ -12,6 +12,7 @@ import { RecentTransactions } from '../components/RecentTransactions';
 import { ActiveBudgetPlanSummary } from '../components/ActiveBudgetPlanSummary';
 import {
   computeSummaryTotals,
+  computeSummaryTotalsFromPlan,
   aggregateByCategory,
   aggregateByMonth,
   budgetVsActual,
@@ -26,11 +27,14 @@ const DashboardPage = () => {
 
   const isLoading = loadingCategories || loadingTransactions || loadingUser || loadingBudgetPlans;
   const hasErrors = categoriesError || transactionsError || userError || budgetPlansError;
+  const activePlan = useMemo(() => budgetPlans.find((p) => p.isActive), [budgetPlans]);
 
-  const summaryTotals = useMemo(() => computeSummaryTotals(transactions), [transactions]);
+  const summaryTotals = useMemo(
+    () => (activePlan ? computeSummaryTotalsFromPlan(activePlan) : computeSummaryTotals(transactions)),
+    [activePlan, transactions],
+  );
   const categoryData = useMemo(() => aggregateByCategory(transactions, categories), [transactions, categories]);
   const monthlyData = useMemo(() => aggregateByMonth(transactions), [transactions]);
-  const activePlan = useMemo(() => budgetPlans.find((p) => p.isActive), [budgetPlans]);
   const budgetActualData = useMemo(
     () => budgetVsActual(activePlan, transactions, categories),
     [activePlan, transactions, categories],
@@ -51,7 +55,7 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-8">
-      <SummaryCards totals={summaryTotals} />
+      <SummaryCards totals={summaryTotals} mode={activePlan ? 'planned' : 'actual'} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SpendingByCategoryChart data={categoryData} />

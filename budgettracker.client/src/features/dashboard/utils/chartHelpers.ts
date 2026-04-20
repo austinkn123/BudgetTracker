@@ -40,6 +40,18 @@ export function computeSummaryTotals(transactions: Transaction[]): SummaryTotals
   return { totalIncome, totalExpenses, netBalance: totalIncome - totalExpenses };
 }
 
+export function computeSummaryTotalsFromPlan(plan: BudgetPlan): SummaryTotals {
+  const totalIncome = plan.lines
+    .filter((line) => line.lineType === 'Income')
+    .reduce((sum, line) => sum + line.monthlyEquivalent, 0);
+
+  const totalExpenses = plan.lines
+    .filter((line) => line.lineType === 'Expense')
+    .reduce((sum, line) => sum + line.monthlyEquivalent, 0);
+
+  return { totalIncome, totalExpenses, netBalance: totalIncome - totalExpenses };
+}
+
 export function aggregateByCategory(
   transactions: Transaction[],
   categories: Category[],

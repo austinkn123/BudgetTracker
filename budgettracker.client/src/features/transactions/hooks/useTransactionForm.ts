@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { transactionService } from '../../../shared/services/transaction.service';
 import type { Category, Transaction } from '../../../shared/types/api';
-import type { TransactionFormData } from '../components/TransactionDialog';
+import type { TransactionFormData } from '../../../shared/validation/transactionSchema';
 
 const todayInputValue = format(new Date(), 'yyyy-MM-dd');
 
@@ -30,19 +30,19 @@ export const useTransactionForm = (
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [formData, setFormData] = useState<TransactionFormData>(
+  const [initialValues, setInitialValues] = useState<TransactionFormData>(
     emptyForm(defaultAccountId, defaultCategoryId),
   );
 
   const openForAdd = useCallback(() => {
-    setFormData(emptyForm(defaultAccountId, defaultCategoryId));
+    setInitialValues(emptyForm(defaultAccountId, defaultCategoryId));
     setEditingId(null);
     setDialogMode('add');
     setDialogOpen(true);
   }, [defaultAccountId, defaultCategoryId]);
 
   const openForEdit = useCallback((transaction: Transaction) => {
-    setFormData({
+    setInitialValues({
       accountId: transaction.accountId,
       categoryId: transaction.categoryId,
       amount: transaction.amount,
@@ -57,10 +57,6 @@ export const useTransactionForm = (
 
   const closeDialog = useCallback(() => {
     setDialogOpen(false);
-  }, []);
-
-  const updateField = useCallback((field: keyof TransactionFormData, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
   const createMutation = useMutation({
@@ -106,13 +102,7 @@ export const useTransactionForm = (
     },
   });
 
-  const save = useCallback(() => {
-    if (formData.categoryId <= 0 || formData.amount <= 0) {
-      setStatusMessage(null);
-      setStatusError('Category and amount are required.');
-      return;
-    }
-
+  const save = useCallback((formData: TransactionFormData) => {
     if (dialogMode === 'add') {
       const payload: Omit<Transaction, 'id'> = {
         accountId: formData.accountId,
@@ -141,7 +131,7 @@ export const useTransactionForm = (
       };
       updateMutation.mutate({ id: editingId, payload });
     }
-  }, [formData, dialogMode, editingId, transactions, createMutation, updateMutation, setStatusMessage, setStatusError]);
+  }, [dialogMode, editingId, transactions, createMutation, updateMutation]);
 
   const deleteTransaction = useCallback(() => {
     if (editingId !== null) {
@@ -154,12 +144,11 @@ export const useTransactionForm = (
   return {
     dialogOpen,
     dialogMode,
-    formData,
+    initialValues,
     isSaving,
     openForAdd,
     openForEdit,
     closeDialog,
-    updateField,
     save,
     deleteTransaction,
   };

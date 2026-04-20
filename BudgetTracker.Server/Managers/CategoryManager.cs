@@ -3,14 +3,15 @@ using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Engines;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace BudgetTracker.Server.Managers;
 
 public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor) : ICategoryManager
 {
-    public async Task<Result<Category>> GetByIdAsync(int id)
+    public async Task<Result<Category>> GetByIdAsync(int id, int userId)
     {
-        var category = await accessor.GetByIdAsync(id);
+        var category = await accessor.GetByIdForUserAsync(id, userId);
         return category is not null
             ? Result<Category>.Success(category)
             : Result<Category>.Failure("Category not found");
@@ -38,15 +39,31 @@ public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor)
         if (error is not null)
             return Result<bool>.Failure(error);
 
-        var updated = await accessor.UpdateAsync(category);
+        var existing = await accessor.GetByIdForUserAsync(category.Id, category.UserId);
+        if (existing is null)
+            return Result<bool>.Failure("Category not found");
+
+        existing.Name = category.Name;
+        existing.CategoryType = category.CategoryType;
+
+        var updated = await accessor.UpdateAsync(existing);
         return updated
             ? Result<bool>.Success(true)
             : Result<bool>.Failure("Category not found");
     }
 
-    public async Task<Result<bool>> DeleteAsync(int id)
+    public async Task<Result<bool>> DeleteAsync(int id, int userId)
     {
-        var deleted = await accessor.DeleteAsync(id);
+        bool deleted;
+        try
+        {
+            deleted = await accessor.DeleteAsync(id, userId);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<bool>.Failure("Category is in use and cannot be deleted");
+        }
+
         return deleted
             ? Result<bool>.Success(true)
             : Result<bool>.Failure("Category not found");

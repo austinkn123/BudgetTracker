@@ -27,7 +27,11 @@ const BudgetPlansPage = () => {
 
       <StatusBanner statusMessage={statusMessage} statusError={statusError} />
 
-      <CategoriesSection isLoading={isLoading} />
+      <CategoriesSection
+        isLoading={isLoading}
+        setStatusMessage={setStatusMessage}
+        setStatusError={setStatusError}
+      />
 
       <BudgetPlansSection
         isLoading={isLoading}

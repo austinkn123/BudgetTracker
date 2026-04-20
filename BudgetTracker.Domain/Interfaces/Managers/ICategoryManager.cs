@@ -5,9 +5,9 @@ namespace BudgetTracker.Domain.Interfaces.Managers;
 
 public interface ICategoryManager
 {
-    Task<Result<Category>> GetByIdAsync(int id);
+    Task<Result<Category>> GetByIdAsync(int id, int userId);
     Task<Result<IEnumerable<Category>>> GetByUserIdAsync(int userId);
     Task<Result<int>> CreateAsync(Category category);
     Task<Result<bool>> UpdateAsync(Category category);
-    Task<Result<bool>> DeleteAsync(int id);
+    Task<Result<bool>> DeleteAsync(int id, int userId);
 }

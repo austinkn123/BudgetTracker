@@ -7,105 +7,173 @@ import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
 import type { Category } from '../../../shared/types/api';
+import {
+  planLineSchema,
+  type PlanLineFormData,
+} from '../../../shared/validation/planLineSchema';
 
-export type PlanLineFormData = {
-  categoryId: number;
-  bucket: 'Core' | 'Buffer';
-  cadence: 'Monthly' | 'Annual';
-  amount: number;
-  isStressFactor: boolean;
-  notes: string;
-};
+export type { PlanLineFormData };
 
 type PlanLineDialogProps = {
   open: boolean;
   mode: 'add' | 'edit';
-  formData: PlanLineFormData;
+  initialValues: PlanLineFormData;
   categories: Category[];
   isSaving: boolean;
   onClose: () => void;
-  onChange: (field: keyof PlanLineFormData, value: string | number | boolean) => void;
-  onSave: () => void;
+  onSave: (values: PlanLineFormData) => Promise<void> | void;
   onDelete?: () => void;
 };
 
 const PlanLineDialog = ({
   open,
   mode,
-  formData,
+  initialValues,
   categories,
   isSaving,
   onClose,
-  onChange,
   onSave,
   onDelete,
 }: PlanLineDialogProps) => {
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<PlanLineFormData>({
+    resolver: zodResolver(planLineSchema),
+    defaultValues: initialValues,
+  });
+
+  useEffect(() => {
+    if (open) {
+      reset(initialValues);
+    }
+  }, [open, initialValues, reset]);
+
+  const submit = handleSubmit(async (values) => {
+    try {
+      await onSave(values);
+    } catch {
+      // Parent hook handles status messaging.
+    }
+  });
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{mode === 'add' ? 'Add Plan Line' : 'Edit Plan Line'}</DialogTitle>
       <DialogContent className="space-y-4 pt-4">
         <div className="grid grid-cols-2 gap-4 pt-2">
-          <TextField
-            label="Category"
-            select
-            value={formData.categoryId || ''}
-            onChange={(e) => onChange('categoryId', Number(e.target.value))}
-            fullWidth
-            required
-          >
-            {categories.map((cat) => (
-              <MenuItem key={cat.id} value={cat.id}>
-                {cat.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            label="Amount"
-            type="number"
-            inputProps={{ min: 0, step: '0.01' }}
-            value={formData.amount || ''}
-            onChange={(e) => onChange('amount', Number(e.target.value))}
-            fullWidth
-            required
+          <Controller
+            name="categoryId"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                label="Category"
+                select
+                value={field.value || ''}
+                onChange={(e) => field.onChange(Number(e.target.value))}
+                error={Boolean(errors.categoryId)}
+                helperText={errors.categoryId?.message}
+                fullWidth
+                required
+              >
+                {categories.map((cat) => (
+                  <MenuItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
           />
-          <TextField
-            label="Bucket"
-            select
-            value={formData.bucket}
-            onChange={(e) => onChange('bucket', e.target.value)}
-            fullWidth
-          >
-            <MenuItem value="Core">Core</MenuItem>
-            <MenuItem value="Buffer">Buffer</MenuItem>
-          </TextField>
-          <TextField
-            label="Cadence"
-            select
-            value={formData.cadence}
-            onChange={(e) => onChange('cadence', e.target.value)}
-            fullWidth
-          >
-            <MenuItem value="Monthly">Monthly</MenuItem>
-            <MenuItem value="Annual">Annual</MenuItem>
-          </TextField>
+          <Controller
+            name="amount"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                label="Amount"
+                type="number"
+                inputProps={{ min: 0, step: '0.01' }}
+                value={field.value || ''}
+                onChange={(e) => field.onChange(Number(e.target.value))}
+                error={Boolean(errors.amount)}
+                helperText={errors.amount?.message}
+                fullWidth
+                required
+              />
+            )}
+          />
+          <Controller
+            name="bucket"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                label="Bucket"
+                select
+                value={field.value}
+                onChange={field.onChange}
+                error={Boolean(errors.bucket)}
+                helperText={errors.bucket?.message}
+                fullWidth
+              >
+                <MenuItem value="Core">Core</MenuItem>
+                <MenuItem value="Buffer">Buffer</MenuItem>
+              </TextField>
+            )}
+          />
+          <Controller
+            name="cadence"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                label="Cadence"
+                select
+                value={field.value}
+                onChange={field.onChange}
+                error={Boolean(errors.cadence)}
+                helperText={errors.cadence?.message}
+                fullWidth
+              >
+                <MenuItem value="Monthly">Monthly</MenuItem>
+                <MenuItem value="Annual">Annual</MenuItem>
+              </TextField>
+            )}
+          />
         </div>
-        <TextField
-          label="Notes"
-          value={formData.notes}
-          onChange={(e) => onChange('notes', e.target.value)}
-          fullWidth
-          multiline
-          rows={2}
-        />
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={formData.isStressFactor}
-              onChange={(e) => onChange('isStressFactor', e.target.checked)}
+        <Controller
+          name="notes"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              label="Notes"
+              value={field.value}
+              onChange={field.onChange}
+              error={Boolean(errors.notes)}
+              helperText={errors.notes?.message}
+              fullWidth
+              multiline
+              rows={2}
             />
-          }
-          label="Stress Factor"
+          )}
+        />
+        <Controller
+          name="isStressFactor"
+          control={control}
+          render={({ field }) => (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={field.value}
+                  onChange={(e) => field.onChange(e.target.checked)}
+                />
+              }
+              label="Stress Factor"
+            />
+          )}
         />
       </DialogContent>
       <DialogActions className="px-6 pb-4">
@@ -117,7 +185,7 @@ const PlanLineDialog = ({
         <Button onClick={onClose} disabled={isSaving}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={onSave} disabled={isSaving}>
+        <Button variant="contained" onClick={submit} disabled={isSaving}>
           {isSaving ? 'Saving...' : mode === 'add' ? 'Add' : 'Save'}
         </Button>
       </DialogActions>

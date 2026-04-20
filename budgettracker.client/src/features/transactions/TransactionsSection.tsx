@@ -53,11 +53,10 @@ const TransactionsSection = ({
       <TransactionDialog
         open={form.dialogOpen}
         mode={form.dialogMode}
-        formData={form.formData}
+        initialValues={form.initialValues}
         categories={expenseCategories}
         isSaving={form.isSaving}
         onClose={form.closeDialog}
-        onChange={form.updateField}
         onSave={form.save}
         onDelete={form.deleteTransaction}
       />

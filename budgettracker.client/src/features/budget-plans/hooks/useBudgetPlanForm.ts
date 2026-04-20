@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan, BudgetPlanLine, Category } from '../../../shared/types/api';
-import type { PlanLineFormData } from '../components/PlanLineDialog';
+import type { PlanLineFormData } from '../../../shared/validation/planLineSchema';
 
 const emptyForm = (defaultCategoryId: number): PlanLineFormData => ({
   categoryId: defaultCategoryId,
@@ -26,10 +26,10 @@ export const useBudgetPlanForm = (
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
   const [editingLineId, setEditingLineId] = useState<number | null>(null);
-  const [formData, setFormData] = useState<PlanLineFormData>(emptyForm(defaultCategoryId));
+  const [initialValues, setInitialValues] = useState<PlanLineFormData>(emptyForm(defaultCategoryId));
 
   const openForAdd = useCallback((planId: number) => {
-    setFormData(emptyForm(defaultCategoryId));
+    setInitialValues(emptyForm(defaultCategoryId));
     setActivePlanId(planId);
     setEditingLineId(null);
     setDialogMode('add');
@@ -37,7 +37,7 @@ export const useBudgetPlanForm = (
   }, [defaultCategoryId]);
 
   const openForEdit = useCallback((planId: number, line: BudgetPlanLine) => {
-    setFormData({
+    setInitialValues({
       categoryId: line.categoryId ?? 0,
       bucket: line.bucket,
       cadence: line.cadence,
@@ -55,10 +55,6 @@ export const useBudgetPlanForm = (
     setDialogOpen(false);
   }, []);
 
-  const updateField = useCallback((field: keyof PlanLineFormData, value: string | number | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
-
   const updateMutation = useMutation({
     mutationFn: async ({ id, payload }: { id: number; payload: BudgetPlan }) =>
       budgetPlanService.update(id, payload),
@@ -74,14 +70,8 @@ export const useBudgetPlanForm = (
     },
   });
 
-  const save = useCallback(() => {
+  const save = useCallback((formData: PlanLineFormData) => {
     if (activePlanId === null) return;
-
-    if (formData.categoryId <= 0 || formData.amount <= 0) {
-      setStatusMessage(null);
-      setStatusError('Category and amount are required.');
-      return;
-    }
 
     const plan = budgetPlans.find((p) => p.id === activePlanId);
     if (!plan) return;
@@ -136,7 +126,7 @@ export const useBudgetPlanForm = (
         payload: { ...plan, lines: updatedLines },
       });
     }
-  }, [formData, dialogMode, activePlanId, editingLineId, budgetPlans, updateMutation, setStatusMessage, setStatusError]);
+  }, [dialogMode, activePlanId, editingLineId, budgetPlans, updateMutation]);
 
   const deleteLine = useCallback(() => {
     if (activePlanId === null || editingLineId === null) return;
@@ -155,12 +145,11 @@ export const useBudgetPlanForm = (
   return {
     dialogOpen,
     dialogMode,
-    formData,
+    initialValues,
     isSaving,
     openForAdd,
     openForEdit,
     closeDialog,
-    updateField,
     save,
     deleteLine,
   };
