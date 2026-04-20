@@ -5,9 +5,10 @@ You are an expert developer working on the BudgetTracker application. This proje
 ## Tech Stack
 - **Backend**: .NET 9, ASP.NET Core Minimal APIs
 - **Frontend**: React + TypeScript + Vite
+- **Styling**: Tailwind CSS + Material UI
+- **Forms/Validation**: React Hook Form + Zod (`@hookform/resolvers`)
 - **Database**: Microsoft SQL Server
 - **ORM**: Entity Framework Core (Code-first with Fluent API configurations)
-- **Styling**: Tailwind CSS + Material UI
 - **Authentication**: AWS Cognito (In progress)
 
 ## Architecture
@@ -26,6 +27,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 ## Coding Standards
 - **C#**: Use modern C# features (records, pattern matching, file-scoped namespaces). Prefer cleaner, concise code.
 - **React**: Use Functional Components and Hooks. Avoid class components.
+- **React Forms**: Use React Hook Form with Zod for validation. Keep reusable schemas in `budgettracker.client/src/shared/validation/` and prefer shared schema imports over inline schema duplication.
 - **EF Core**: Use LINQ queries through `BudgetTrackerDbContext`. Use `AsNoTracking()` for read-only queries. Define entity configurations using Fluent API in `BudgetTracker.Domain/Data/Configurations/`. Use EF migrations (`dotnet ef migrations add`) for schema changes.
 - **Testing**: Follow TDD (Red-Green-Refactor). Unit test Engines directly. Test Managers with mocked Engines/Accessors.
 - **Contracts first**: Define interfaces in `BudgetTracker.Domain/Interfaces/` before implementing.

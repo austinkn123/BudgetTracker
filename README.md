@@ -5,6 +5,8 @@ BudgetTracker is a full-stack personal finance application with a React frontend
 ## Overview
 
 - Frontend: React + TypeScript + Vite
+- Styling: Tailwind CSS + Material UI
+- Forms and validation: React Hook Form + Zod
 - Backend: ASP.NET Core Minimal APIs on .NET 9
 - Database: SQL Server
 - Data access: Entity Framework Core
@@ -98,6 +100,8 @@ Endpoint mappings live in `BudgetTracker.Server/Endpoints/`.
 - Vite
 - Tailwind CSS
 - Material UI
+- React Hook Form
+- Zod
 
 ### Backend
 
@@ -125,6 +129,8 @@ Authentication is not documented as active in the current setup. Treat the app a
 - Keep managers orchestration-only
 - Keep engines free of data access concerns
 - Keep accessors focused on database interaction
+- For frontend forms, use React Hook Form with Zod schemas and `@hookform/resolvers`
+- Keep reusable form schemas in `budgettracker.client/src/shared/validation/`
 
 ## Related Files
 
