@@ -41,15 +41,37 @@ export function computeSummaryTotals(transactions: Transaction[]): SummaryTotals
 }
 
 export function computeSummaryTotalsFromPlan(plan: BudgetPlan): SummaryTotals {
-  const totalIncome = plan.lines
-    .filter((line) => line.lineType === 'Income')
-    .reduce((sum, line) => sum + line.monthlyEquivalent, 0);
+  const totalIncome = plan.netIncomeMonthly;
 
   const totalExpenses = plan.lines
     .filter((line) => line.lineType === 'Expense')
     .reduce((sum, line) => sum + line.monthlyEquivalent, 0);
 
   return { totalIncome, totalExpenses, netBalance: totalIncome - totalExpenses };
+}
+
+export function aggregateByCategoryFromPlan(
+  plan: BudgetPlan,
+  categories: Category[],
+): CategorySlice[] {
+  const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
+  const totals = new Map<number, number>();
+
+  for (const line of plan.lines) {
+    if (line.lineType !== 'Expense' || line.categoryId == null) {
+      continue;
+    }
+
+    totals.set(line.categoryId, (totals.get(line.categoryId) ?? 0) + line.monthlyEquivalent);
+  }
+
+  return Array.from(totals.entries())
+    .map(([id, value]) => ({
+      id,
+      label: categoryMap.get(id) ?? `Category ${id}`,
+      value,
+    }))
+    .sort((a, b) => b.value - a.value);
 }
 
 export function aggregateByCategory(

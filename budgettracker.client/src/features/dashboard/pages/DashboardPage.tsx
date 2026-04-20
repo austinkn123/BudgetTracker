@@ -14,6 +14,7 @@ import {
   computeSummaryTotals,
   computeSummaryTotalsFromPlan,
   aggregateByCategory,
+  aggregateByCategoryFromPlan,
   aggregateByMonth,
   budgetVsActual,
 } from '../utils/chartHelpers';
@@ -33,7 +34,12 @@ const DashboardPage = () => {
     () => (activePlan ? computeSummaryTotalsFromPlan(activePlan) : computeSummaryTotals(transactions)),
     [activePlan, transactions],
   );
-  const categoryData = useMemo(() => aggregateByCategory(transactions, categories), [transactions, categories]);
+  const categoryData = useMemo(
+    () => (activePlan
+      ? aggregateByCategoryFromPlan(activePlan, categories)
+      : aggregateByCategory(transactions, categories)),
+    [activePlan, transactions, categories],
+  );
   const monthlyData = useMemo(() => aggregateByMonth(transactions), [transactions]);
   const budgetActualData = useMemo(
     () => budgetVsActual(activePlan, transactions, categories),
@@ -62,7 +68,11 @@ const DashboardPage = () => {
         <SpendingOverTimeChart data={monthlyData} />
       </div>
 
-      <BudgetVsActualChart data={budgetActualData} planName={activePlan?.name} />
+      <BudgetVsActualChart
+        data={budgetActualData}
+        planName={activePlan?.name}
+        hasActivePlan={Boolean(activePlan)}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RecentTransactions transactions={transactions} categories={categories} />

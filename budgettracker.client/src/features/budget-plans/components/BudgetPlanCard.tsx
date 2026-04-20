@@ -4,6 +4,7 @@ import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -11,20 +12,36 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import type { BudgetPlan, BudgetPlanLine } from '../../../shared/types/api';
 
 type BudgetPlanCardProps = {
   plan: BudgetPlan;
   categoryNameById: Map<number, string>;
+  isSwitchingPlan: boolean;
   onAddLine: (planId: number) => void;
   onEditLine: (planId: number, line: BudgetPlanLine) => void;
+  onSwitchActive: (planId: number) => void;
+  onEditPlan: (plan: BudgetPlan) => void;
+  onDeletePlan: (plan: BudgetPlan) => void;
 };
 
-const BudgetPlanCard = ({ plan, categoryNameById, onAddLine, onEditLine }: BudgetPlanCardProps) => {
-  const monthlyIncome = plan.lines
-    .filter((line) => line.lineType === 'Income')
-    .reduce((sum, line) => sum + line.monthlyEquivalent, 0);
+const BudgetPlanCard = ({
+  plan,
+  categoryNameById,
+  isSwitchingPlan,
+  onAddLine,
+  onEditLine,
+  onSwitchActive,
+  onEditPlan,
+  onDeletePlan,
+}: BudgetPlanCardProps) => {
+  const [planYear, planMonth] = plan.planMonth.slice(0, 7).split('-').map(Number);
+  const planMonthLabel = Number.isFinite(planYear) && Number.isFinite(planMonth)
+    ? format(new Date(planYear, planMonth - 1, 1), 'MMMM yyyy')
+    : plan.planMonth;
+
+  const monthlyIncome = plan.netIncomeMonthly;
 
   const monthlyExpenses = plan.lines
     .filter((line) => line.lineType === 'Expense')
@@ -45,15 +62,43 @@ const BudgetPlanCard = ({ plan, categoryNameById, onAddLine, onEditLine }: Budge
             />
           </div>
         }
-        subheader={format(new Date(plan.planMonth), 'MMMM yyyy')}
+        subheader={planMonthLabel}
         action={
-          <Button
-            size="small"
-            startIcon={<Plus className="w-4 h-4" />}
-            onClick={() => onAddLine(plan.id)}
-          >
-            Add Line
-          </Button>
+          <Stack direction="row" spacing={1} className="items-center justify-end flex-wrap">
+            {!plan.isActive && (
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => onSwitchActive(plan.id)}
+                disabled={isSwitchingPlan}
+              >
+                Set Active
+              </Button>
+            )}
+            <Button
+              size="small"
+              startIcon={<Plus className="w-4 h-4" />}
+              onClick={() => onAddLine(plan.id)}
+            >
+              Add Line
+            </Button>
+            <Button
+              size="small"
+              color="inherit"
+              startIcon={<Pencil className="w-4 h-4" />}
+              onClick={() => onEditPlan(plan)}
+            >
+              Edit
+            </Button>
+            <Button
+              size="small"
+              color="error"
+              startIcon={<Trash2 className="w-4 h-4" />}
+              onClick={() => onDeletePlan(plan)}
+            >
+              Delete
+            </Button>
+          </Stack>
         }
       />
       <CardContent className="pt-0">

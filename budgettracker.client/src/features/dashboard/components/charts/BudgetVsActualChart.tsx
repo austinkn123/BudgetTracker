@@ -7,9 +7,10 @@ import type { BudgetVsActualItem } from '../../utils/chartHelpers';
 interface BudgetVsActualChartProps {
   data: BudgetVsActualItem[];
   planName?: string;
+  hasActivePlan: boolean;
 }
 
-export function BudgetVsActualChart({ data, planName }: BudgetVsActualChartProps) {
+export function BudgetVsActualChart({ data, planName, hasActivePlan }: BudgetVsActualChartProps) {
   if (data.length === 0) {
     return (
       <Card>
@@ -18,8 +19,15 @@ export function BudgetVsActualChart({ data, planName }: BudgetVsActualChartProps
             Budget vs Actual
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            No active budget plan to compare
+            {hasActivePlan
+              ? 'No budget line items or matching expense transactions for this plan month yet'
+              : 'No active budget plan to compare'}
           </Typography>
+          {hasActivePlan && planName && (
+            <Typography variant="caption" color="text.secondary" className="mt-1">
+              Active plan: {planName}
+            </Typography>
+          )}
         </CardContent>
       </Card>
     );

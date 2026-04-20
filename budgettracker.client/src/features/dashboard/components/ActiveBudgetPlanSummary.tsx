@@ -33,9 +33,7 @@ export function ActiveBudgetPlanSummary({ plan }: ActiveBudgetPlanSummaryProps) 
     );
   }
 
-  const totalIncome = plan.lines
-    .filter((l) => l.lineType === 'Income')
-    .reduce((sum, l) => sum + l.monthlyEquivalent, 0);
+  const totalIncome = plan.netIncomeMonthly;
 
   const totalExpenses = plan.lines
     .filter((l) => l.lineType === 'Expense')
@@ -64,14 +62,6 @@ export function ActiveBudgetPlanSummary({ plan }: ActiveBudgetPlanSummaryProps) 
         </div>
 
         <div className="space-y-3">
-          <div className="flex justify-between">
-            <Typography variant="body2" color="text.secondary">
-              Target Income
-            </Typography>
-            <Typography variant="body2" className="font-semibold text-gray-900">
-              {formatter.format(plan.netIncomeMonthly)}
-            </Typography>
-          </div>
           <div className="flex justify-between">
             <Typography variant="body2" color="text.secondary">
               Planned Income
