@@ -68,7 +68,7 @@ public class BudgetPlanManager(IBudgetPlanEngine engine, IBudgetPlanAccessor acc
 
     private async Task<string?> ValidateCategoryOwnershipAsync(BudgetPlan budgetPlan, int userId)
     {
-        var categoryIds = budgetPlan.Lines
+        var categoryIds = budgetPlan.Entries
             .Where(l => l.CategoryId.HasValue)
             .Select(l => l.CategoryId!.Value)
             .Distinct()

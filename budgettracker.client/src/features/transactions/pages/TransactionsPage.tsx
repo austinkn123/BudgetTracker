@@ -16,7 +16,7 @@ const TransactionsPage = () => {
           Transactions
         </Typography>
         <Typography variant="body2" className="text-gray-500 mt-1">
-          Record and manage your income and expenses
+          Browse your ledger by day or month, then add or edit transactions as needed
         </Typography>
       </div>
 

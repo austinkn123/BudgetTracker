@@ -74,26 +74,26 @@ const CategoriesSection = ({
   }, [categories]);
 
   const usageByCategoryId = useMemo(() => {
-    const map = new Map<number, { transactions: number; planLines: number; total: number }>();
+    const map = new Map<number, { transactions: number; planEntries: number; total: number }>();
 
     for (const category of categories) {
-      map.set(category.id, { transactions: 0, planLines: 0, total: 0 });
+      map.set(category.id, { transactions: 0, planEntries: 0, total: 0 });
     }
 
     for (const transaction of transactions) {
-      const usage = map.get(transaction.categoryId) ?? { transactions: 0, planLines: 0, total: 0 };
+      const usage = map.get(transaction.categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
       usage.transactions += 1;
       usage.total += 1;
       map.set(transaction.categoryId, usage);
     }
 
     for (const plan of budgetPlans) {
-      for (const line of plan.lines) {
-        if (line.categoryId == null) continue;
-        const usage = map.get(line.categoryId) ?? { transactions: 0, planLines: 0, total: 0 };
-        usage.planLines += 1;
+      for (const entry of plan.entries) {
+        if (entry.categoryId == null) continue;
+        const usage = map.get(entry.categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
+        usage.planEntries += 1;
         usage.total += 1;
-        map.set(line.categoryId, usage);
+        map.set(entry.categoryId, usage);
       }
     }
 
@@ -162,7 +162,7 @@ const CategoriesSection = ({
   };
 
   const getUsage = (categoryId: number) => {
-    return usageByCategoryId.get(categoryId) ?? { transactions: 0, planLines: 0, total: 0 };
+    return usageByCategoryId.get(categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
   };
 
   const isSaving = createCategory.isPending || updateCategory.isPending || deleteCategory.isPending;
@@ -195,7 +195,7 @@ const CategoriesSection = ({
                   <div className="flex flex-wrap gap-1">
                     {items.map((cat) => {
                       const usage = getUsage(cat.id);
-                      const tooltipLabel = `Used in ${usage.transactions} transaction${usage.transactions === 1 ? '' : 's'} and ${usage.planLines} budget plan line${usage.planLines === 1 ? '' : 's'}`;
+                      const tooltipLabel = `Used in ${usage.transactions} transaction${usage.transactions === 1 ? '' : 's'} and ${usage.planEntries} budget plan entr${usage.planEntries === 1 ? 'y' : 'ies'}`;
 
                       return (
                         <Tooltip key={cat.id} title={tooltipLabel} arrow>
@@ -267,7 +267,7 @@ const CategoriesSection = ({
         <DialogContent>
           {deleteTarget && (
             <Typography variant="caption" color="text.secondary" className="mb-2 block">
-              Used in {getUsage(deleteTarget.id).transactions} transactions and {getUsage(deleteTarget.id).planLines} budget plan lines.
+              Used in {getUsage(deleteTarget.id).transactions} transactions and {getUsage(deleteTarget.id).planEntries} budget plan entries.
             </Typography>
           )}
           <Typography variant="body2">

@@ -4,6 +4,7 @@ using BudgetTracker.Domain.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BudgetTracker.Domain.Migrations
 {
     [DbContext(typeof(BudgetTrackerDbContext))]
-    partial class BudgetTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260427020214_RenameBudgetPlanLinesToEntries")]
+    partial class RenameBudgetPlanLinesToEntries
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -337,7 +340,7 @@ namespace BudgetTracker.Domain.Migrations
             modelBuilder.Entity("BudgetTracker.Domain.Models.BudgetPlanEntry", b =>
                 {
                     b.HasOne("BudgetTracker.Domain.Models.BudgetPlan", "BudgetPlan")
-                        .WithMany("Entries")
+                        .WithMany("Lines")
                         .HasForeignKey("BudgetPlanId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -395,7 +398,7 @@ namespace BudgetTracker.Domain.Migrations
 
             modelBuilder.Entity("BudgetTracker.Domain.Models.BudgetPlan", b =>
                 {
-                    b.Navigation("Entries");
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("BudgetTracker.Domain.Models.Category", b =>

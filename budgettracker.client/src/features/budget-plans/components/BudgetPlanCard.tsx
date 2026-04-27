@@ -13,14 +13,14 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import type { BudgetPlan, BudgetPlanLine } from '../../../shared/types/api';
+import type { BudgetPlan, BudgetPlanEntry } from '../../../shared/types/api';
 
 type BudgetPlanCardProps = {
   plan: BudgetPlan;
   categoryNameById: Map<number, string>;
   isSwitchingPlan: boolean;
   onAddLine: (planId: number) => void;
-  onEditLine: (planId: number, line: BudgetPlanLine) => void;
+  onEditLine: (planId: number, line: BudgetPlanEntry) => void;
   onSwitchActive: (planId: number) => void;
   onEditPlan: (plan: BudgetPlan) => void;
   onDeletePlan: (plan: BudgetPlan) => void;
@@ -43,9 +43,9 @@ const BudgetPlanCard = ({
 
   const monthlyIncome = plan.netIncomeMonthly;
 
-  const monthlyExpenses = plan.lines
-    .filter((line) => line.lineType === 'Expense')
-    .reduce((sum, line) => sum + line.monthlyEquivalent, 0);
+  const monthlyExpenses = plan.entries
+    .filter((entry) => entry.lineType === 'Expense')
+    .reduce((sum, entry) => sum + entry.monthlyEquivalent, 0);
 
   const monthlyNet = monthlyIncome - monthlyExpenses;
 
@@ -80,7 +80,7 @@ const BudgetPlanCard = ({
               startIcon={<Plus className="w-4 h-4" />}
               onClick={() => onAddLine(plan.id)}
             >
-              Add Line
+              Add Entry
             </Button>
             <Button
               size="small"
@@ -136,43 +136,43 @@ const BudgetPlanCard = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {plan.lines.length > 0 ? (
-                plan.lines
+              {plan.entries.length > 0 ? (
+                plan.entries
                   .slice()
                   .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map((line) => (
+                  .map((entry) => (
                     <TableRow
-                      key={line.id}
+                      key={entry.id}
                       hover
-                      onClick={() => onEditLine(plan.id, line)}
+                      onClick={() => onEditLine(plan.id, entry)}
                       className="cursor-pointer"
                     >
                       <TableCell>
-                        {line.categoryId
-                          ? (categoryNameById.get(line.categoryId) ?? `Unknown`)
+                        {entry.categoryId
+                          ? (categoryNameById.get(entry.categoryId) ?? `Unknown`)
                           : '-'}
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={line.lineType}
+                          label={entry.lineType}
                           size="small"
-                          color={line.lineType === 'Income' ? 'success' : 'error'}
+                          color={entry.lineType === 'Income' ? 'success' : 'error'}
                           variant="outlined"
                         />
                       </TableCell>
-                      <TableCell>{line.bucket}</TableCell>
-                      <TableCell>{line.cadence}</TableCell>
+                      <TableCell>{entry.bucket}</TableCell>
+                      <TableCell>{entry.cadence}</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        ${line.amount.toFixed(2)}
+                        ${entry.amount.toFixed(2)}
                       </TableCell>
-                      <TableCell align="right">${line.monthlyEquivalent.toFixed(2)}</TableCell>
+                      <TableCell align="right">${entry.monthlyEquivalent.toFixed(2)}</TableCell>
                     </TableRow>
                   ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
                     <Typography color="text.secondary" fontStyle="italic">
-                      No plan lines — click "Add Line" to get started
+                      No plan entries — click "Add Entry" to get started
                     </Typography>
                   </TableCell>
                 </TableRow>

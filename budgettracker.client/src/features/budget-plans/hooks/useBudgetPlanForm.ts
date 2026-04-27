@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
-import type { BudgetPlan, BudgetPlanLine, Category } from '../../../shared/types/api';
+import type { BudgetPlan, BudgetPlanEntry, Category } from '../../../shared/types/api';
 import type { PlanLineFormData } from '../../../shared/validation/planLineSchema';
 
 const emptyForm = (defaultCategoryId: number): PlanLineFormData => ({
@@ -36,7 +36,7 @@ export const useBudgetPlanForm = (
     setDialogOpen(true);
   }, [defaultCategoryId]);
 
-  const openForEdit = useCallback((planId: number, line: BudgetPlanLine) => {
+  const openForEdit = useCallback((planId: number, line: BudgetPlanEntry) => {
     setInitialValues({
       categoryId: line.categoryId ?? 0,
       bucket: line.bucket,
@@ -77,11 +77,11 @@ export const useBudgetPlanForm = (
     if (!plan) return;
 
     if (dialogMode === 'add') {
-      const maxSortOrder = plan.lines.length > 0
-        ? Math.max(...plan.lines.map((l) => l.sortOrder))
+      const maxSortOrder = plan.entries.length > 0
+        ? Math.max(...plan.entries.map((entry) => entry.sortOrder))
         : 0;
 
-      const newLine: BudgetPlanLine = {
+      const newLine: BudgetPlanEntry = {
         id: 0,
         budgetPlanId: plan.id,
         categoryId: formData.categoryId,
@@ -101,13 +101,13 @@ export const useBudgetPlanForm = (
 
       updateMutation.mutate({
         id: plan.id,
-        payload: { ...plan, lines: [...plan.lines, newLine] },
+        payload: { ...plan, entries: [...plan.entries, newLine] },
       });
     } else if (editingLineId !== null) {
-      const updatedLines = plan.lines.map((line) => {
-        if (line.id !== editingLineId) return line;
+      const updatedEntries = plan.entries.map((entry) => {
+        if (entry.id !== editingLineId) return entry;
         return {
-          ...line,
+          ...entry,
           categoryId: formData.categoryId,
           bucket: formData.bucket,
           cadence: formData.cadence,
@@ -123,7 +123,7 @@ export const useBudgetPlanForm = (
 
       updateMutation.mutate({
         id: plan.id,
-        payload: { ...plan, lines: updatedLines },
+        payload: { ...plan, entries: updatedEntries },
       });
     }
   }, [dialogMode, activePlanId, editingLineId, budgetPlans, updateMutation]);
@@ -136,7 +136,7 @@ export const useBudgetPlanForm = (
 
     updateMutation.mutate({
       id: plan.id,
-      payload: { ...plan, lines: plan.lines.filter((l) => l.id !== editingLineId) },
+      payload: { ...plan, entries: plan.entries.filter((entry) => entry.id !== editingLineId) },
     });
   }, [activePlanId, editingLineId, budgetPlans, updateMutation]);
 

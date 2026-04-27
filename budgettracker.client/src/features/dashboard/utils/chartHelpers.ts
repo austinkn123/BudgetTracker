@@ -43,7 +43,7 @@ export function computeSummaryTotals(transactions: Transaction[]): SummaryTotals
 export function computeSummaryTotalsFromPlan(plan: BudgetPlan): SummaryTotals {
   const totalIncome = plan.netIncomeMonthly;
 
-  const totalExpenses = plan.lines
+  const totalExpenses = plan.entries
     .filter((line) => line.lineType === 'Expense')
     .reduce((sum, line) => sum + line.monthlyEquivalent, 0);
 
@@ -57,7 +57,7 @@ export function aggregateByCategoryFromPlan(
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
   const totals = new Map<number, number>();
 
-  for (const line of plan.lines) {
+  for (const line of plan.entries) {
     if (line.lineType !== 'Expense' || line.categoryId == null) {
       continue;
     }
@@ -141,7 +141,7 @@ export function budgetVsActual(
   }
 
   const budgetedByCategory = new Map<number, number>();
-  for (const line of activePlan.lines) {
+  for (const line of activePlan.entries) {
     if (line.lineType === 'Expense' && line.categoryId != null) {
       budgetedByCategory.set(
         line.categoryId,

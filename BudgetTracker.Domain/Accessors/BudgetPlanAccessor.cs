@@ -22,10 +22,10 @@ public class BudgetPlanAccessor(BudgetTrackerDbContext context) : IBudgetPlanAcc
                 IsActive = bp.IsActive,
                 CreatedAt = bp.CreatedAt,
                 UpdatedAt = bp.UpdatedAt,
-                Lines = bp.Lines
+                Entries = bp.Entries
                     .OrderBy(l => l.SortOrder)
                     .ThenBy(l => l.Id)
-                    .Select(l => new BudgetPlanLine
+                    .Select(l => new BudgetPlanEntry
                     {
                         Id = l.Id,
                         BudgetPlanId = l.BudgetPlanId,
@@ -64,10 +64,10 @@ public class BudgetPlanAccessor(BudgetTrackerDbContext context) : IBudgetPlanAcc
                 IsActive = bp.IsActive,
                 CreatedAt = bp.CreatedAt,
                 UpdatedAt = bp.UpdatedAt,
-                Lines = bp.Lines
+                Entries = bp.Entries
                     .OrderBy(l => l.SortOrder)
                     .ThenBy(l => l.Id)
-                    .Select(l => new BudgetPlanLine
+                    .Select(l => new BudgetPlanEntry
                     {
                         Id = l.Id,
                         BudgetPlanId = l.BudgetPlanId,
@@ -114,7 +114,7 @@ public class BudgetPlanAccessor(BudgetTrackerDbContext context) : IBudgetPlanAcc
     public async Task<bool> UpdateAsync(BudgetPlan budgetPlan, int userId)
     {
         var existing = await context.BudgetPlans
-            .Include(bp => bp.Lines)
+            .Include(bp => bp.Entries)
             .Where(bp => bp.Id == budgetPlan.Id && bp.UserId == userId)
             .FirstOrDefaultAsync();
 
@@ -129,57 +129,57 @@ public class BudgetPlanAccessor(BudgetTrackerDbContext context) : IBudgetPlanAcc
         existing.IsActive = budgetPlan.IsActive;
         existing.UpdatedAt = DateTime.UtcNow;
 
-        var incomingLineIds = budgetPlan.Lines
+        var incomingEntryIds = budgetPlan.Entries
             .Where(l => l.Id > 0)
             .Select(l => l.Id)
             .ToHashSet();
 
-        var linesToRemove = existing.Lines
-            .Where(l => !incomingLineIds.Contains(l.Id))
+        var entriesToRemove = existing.Entries
+            .Where(l => !incomingEntryIds.Contains(l.Id))
             .ToList();
 
-        foreach (var lineToRemove in linesToRemove)
+        foreach (var entryToRemove in entriesToRemove)
         {
-            context.BudgetPlanLines.Remove(lineToRemove);
+            context.BudgetPlanEntries.Remove(entryToRemove);
         }
 
-        foreach (var incomingLine in budgetPlan.Lines)
+        foreach (var incomingEntry in budgetPlan.Entries)
         {
-            if (incomingLine.Id <= 0)
+            if (incomingEntry.Id <= 0)
             {
-                existing.Lines.Add(new BudgetPlanLine
+                existing.Entries.Add(new BudgetPlanEntry
                 {
-                    CategoryId = incomingLine.CategoryId,
-                    LineType = incomingLine.LineType,
-                    Bucket = incomingLine.Bucket,
-                    Cadence = incomingLine.Cadence,
-                    Amount = incomingLine.Amount,
-                    MonthlyEquivalent = incomingLine.MonthlyEquivalent,
-                    IsStressFactor = incomingLine.IsStressFactor,
-                    Notes = incomingLine.Notes,
-                    SortOrder = incomingLine.SortOrder,
+                    CategoryId = incomingEntry.CategoryId,
+                    LineType = incomingEntry.LineType,
+                    Bucket = incomingEntry.Bucket,
+                    Cadence = incomingEntry.Cadence,
+                    Amount = incomingEntry.Amount,
+                    MonthlyEquivalent = incomingEntry.MonthlyEquivalent,
+                    IsStressFactor = incomingEntry.IsStressFactor,
+                    Notes = incomingEntry.Notes,
+                    SortOrder = incomingEntry.SortOrder,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 });
                 continue;
             }
 
-            var existingLine = existing.Lines.FirstOrDefault(l => l.Id == incomingLine.Id);
-            if (existingLine is null)
+            var existingEntry = existing.Entries.FirstOrDefault(l => l.Id == incomingEntry.Id);
+            if (existingEntry is null)
             {
                 return false;
             }
 
-            existingLine.CategoryId = incomingLine.CategoryId;
-            existingLine.LineType = incomingLine.LineType;
-            existingLine.Bucket = incomingLine.Bucket;
-            existingLine.Cadence = incomingLine.Cadence;
-            existingLine.Amount = incomingLine.Amount;
-            existingLine.MonthlyEquivalent = incomingLine.MonthlyEquivalent;
-            existingLine.IsStressFactor = incomingLine.IsStressFactor;
-            existingLine.Notes = incomingLine.Notes;
-            existingLine.SortOrder = incomingLine.SortOrder;
-            existingLine.UpdatedAt = DateTime.UtcNow;
+            existingEntry.CategoryId = incomingEntry.CategoryId;
+            existingEntry.LineType = incomingEntry.LineType;
+            existingEntry.Bucket = incomingEntry.Bucket;
+            existingEntry.Cadence = incomingEntry.Cadence;
+            existingEntry.Amount = incomingEntry.Amount;
+            existingEntry.MonthlyEquivalent = incomingEntry.MonthlyEquivalent;
+            existingEntry.IsStressFactor = incomingEntry.IsStressFactor;
+            existingEntry.Notes = incomingEntry.Notes;
+            existingEntry.SortOrder = incomingEntry.SortOrder;
+            existingEntry.UpdatedAt = DateTime.UtcNow;
         }
 
         return await context.SaveChangesAsync() > 0;

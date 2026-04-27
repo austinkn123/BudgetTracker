@@ -1,6 +1,6 @@
 namespace BudgetTracker.Domain.Models;
 
-public class BudgetPlanLine
+public class BudgetPlanEntry
 {
     public int Id { get; set; }
     public int BudgetPlanId { get; set; }

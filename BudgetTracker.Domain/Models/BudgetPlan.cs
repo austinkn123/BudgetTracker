@@ -12,5 +12,5 @@ public class BudgetPlan
     public DateTime? UpdatedAt { get; set; }
 
     public User User { get; set; } = null!;
-    public ICollection<BudgetPlanLine> Lines { get; set; } = [];
+    public ICollection<BudgetPlanEntry> Entries { get; set; } = [];
 }

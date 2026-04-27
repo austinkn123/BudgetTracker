@@ -26,7 +26,7 @@ public class BudgetPlanEngine : IBudgetPlanEngine
         if (budgetPlan.NetIncomeMonthly < 0)
             return "Net income must be zero or greater";
 
-        return ValidateLines(budgetPlan.Lines);
+        return ValidateEntries(budgetPlan.Entries);
     }
 
     public void NormalizeForPersistence(BudgetPlan budgetPlan)
@@ -34,44 +34,44 @@ public class BudgetPlanEngine : IBudgetPlanEngine
         budgetPlan.Name = budgetPlan.Name.Trim();
         budgetPlan.PlanMonth = new DateTime(budgetPlan.PlanMonth.Year, budgetPlan.PlanMonth.Month, 1);
 
-        foreach (var line in budgetPlan.Lines)
+        foreach (var entry in budgetPlan.Entries)
         {
-            line.LineType = NormalizeValue(line.LineType, ValidLineTypes);
-            line.Bucket = NormalizeValue(line.Bucket, ValidBuckets);
-            line.Cadence = NormalizeValue(line.Cadence, ValidCadences);
-            line.MonthlyEquivalent = line.Cadence == "Annual"
-                ? Math.Round(line.Amount / 12m, 2, MidpointRounding.AwayFromZero)
-                : line.Amount;
+            entry.LineType = NormalizeValue(entry.LineType, ValidLineTypes);
+            entry.Bucket = NormalizeValue(entry.Bucket, ValidBuckets);
+            entry.Cadence = NormalizeValue(entry.Cadence, ValidCadences);
+            entry.MonthlyEquivalent = entry.Cadence == "Annual"
+                ? Math.Round(entry.Amount / 12m, 2, MidpointRounding.AwayFromZero)
+                : entry.Amount;
         }
     }
 
-    private static string? ValidateLines(IEnumerable<BudgetPlanLine> lines)
+    private static string? ValidateEntries(IEnumerable<BudgetPlanEntry> entries)
     {
-        var lineNumber = 0;
-        foreach (var line in lines)
+        var entryNumber = 0;
+        foreach (var entry in entries)
         {
-            lineNumber++;
+            entryNumber++;
 
-            if (!ValidLineTypes.Contains(line.LineType))
-                return $"Line {lineNumber}: line type must be Income or Expense";
+            if (!ValidLineTypes.Contains(entry.LineType))
+                return $"Entry {entryNumber}: line type must be Income or Expense";
 
-            if (!ValidBuckets.Contains(line.Bucket))
-                return $"Line {lineNumber}: bucket must be Core or Buffer";
+            if (!ValidBuckets.Contains(entry.Bucket))
+                return $"Entry {entryNumber}: bucket must be Core or Buffer";
 
-            if (!ValidCadences.Contains(line.Cadence))
-                return $"Line {lineNumber}: cadence must be Monthly or Annual";
+            if (!ValidCadences.Contains(entry.Cadence))
+                return $"Entry {entryNumber}: cadence must be Monthly or Annual";
 
-            if (line.Amount < 0)
-                return $"Line {lineNumber}: amount must be zero or greater";
+            if (entry.Amount < 0)
+                return $"Entry {entryNumber}: amount must be zero or greater";
 
-            if (line.MonthlyEquivalent < 0)
-                return $"Line {lineNumber}: monthly equivalent must be zero or greater";
+            if (entry.MonthlyEquivalent < 0)
+                return $"Entry {entryNumber}: monthly equivalent must be zero or greater";
 
-            if (line.CategoryId is <= 0)
-                return $"Line {lineNumber}: category ID must be greater than zero when provided";
+            if (entry.CategoryId is <= 0)
+                return $"Entry {entryNumber}: category ID must be greater than zero when provided";
 
-            if (!string.IsNullOrEmpty(line.Notes) && line.Notes.Length > 500)
-                return $"Line {lineNumber}: notes must be 500 characters or fewer";
+            if (!string.IsNullOrEmpty(entry.Notes) && entry.Notes.Length > 500)
+                return $"Entry {entryNumber}: notes must be 500 characters or fewer";
         }
 
         return null;

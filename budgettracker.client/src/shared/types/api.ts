@@ -24,7 +24,7 @@ export interface Transaction {
   createdAt: string;
 }
 
-export interface BudgetPlanLine {
+export interface BudgetPlanEntry {
   id: number;
   budgetPlanId: number;
   categoryId?: number | null;
@@ -49,5 +49,5 @@ export interface BudgetPlan {
   isActive: boolean;
   createdAt: string;
   updatedAt?: string | null;
-  lines: BudgetPlanLine[];
+  entries: BudgetPlanEntry[];
 }

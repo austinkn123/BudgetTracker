@@ -35,7 +35,7 @@ export function ActiveBudgetPlanSummary({ plan }: ActiveBudgetPlanSummaryProps) 
 
   const totalIncome = plan.netIncomeMonthly;
 
-  const totalExpenses = plan.lines
+  const totalExpenses = plan.entries
     .filter((l) => l.lineType === 'Expense')
     .reduce((sum, l) => sum + l.monthlyEquivalent, 0);
 

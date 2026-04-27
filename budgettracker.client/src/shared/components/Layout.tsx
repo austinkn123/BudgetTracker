@@ -17,8 +17,8 @@ import { Menu, LayoutDashboard, ArrowLeftRight, ClipboardList, Settings, Wallet 
 
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Transactions', path: '/transactions', icon: ArrowLeftRight },
   { label: 'Budget Plans', path: '/budget-plans', icon: ClipboardList },
+  { label: 'Transactions', path: '/transactions', icon: ArrowLeftRight },
   { label: 'Settings', path: '/settings', icon: Settings },
 ] as const;
 

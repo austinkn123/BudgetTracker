@@ -9,5 +9,5 @@ public class Category
 
     public User User { get; set; } = null!;
     public ICollection<Transaction> Transactions { get; set; } = [];
-    public ICollection<BudgetPlanLine> BudgetPlanLines { get; set; } = [];
+    public ICollection<BudgetPlanEntry> BudgetPlanEntries { get; set; } = [];
 }

@@ -85,7 +85,7 @@ export const useBudgetPlanManagement = (
           isActive: values.isActive,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          lines: [],
+          entries: [],
         });
 
         return;
