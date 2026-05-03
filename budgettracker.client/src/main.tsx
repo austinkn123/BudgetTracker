@@ -2,18 +2,36 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
-import { ThemeProvider, createTheme } from '@mui/material/styles'
+import { alpha, ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import './index.css'
 import App from './App.tsx'
 
+const palette = {
+  forestBlack: '#100B00',
+  leaf: '#85CB33',
+  parchment: '#EFFFC8',
+  mist: '#A5CBC3',
+  bark: '#3B341F',
+}
+
 const theme = createTheme({
   palette: {
-    primary: { main: '#2563eb' },
-    secondary: { main: '#7c3aed' },
-    success: { main: '#16a34a' },
-    error: { main: '#dc2626' },
-    background: { default: '#f9fafb' },
+    mode: 'light',
+    primary: { main: palette.leaf, contrastText: palette.forestBlack },
+    secondary: { main: palette.mist, contrastText: palette.forestBlack },
+    success: { main: palette.leaf, contrastText: palette.forestBlack },
+    warning: { main: palette.parchment, contrastText: palette.forestBlack },
+    error: { main: palette.bark, contrastText: palette.parchment },
+    background: {
+      default: palette.parchment,
+      paper: alpha('#ffffff', 0.82),
+    },
+    text: {
+      primary: palette.forestBlack,
+      secondary: palette.bark,
+    },
+    divider: alpha(palette.bark, 0.18),
   },
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -23,7 +41,22 @@ const theme = createTheme({
     MuiCard: {
       defaultProps: { elevation: 0 },
       styleOverrides: {
-        root: { border: '1px solid #e5e7eb' },
+        root: {
+          border: `1px solid ${alpha(palette.mist, 0.45)}`,
+          backgroundImage: 'none',
+          backgroundColor: alpha('#ffffff', 0.7),
+        },
+      },
+    },
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: palette.parchment,
+          color: palette.forestBlack,
+        },
+        '::selection': {
+          backgroundColor: alpha(palette.leaf, 0.3),
+        },
       },
     },
   },

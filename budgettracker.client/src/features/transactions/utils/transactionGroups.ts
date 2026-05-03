@@ -1,28 +1,8 @@
-import {
-  endOfDay,
-  endOfMonth,
-  format,
-  parse,
-  parseISO,
-  startOfDay,
-  startOfMonth,
-  startOfYear,
-  subMonths,
-} from 'date-fns';
+import { format, isSameMonth, parseISO } from 'date-fns';
 import type { Transaction } from '../../../shared/types/api';
 
-export type TransactionGroupBy = 'day' | 'month';
-export type TransactionRangePreset = 'this-month' | 'last-3-months' | 'ytd' | 'all' | 'custom';
-
-export type TransactionRangeValues = {
-  startDate: string;
-  endDate: string;
-  startMonth: string;
-  endMonth: string;
-};
-
-export type TransactionGroup = {
-  key: string;
+export type TransactionDaySummary = {
+  dateKey: string;
   label: string;
   transactions: Transaction[];
   incomeTotal: number;
@@ -31,96 +11,29 @@ export type TransactionGroup = {
   transactionCount: number;
 };
 
-type GroupTransactionsOptions = {
-  groupBy: TransactionGroupBy;
-  startValue: string;
-  endValue: string;
+export type TransactionMonthSummary = {
+  label: string;
+  activeDayCount: number;
+  transactionCount: number;
+  incomeTotal: number;
+  outflowTotal: number;
+  netTotal: number;
 };
 
 const getSignedAmount = (transaction: Transaction) =>
   transaction.transactionType === 'Income' ? transaction.amount : -transaction.amount;
 
-const parseMonthInput = (value: string) => parse(`${value}-01`, 'yyyy-MM-dd', new Date());
+export const toDateKey = (value: Date | string) =>
+  format(typeof value === 'string' ? parseISO(value) : value, 'yyyy-MM-dd');
 
-const normalizeRange = (
-  groupBy: TransactionGroupBy,
-  startValue: string,
-  endValue: string,
-): { start: Date | null; end: Date | null } => {
-  const rawStart = startValue
-    ? groupBy === 'month'
-      ? startOfMonth(parseMonthInput(startValue))
-      : startOfDay(parseISO(startValue))
-    : null;
+export const buildTransactionDaySummaries = (transactions: Transaction[]) => {
+  const summaries = new Map<string, TransactionDaySummary>();
 
-  const rawEnd = endValue
-    ? groupBy === 'month'
-      ? endOfMonth(parseMonthInput(endValue))
-      : endOfDay(parseISO(endValue))
-    : null;
-
-  if (rawStart && rawEnd && rawStart > rawEnd) {
-    return { start: rawEnd, end: rawStart };
-  }
-
-  return { start: rawStart, end: rawEnd };
-};
-
-export const getRangeValuesForPreset = (
-  preset: Exclude<TransactionRangePreset, 'custom'>,
-  referenceDate = new Date(),
-): TransactionRangeValues => {
-  if (preset === 'all') {
-    return {
-      startDate: '',
-      endDate: '',
-      startMonth: '',
-      endMonth: '',
-    };
-  }
-
-  const monthStart =
-    preset === 'this-month'
-      ? startOfMonth(referenceDate)
-      : preset === 'last-3-months'
-        ? startOfMonth(subMonths(referenceDate, 2))
-        : startOfYear(referenceDate);
-
-  const dayEnd = endOfDay(referenceDate);
-  const monthEnd = endOfMonth(referenceDate);
-
-  return {
-    startDate: format(monthStart, 'yyyy-MM-dd'),
-    endDate: format(dayEnd, 'yyyy-MM-dd'),
-    startMonth: format(monthStart, 'yyyy-MM'),
-    endMonth: format(monthEnd, 'yyyy-MM'),
-  };
-};
-
-export const groupTransactionsByPeriod = (
-  transactions: Transaction[],
-  { groupBy, startValue, endValue }: GroupTransactionsOptions,
-): { groups: TransactionGroup[]; visibleCount: number } => {
-  const { start, end } = normalizeRange(groupBy, startValue, endValue);
-
-  const filtered = transactions.filter((transaction) => {
+  for (const transaction of transactions) {
     const occurredAt = parseISO(transaction.occurredAt);
+    const dateKey = toDateKey(occurredAt);
+    const existing = summaries.get(dateKey);
 
-    if (start && occurredAt < start) return false;
-    if (end && occurredAt > end) return false;
-
-    return true;
-  });
-
-  const groups = new Map<string, TransactionGroup>();
-
-  for (const transaction of filtered) {
-    const occurredAt = parseISO(transaction.occurredAt);
-    const key = format(occurredAt, groupBy === 'month' ? 'yyyy-MM' : 'yyyy-MM-dd');
-    const label = format(occurredAt, groupBy === 'month' ? 'MMMM yyyy' : 'PPPP');
-    const signedAmount = getSignedAmount(transaction);
-
-    const existing = groups.get(key);
     if (existing) {
       existing.transactions.push(transaction);
       existing.transactionCount += 1;
@@ -129,32 +42,63 @@ export const groupTransactionsByPeriod = (
       } else {
         existing.outflowTotal += transaction.amount;
       }
-      existing.netTotal += signedAmount;
+      existing.netTotal += getSignedAmount(transaction);
       continue;
     }
 
-    groups.set(key, {
-      key,
-      label,
+    summaries.set(dateKey, {
+      dateKey,
+      label: format(occurredAt, 'PPPP'),
       transactions: [transaction],
       transactionCount: 1,
       incomeTotal: transaction.transactionType === 'Income' ? transaction.amount : 0,
       outflowTotal: transaction.transactionType === 'Income' ? 0 : transaction.amount,
-      netTotal: signedAmount,
+      netTotal: getSignedAmount(transaction),
     });
   }
 
-  const sortedGroups = Array.from(groups.values())
-    .sort((left, right) => right.key.localeCompare(left.key))
-    .map((group) => ({
-      ...group,
-      transactions: group.transactions
-        .slice()
-        .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)),
-    }));
+  for (const summary of summaries.values()) {
+    summary.transactions = summary.transactions
+      .slice()
+      .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
+  }
+
+  return summaries;
+};
+
+export const getTransactionDaySummary = (
+  daySummaries: Map<string, TransactionDaySummary>,
+  selectedDate: Date,
+) => daySummaries.get(toDateKey(selectedDate)) ?? null;
+
+export const getTransactionMonthSummary = (
+  daySummaries: Map<string, TransactionDaySummary>,
+  selectedDate: Date,
+): TransactionMonthSummary => {
+  let activeDayCount = 0;
+  let transactionCount = 0;
+  let incomeTotal = 0;
+  let outflowTotal = 0;
+  let netTotal = 0;
+
+  for (const summary of daySummaries.values()) {
+    if (!isSameMonth(parseISO(summary.dateKey), selectedDate)) {
+      continue;
+    }
+
+    activeDayCount += 1;
+    transactionCount += summary.transactionCount;
+    incomeTotal += summary.incomeTotal;
+    outflowTotal += summary.outflowTotal;
+    netTotal += summary.netTotal;
+  }
 
   return {
-    groups: sortedGroups,
-    visibleCount: filtered.length,
+    label: format(selectedDate, 'MMMM yyyy'),
+    activeDayCount,
+    transactionCount,
+    incomeTotal,
+    outflowTotal,
+    netTotal,
   };
 };

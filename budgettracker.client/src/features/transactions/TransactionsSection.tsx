@@ -1,11 +1,9 @@
 import { useMemo, useState } from 'react';
+import { format, startOfDay, startOfMonth } from 'date-fns';
 import Button from '@mui/material/Button';
-import ButtonGroup from '@mui/material/ButtonGroup';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { Plus } from 'lucide-react';
 import { useTransactions } from './hooks/useTransactions';
@@ -14,10 +12,10 @@ import { useCategories } from '../categories/hooks/useCategories';
 import TransactionDialog from './components/TransactionDialog';
 import TransactionTable from './components/TransactionTable';
 import {
-  getRangeValuesForPreset,
-  groupTransactionsByPeriod,
-  type TransactionGroupBy,
-  type TransactionRangePreset,
+  buildTransactionDaySummaries,
+  getTransactionDaySummary,
+  getTransactionMonthSummary,
+  toDateKey,
 } from './utils/transactionGroups';
 
 type TransactionsSectionProps = {
@@ -33,9 +31,7 @@ const TransactionsSection = ({
 }: TransactionsSectionProps) => {
   const { data: transactions = [] } = useTransactions();
   const { data: categories = [] } = useCategories();
-  const [groupBy, setGroupBy] = useState<TransactionGroupBy>('month');
-  const [rangePreset, setRangePreset] = useState<TransactionRangePreset>('this-month');
-  const [rangeValues, setRangeValues] = useState(() => getRangeValuesForPreset('this-month'));
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
 
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.categoryType === 'Expense' || c.categoryType === 'Both'),
@@ -44,162 +40,72 @@ const TransactionsSection = ({
 
   const form = useTransactionForm(transactions, expenseCategories, setStatusMessage, setStatusError);
 
-  const groupedResult = useMemo(
-    () =>
-      groupTransactionsByPeriod(transactions, {
-        groupBy,
-        startValue: groupBy === 'month' ? rangeValues.startMonth : rangeValues.startDate,
-        endValue: groupBy === 'month' ? rangeValues.endMonth : rangeValues.endDate,
-      }),
-    [groupBy, rangeValues.endDate, rangeValues.endMonth, rangeValues.startDate, rangeValues.startMonth, transactions],
+  const daySummaries = useMemo(() => buildTransactionDaySummaries(transactions), [transactions]);
+  const selectedDaySummary = useMemo(
+    () => getTransactionDaySummary(daySummaries, selectedDate),
+    [daySummaries, selectedDate],
+  );
+  const visibleMonthSummary = useMemo(
+    () => getTransactionMonthSummary(daySummaries, selectedDate),
+    [daySummaries, selectedDate],
   );
 
-  const handleGroupByChange = (_event: React.MouseEvent<HTMLElement>, value: TransactionGroupBy | null) => {
-    if (value) {
-      setGroupBy(value);
-    }
+  const handleToday = () => {
+    setSelectedDate(startOfDay(new Date()));
   };
-
-  const applyPreset = (preset: Exclude<TransactionRangePreset, 'custom'>) => {
-    setRangePreset(preset);
-    setRangeValues(getRangeValuesForPreset(preset));
-  };
-
-  const handleDateFieldChange =
-    (field: 'startDate' | 'endDate' | 'startMonth' | 'endMonth') =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setRangePreset('custom');
-      setRangeValues((current) => ({
-        ...current,
-        [field]: event.target.value,
-      }));
-    };
 
   if (isLoading) return null;
 
   return (
     <>
       <Stack spacing={2.5}>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <Typography variant="body2" color="text.secondary">
-              Showing {groupedResult.visibleCount} of {transactions.length}{' '}
-              {transactions.length === 1 ? 'transaction' : 'transactions'}
+              {visibleMonthSummary.label} has {visibleMonthSummary.transactionCount}{' '}
+              {visibleMonthSummary.transactionCount === 1 ? 'transaction' : 'transactions'} across{' '}
+              {visibleMonthSummary.activeDayCount} active{' '}
+              {visibleMonthSummary.activeDayCount === 1 ? 'day' : 'days'}.
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Organize your ledger by {groupBy} and narrow the visible period.
+              Select a day on the calendar to inspect that ledger slice or start a new entry.
             </Typography>
           </div>
-          <Button variant="contained" startIcon={<Plus className="w-4 h-4" />} onClick={form.openForAdd}>
-            Add Transaction
-          </Button>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
+            <Button variant="outlined" onClick={handleToday}>
+              Today
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Plus className="w-4 h-4" />}
+              onClick={() => form.openForAdd(toDateKey(selectedDate))}
+            >
+              Add Transaction
+            </Button>
+          </Stack>
         </div>
 
         <Card variant="outlined" sx={{ p: 2 }}>
-          <Stack spacing={2}>
-            <Stack
-              direction={{ xs: 'column', lg: 'row' }}
-              spacing={2}
-              justifyContent="space-between"
-              alignItems={{ xs: 'stretch', lg: 'center' }}
-            >
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
-                <Typography variant="subtitle2" sx={{ minWidth: 84 }}>
-                  Group By
-                </Typography>
-                <ToggleButtonGroup
-                  exclusive
-                  color="primary"
-                  value={groupBy}
-                  onChange={handleGroupByChange}
-                  size="small"
-                >
-                  <ToggleButton value="day">Day</ToggleButton>
-                  <ToggleButton value="month">Month</ToggleButton>
-                </ToggleButtonGroup>
-              </Stack>
-
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
-                <Typography variant="subtitle2" sx={{ minWidth: 84 }}>
-                  Quick Range
-                </Typography>
-                <ButtonGroup size="small" variant="outlined">
-                  <Button
-                    variant={rangePreset === 'this-month' ? 'contained' : 'outlined'}
-                    onClick={() => applyPreset('this-month')}
-                  >
-                    This Month
-                  </Button>
-                  <Button
-                    variant={rangePreset === 'last-3-months' ? 'contained' : 'outlined'}
-                    onClick={() => applyPreset('last-3-months')}
-                  >
-                    Last 3 Months
-                  </Button>
-                  <Button
-                    variant={rangePreset === 'ytd' ? 'contained' : 'outlined'}
-                    onClick={() => applyPreset('ytd')}
-                  >
-                    Year to Date
-                  </Button>
-                  <Button
-                    variant={rangePreset === 'all' ? 'contained' : 'outlined'}
-                    onClick={() => applyPreset('all')}
-                  >
-                    All
-                  </Button>
-                </ButtonGroup>
-              </Stack>
-            </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-              {groupBy === 'month' ? (
-                <>
-                  <TextField
-                    label="Start Month"
-                    type="month"
-                    value={rangeValues.startMonth}
-                    onChange={handleDateFieldChange('startMonth')}
-                    fullWidth
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                  <TextField
-                    label="End Month"
-                    type="month"
-                    value={rangeValues.endMonth}
-                    onChange={handleDateFieldChange('endMonth')}
-                    fullWidth
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                </>
-              ) : (
-                <>
-                  <TextField
-                    label="Start Date"
-                    type="date"
-                    value={rangeValues.startDate}
-                    onChange={handleDateFieldChange('startDate')}
-                    fullWidth
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                  <TextField
-                    label="End Date"
-                    type="date"
-                    value={rangeValues.endDate}
-                    onChange={handleDateFieldChange('endDate')}
-                    fullWidth
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                </>
-              )}
-            </Stack>
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.25} useFlexGap flexWrap="wrap">
+            <Chip label={`Selected ${format(selectedDate, 'PP')}`} color="primary" variant="outlined" />
+            <Chip label={`Income $${visibleMonthSummary.incomeTotal.toFixed(2)}`} color="success" variant="outlined" />
+            <Chip label={`Outflow $${visibleMonthSummary.outflowTotal.toFixed(2)}`} color="error" variant="outlined" />
+            <Chip
+              label={`Net ${visibleMonthSummary.netTotal >= 0 ? '+' : '-'}$${Math.abs(visibleMonthSummary.netTotal).toFixed(2)}`}
+              color={visibleMonthSummary.netTotal >= 0 ? 'success' : 'error'}
+            />
           </Stack>
         </Card>
 
         <Card variant="outlined">
           <TransactionTable
-            groups={groupedResult.groups}
             categories={categories}
+            daySummaries={daySummaries}
+            selectedDate={selectedDate}
+            selectedDaySummary={selectedDaySummary}
+            onDateChange={setSelectedDate}
+            onMonthChange={(month) => setSelectedDate(startOfMonth(month))}
+            onAddTransaction={form.openForAdd}
             onRowClick={form.openForEdit}
           />
         </Card>

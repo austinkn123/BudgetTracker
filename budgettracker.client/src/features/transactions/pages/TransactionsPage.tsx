@@ -16,7 +16,7 @@ const TransactionsPage = () => {
           Transactions
         </Typography>
         <Typography variant="body2" className="text-gray-500 mt-1">
-          Browse your ledger by day or month, then add or edit transactions as needed
+          Browse your ledger by calendar day, then drill into that date to add or edit transactions
         </Typography>
       </div>
 

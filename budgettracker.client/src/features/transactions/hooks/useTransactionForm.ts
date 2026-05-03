@@ -7,11 +7,15 @@ import type { TransactionFormData } from '../../../shared/validation/transaction
 
 const todayInputValue = format(new Date(), 'yyyy-MM-dd');
 
-const emptyForm = (defaultAccountId: number, defaultCategoryId: number): TransactionFormData => ({
+const emptyForm = (
+  defaultAccountId: number,
+  defaultCategoryId: number,
+  occurredAt = todayInputValue,
+): TransactionFormData => ({
   accountId: defaultAccountId,
   categoryId: defaultCategoryId,
   amount: 0,
-  occurredAt: todayInputValue,
+  occurredAt,
   payee: '',
   notes: '',
 });
@@ -34,8 +38,8 @@ export const useTransactionForm = (
     emptyForm(defaultAccountId, defaultCategoryId),
   );
 
-  const openForAdd = useCallback(() => {
-    setInitialValues(emptyForm(defaultAccountId, defaultCategoryId));
+  const openForAdd = useCallback((occurredAt?: string) => {
+    setInitialValues(emptyForm(defaultAccountId, defaultCategoryId, occurredAt ?? todayInputValue));
     setEditingId(null);
     setDialogMode('add');
     setDialogOpen(true);

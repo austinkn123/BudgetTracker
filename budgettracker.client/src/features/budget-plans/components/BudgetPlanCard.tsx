@@ -1,10 +1,12 @@
 import { format } from 'date-fns';
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
+import { alpha } from '@mui/material/styles';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -102,26 +104,57 @@ const BudgetPlanCard = ({
         }
       />
       <CardContent className="pt-0">
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="rounded-lg bg-green-50 px-3 py-2">
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
+            gap: 1.5,
+            mb: 3,
+          }}
+        >
+          <Box
+            sx={{
+              borderRadius: 3,
+              px: 1.5,
+              py: 1.25,
+              border: (theme) => `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+              backgroundColor: (theme) => alpha(theme.palette.success.main, 0.12),
+            }}
+          >
             <Typography variant="caption" color="success.main">Monthly Income</Typography>
             <Typography variant="subtitle1" fontWeight={600} color="success.dark">
               ${monthlyIncome.toFixed(2)}
             </Typography>
-          </div>
-          <div className="rounded-lg bg-red-50 px-3 py-2">
+          </Box>
+          <Box
+            sx={{
+              borderRadius: 3,
+              px: 1.5,
+              py: 1.25,
+              border: (theme) => `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+              backgroundColor: (theme) => alpha(theme.palette.error.main, 0.08),
+            }}
+          >
             <Typography variant="caption" color="error.main">Monthly Expenses</Typography>
             <Typography variant="subtitle1" fontWeight={600} color="error.dark">
               ${monthlyExpenses.toFixed(2)}
             </Typography>
-          </div>
-          <div className="rounded-lg bg-blue-50 px-3 py-2">
+          </Box>
+          <Box
+            sx={{
+              borderRadius: 3,
+              px: 1.5,
+              py: 1.25,
+              border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+              backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.12),
+            }}
+          >
             <Typography variant="caption" color="primary.main">Monthly Net</Typography>
             <Typography variant="subtitle1" fontWeight={600} color={monthlyNet >= 0 ? 'success.dark' : 'error.dark'}>
               ${monthlyNet.toFixed(2)}
             </Typography>
-          </div>
-        </div>
+          </Box>
+        </Box>
 
         <TableContainer>
           <Table size="small">

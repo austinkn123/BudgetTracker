@@ -52,7 +52,7 @@ export const Layout = () => {
             onClick={() => handleNav('/')}
             sx={{ flexGrow: { xs: 1, md: 0 }, mr: { md: 4 } }}
           >
-            <Wallet className="w-6 h-6 text-blue-600" />
+            <Wallet className="w-6 h-6" style={{ color: 'var(--mui-palette-primary-main)' }} />
             <Typography variant="h6" sx={{ color: 'grey.900', fontWeight: 700 }}>
               BudgetTracker
             </Typography>
@@ -95,7 +95,7 @@ export const Layout = () => {
         PaperProps={{ sx: { width: 280 } }}
       >
         <Box className="p-4 flex items-center gap-2">
-          <Wallet className="w-6 h-6 text-blue-600" />
+          <Wallet className="w-6 h-6" style={{ color: 'var(--mui-palette-primary-main)' }} />
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
             BudgetTracker
           </Typography>
