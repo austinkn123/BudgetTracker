@@ -20,12 +20,12 @@ const formatter = new Intl.NumberFormat('en-US', {
 export function SpendingByCategoryChart({ data }: SpendingByCategoryChartProps) {
   if (data.length === 0) {
     return (
-      <Card className="h-full">
+      <Card className="h-full rounded-2xl border border-slate-200/80 bg-white shadow-sm" elevation={0}>
         <CardContent className="flex flex-col items-center justify-center h-full min-h-[300px]">
-          <Typography variant="h6" className="font-semibold mb-2">
+          <Typography variant="h6" className="font-semibold mb-2 text-slate-900">
             Spending by Category
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" className="text-slate-500">
             No expense data yet
           </Typography>
         </CardContent>
@@ -34,10 +34,13 @@ export function SpendingByCategoryChart({ data }: SpendingByCategoryChartProps) 
   }
 
   return (
-    <Card className="h-full">
-      <CardContent>
-        <Typography variant="h6" className="font-semibold mb-4">
+    <Card className="h-full rounded-2xl border border-slate-200/80 bg-white shadow-sm" elevation={0}>
+      <CardContent className="p-6">
+        <Typography variant="h6" className="font-semibold mb-1 text-slate-900">
           Spending by Category
+        </Typography>
+        <Typography variant="body2" className="mb-4 text-slate-500">
+          Breakdown of expense distribution across categories
         </Typography>
         <PieChart
           series={[

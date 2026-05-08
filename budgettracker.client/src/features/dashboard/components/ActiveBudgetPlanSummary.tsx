@@ -20,12 +20,12 @@ const formatter = new Intl.NumberFormat('en-US', {
 export function ActiveBudgetPlanSummary({ plan }: ActiveBudgetPlanSummaryProps) {
   if (!plan) {
     return (
-      <Card className="h-full">
+      <Card className="h-full rounded-2xl border border-slate-200/80 bg-white shadow-sm" elevation={0}>
         <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px]">
-          <Typography variant="h6" className="font-semibold mb-2">
+          <Typography variant="h6" className="font-semibold mb-2 text-slate-900">
             Active Budget Plan
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" className="text-slate-500">
             No active budget plan
           </Typography>
         </CardContent>
@@ -42,19 +42,19 @@ export function ActiveBudgetPlanSummary({ plan }: ActiveBudgetPlanSummaryProps) 
   const plannedNet = totalIncome - totalExpenses;
 
   return (
-    <Card className="h-full">
-      <CardContent>
+    <Card className="h-full rounded-2xl border border-slate-200/80 bg-white shadow-sm" elevation={0}>
+      <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <Typography variant="h6" className="font-semibold">
+          <Typography variant="h6" className="font-semibold text-slate-900">
             Active Budget Plan
           </Typography>
           <Chip label="Active" color="success" size="small" />
         </div>
 
-        <Typography variant="subtitle1" className="font-medium">
+        <Typography variant="subtitle1" className="font-medium text-slate-900">
           {plan.name}
         </Typography>
-        <div className="flex items-center gap-1 text-gray-500 mb-4">
+        <div className="flex items-center gap-1 text-slate-500 mb-4">
           <CalendarDays className="w-4 h-4" />
           <Typography variant="caption">
             {format(parseISO(plan.planMonth), 'MMMM yyyy')}
@@ -78,7 +78,7 @@ export function ActiveBudgetPlanSummary({ plan }: ActiveBudgetPlanSummaryProps) 
               {formatter.format(totalExpenses)}
             </Typography>
           </div>
-          <div className="border-t border-gray-200 pt-3 flex justify-between">
+          <div className="border-t border-slate-200 pt-3 flex justify-between">
             <Typography variant="body2" className="font-medium">
               Planned Net
             </Typography>

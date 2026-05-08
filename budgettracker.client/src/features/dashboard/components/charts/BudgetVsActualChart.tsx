@@ -13,18 +13,18 @@ interface BudgetVsActualChartProps {
 export function BudgetVsActualChart({ data, planName, hasActivePlan }: BudgetVsActualChartProps) {
   if (data.length === 0) {
     return (
-      <Card>
+      <Card className="rounded-2xl border border-slate-200/80 bg-white shadow-sm" elevation={0}>
         <CardContent className="flex flex-col items-center justify-center min-h-[300px]">
-          <Typography variant="h6" className="font-semibold mb-2">
+          <Typography variant="h6" className="font-semibold mb-2 text-slate-900">
             Budget vs Actual
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" className="text-slate-500">
             {hasActivePlan
               ? 'No budget line items or matching expense transactions for this plan month yet'
               : 'No active budget plan to compare'}
           </Typography>
           {hasActivePlan && planName && (
-            <Typography variant="caption" color="text.secondary" className="mt-1">
+            <Typography variant="caption" className="mt-1 text-slate-400">
               Active plan: {planName}
             </Typography>
           )}
@@ -34,14 +34,14 @@ export function BudgetVsActualChart({ data, planName, hasActivePlan }: BudgetVsA
   }
 
   return (
-    <Card>
-      <CardContent>
+    <Card className="rounded-2xl border border-slate-200/80 bg-white shadow-sm" elevation={0}>
+      <CardContent className="p-6">
         <div className="flex items-baseline gap-2 mb-4">
-          <Typography variant="h6" className="font-semibold">
+          <Typography variant="h6" className="font-semibold text-slate-900">
             Budget vs Actual
           </Typography>
           {planName && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" className="text-slate-500">
               — {planName}
             </Typography>
           )}

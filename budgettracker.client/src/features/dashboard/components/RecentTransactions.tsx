@@ -27,26 +27,29 @@ export function RecentTransactions({ transactions, categories }: RecentTransacti
     .slice(0, 5);
 
   return (
-    <Card className="h-full">
-      <CardContent>
-        <Typography variant="h6" className="font-semibold mb-2">
+    <Card className="h-full rounded-2xl border border-slate-200/80 bg-white shadow-sm" elevation={0}>
+      <CardContent className="p-6">
+        <Typography variant="h6" className="font-semibold mb-1 text-slate-900">
           Recent Transactions
         </Typography>
+        <Typography variant="body2" className="mb-3 text-slate-500">
+          Your five latest entries
+        </Typography>
         {recent.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" className="py-8 text-center">
+          <Typography variant="body2" className="py-8 text-center text-slate-500">
             No transactions yet
           </Typography>
         ) : (
           <List disablePadding>
             {recent.map((t, i) => (
               <div key={t.id}>
-                {i > 0 && <Divider />}
+                {i > 0 && <Divider className="border-slate-100" />}
                 <ListItem disableGutters className="py-2">
                   <ListItemText
                     primary={t.payee || categoryMap.get(t.categoryId) || 'Transaction'}
                     secondary={`${format(parseISO(t.occurredAt), 'MMM d, yyyy')} · ${categoryMap.get(t.categoryId) ?? ''}`}
-                    primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
-                    secondaryTypographyProps={{ variant: 'caption' }}
+                    primaryTypographyProps={{ variant: 'body2', fontWeight: 600, color: '#0f172a' }}
+                    secondaryTypographyProps={{ variant: 'caption', color: '#64748b' }}
                   />
                   <Typography
                     variant="body2"

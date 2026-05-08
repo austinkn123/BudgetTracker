@@ -61,6 +61,14 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-8">
+      <section className="rounded-2xl border border-slate-200/70 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-7 text-white shadow-sm md:px-8">
+        <p className="text-sm font-medium text-slate-200">Overview</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">Financial Dashboard</h1>
+        <p className="mt-2 max-w-2xl text-sm text-slate-300 md:text-base">
+          Track spending, compare budgets, and monitor monthly performance at a glance.
+        </p>
+      </section>
+
       <SummaryCards totals={summaryTotals} mode={activePlan ? 'planned' : 'actual'} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
