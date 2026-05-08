@@ -32,25 +32,6 @@
                 "reveal": "silent"
             },
             "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "rebuild",
-            "command": "dotnet",
-            "type": "shell",
-            "args": [
-                "rebuild",
-                "${workspaceFolder}/BudgetTracker.sln",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "presentation": {
-                "reveal": "silent"
-            },
-            "problemMatcher": "$msCompile"
         }
     ]
 }
