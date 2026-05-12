@@ -30,6 +30,13 @@ public class UserAccessor(BudgetTrackerDbContext context) : IUserAccessor
             .FirstOrDefaultAsync(u => u.Id == id);
     }
 
+    public async Task<User?> GetByCognitoSubAsync(string sub)
+    {
+        return await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.CognitoSub == sub);
+    }
+
     public async Task<bool> UpdateAsync(User user)
     {
         context.Users.Update(user);

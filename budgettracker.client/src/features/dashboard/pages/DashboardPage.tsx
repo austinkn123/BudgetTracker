@@ -1,24 +1,23 @@
 import { useMemo } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { useBudgetPlans } from '../../budget-plans/hooks/useBudgetPlans';
+import { useUser } from '../../user/hooks/useUser';
 import { DashboardLoadingState } from '../components/DashboardLoadingState';
 import { DashboardErrorState } from '../components/DashboardErrorState';
-import { SummaryCards } from '../components/SummaryCards';
-import { SpendingByCategoryChart } from '../components/charts/SpendingByCategoryChart';
-import { SpendingOverTimeChart } from '../components/charts/SpendingOverTimeChart';
-import { BudgetVsActualChart } from '../components/charts/BudgetVsActualChart';
-import { RecentTransactions } from '../components/RecentTransactions';
-import { ActiveBudgetPlanSummary } from '../components/ActiveBudgetPlanSummary';
-import {
-  computeSummaryTotals,
-  computeSummaryTotalsFromPlan,
-  aggregateByCategory,
-  aggregateByCategoryFromPlan,
-  aggregateByMonth,
-  budgetVsActual,
-} from '../utils/chartHelpers';
-import { useUser } from '../../user/hooks/useUser';
+import { RangeSelector } from '../components/RangeSelector';
+import { PlanStoryHero } from '../components/PlanStoryHero';
+import { PlanStoryHeroEmpty } from '../components/PlanStoryHeroEmpty';
+import { CashflowWaterfall } from '../components/CashflowWaterfall';
+import { WhereItWent } from '../components/WhereItWent';
+import { CategoryDrillGrid } from '../components/CategoryDrillGrid';
+import { BucketBreakdown } from '../components/BucketBreakdown';
+import { RecentActivityFeed } from '../components/RecentActivityFeed';
+import { useDateRange } from '../hooks/useDateRange';
+import { usePlanProgress } from '../hooks/usePlanProgress';
+import { filterTransactionsByRange } from '../utils/chartHelpers';
 
 const DashboardPage = () => {
   const { isLoading: loadingUser, error: userError } = useUser();
@@ -26,24 +25,17 @@ const DashboardPage = () => {
   const { data: transactions = [], isLoading: loadingTransactions, error: transactionsError } = useTransactions();
   const { data: budgetPlans = [], isLoading: loadingBudgetPlans, error: budgetPlansError } = useBudgetPlans();
 
+  const { range, setRange, start, end } = useDateRange();
+
   const isLoading = loadingCategories || loadingTransactions || loadingUser || loadingBudgetPlans;
   const hasErrors = categoriesError || transactionsError || userError || budgetPlansError;
-  const activePlan = useMemo(() => budgetPlans.find((p) => p.isActive), [budgetPlans]);
 
-  const summaryTotals = useMemo(
-    () => (activePlan ? computeSummaryTotalsFromPlan(activePlan) : computeSummaryTotals(transactions)),
-    [activePlan, transactions],
-  );
-  const categoryData = useMemo(
-    () => (activePlan
-      ? aggregateByCategoryFromPlan(activePlan, categories)
-      : aggregateByCategory(transactions, categories)),
-    [activePlan, transactions, categories],
-  );
-  const monthlyData = useMemo(() => aggregateByMonth(transactions), [transactions]);
-  const budgetActualData = useMemo(
-    () => budgetVsActual(activePlan, transactions, categories),
-    [activePlan, transactions, categories],
+  const activePlan = useMemo(() => budgetPlans.find((p) => p.isActive), [budgetPlans]);
+  const progress = usePlanProgress({ plan: activePlan, transactions, categories });
+
+  const rangedTransactions = useMemo(
+    () => filterTransactionsByRange(transactions, start, end),
+    [transactions, start, end],
   );
 
   if (isLoading) return <DashboardLoadingState />;
@@ -61,22 +53,66 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-8">
-      <SummaryCards totals={summaryTotals} mode={activePlan ? 'planned' : 'actual'} />
+      {/* Header row: title + range selector */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 2,
+        }}
+      >
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Dashboard
+          </Typography>
+          {activePlan && (
+            <Typography variant="body2" color="text.secondary">
+              Active plan: {activePlan.name}
+            </Typography>
+          )}
+        </Box>
+        <RangeSelector value={range} onChange={setRange} />
+      </Box>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SpendingByCategoryChart data={categoryData} />
-        <SpendingOverTimeChart data={monthlyData} />
+      {/* Hero */}
+      {activePlan && progress ? (
+        <PlanStoryHero plan={activePlan} progress={progress} />
+      ) : (
+        <PlanStoryHeroEmpty />
+      )}
+
+      {/* Cashflow waterfall + Where it went */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <CashflowWaterfall
+            plan={activePlan}
+            transactions={transactions}
+            categories={categories}
+          />
+        </div>
+        <WhereItWent transactions={rangedTransactions} categories={categories} />
       </div>
 
-      <BudgetVsActualChart
-        data={budgetActualData}
-        planName={activePlan?.name}
-        hasActivePlan={Boolean(activePlan)}
-      />
+      {/* Category drill grid */}
+      {activePlan && (
+        <CategoryDrillGrid
+          plan={activePlan}
+          transactions={transactions}
+          categories={categories}
+          start={start}
+          end={end}
+        />
+      )}
 
+      {/* Bucket breakdown + recent activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentTransactions transactions={transactions} categories={categories} />
-        <ActiveBudgetPlanSummary plan={activePlan} />
+        <BucketBreakdown plan={activePlan} transactions={transactions} />
+        <RecentActivityFeed
+          transactions={rangedTransactions}
+          categories={categories}
+        />
       </div>
     </div>
   );

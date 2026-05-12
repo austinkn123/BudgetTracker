@@ -1,5 +1,20 @@
 namespace BudgetTracker.Domain.Common;
 
+public record Result
+{
+    public bool IsSuccess { get; }
+    public string? Error { get; }
+
+    private Result(bool isSuccess, string? error)
+    {
+        IsSuccess = isSuccess;
+        Error = error;
+    }
+
+    public static Result Success() => new(true, null);
+    public static Result Failure(string error) => new(false, error);
+}
+
 public record Result<T>
 {
     public bool IsSuccess { get; }

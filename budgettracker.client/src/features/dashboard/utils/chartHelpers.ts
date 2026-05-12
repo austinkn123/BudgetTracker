@@ -1,5 +1,5 @@
 import type { Transaction, BudgetPlan, Category } from '../../../shared/types/api';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfMonth, subMonths } from 'date-fns';
 
 export interface SummaryTotals {
   totalIncome: number;
@@ -162,4 +162,72 @@ export function budgetVsActual(
       actual: actualByCategory.get(id) ?? 0,
     }))
     .sort((a, b) => b.budgeted - a.budgeted);
+}
+
+/**
+ * Filter a list of transactions to those occurring within `[start, end]`
+ * (inclusive on both ends — matches the {@link useDateRange} bounds).
+ */
+export function filterTransactionsByRange(
+  transactions: Transaction[],
+  start: Date,
+  end: Date,
+): Transaction[] {
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+  return transactions.filter((t) => {
+    const ts = parseISO(t.occurredAt).getTime();
+    return ts >= startMs && ts <= endMs;
+  });
+}
+
+/**
+ * Build a per-category, per-month expense timeline for the past `monthsBack`
+ * months (inclusive of the current month). Each map entry is a chronologically
+ * ordered series suitable for a sparkline.
+ */
+export function aggregateByCategoryMonthly(
+  transactions: Transaction[],
+  categories: Category[],
+  monthsBack: number,
+): Map<number, MonthlyDataPoint[]> {
+  const now = new Date();
+  // Build the month bucket order: oldest -> newest.
+  const months: string[] = [];
+  for (let i = monthsBack - 1; i >= 0; i -= 1) {
+    months.push(format(startOfMonth(subMonths(now, i)), 'yyyy-MM'));
+  }
+  const monthLabels = new Map(
+    months.map((m) => [m, format(parseISO(`${m}-01`), 'MMM yyyy')] as const),
+  );
+
+  const result = new Map<number, MonthlyDataPoint[]>();
+
+  // Seed every category with zeroed months so sparklines have a flat baseline.
+  for (const c of categories) {
+    result.set(
+      c.id,
+      months.map((m) => ({ month: monthLabels.get(m)!, income: 0, expenses: 0 })),
+    );
+  }
+
+  for (const t of transactions) {
+    const monthKey = t.occurredAt.substring(0, 7);
+    const idx = months.indexOf(monthKey);
+    if (idx === -1) continue;
+
+    let series = result.get(t.categoryId);
+    if (!series) {
+      series = months.map((m) => ({ month: monthLabels.get(m)!, income: 0, expenses: 0 }));
+      result.set(t.categoryId, series);
+    }
+
+    if (t.transactionType === 'Income') {
+      series[idx].income += t.amount;
+    } else {
+      series[idx].expenses += t.amount;
+    }
+  }
+
+  return result;
 }

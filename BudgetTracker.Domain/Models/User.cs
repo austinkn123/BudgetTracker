@@ -4,6 +4,7 @@ public class User
 {
     public int Id { get; set; }
     public string Email { get; set; } = string.Empty;
+    public string CognitoSub { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 
     public ICollection<Category> Categories { get; set; } = [];

@@ -2,18 +2,23 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import { LineChart } from '@mui/x-charts/LineChart';
+import { useTheme } from '@mui/material/styles';
 import type { MonthlyDataPoint } from '../../utils/chartHelpers';
+import { getSemanticColors } from '../../utils/chartTheme';
 
 interface SpendingOverTimeChartProps {
   data: MonthlyDataPoint[];
 }
 
 export function SpendingOverTimeChart({ data }: SpendingOverTimeChartProps) {
+  const theme = useTheme();
+  const semantic = getSemanticColors(theme);
+
   if (data.length === 0) {
     return (
       <Card className="h-full">
         <CardContent className="flex flex-col items-center justify-center h-full min-h-[300px]">
-          <Typography variant="h6" className="font-semibold mb-2">
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
             Spending Over Time
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -27,7 +32,7 @@ export function SpendingOverTimeChart({ data }: SpendingOverTimeChartProps) {
   return (
     <Card className="h-full">
       <CardContent>
-        <Typography variant="h6" className="font-semibold mb-4">
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
           Spending Over Time
         </Typography>
         <LineChart
@@ -42,14 +47,14 @@ export function SpendingOverTimeChart({ data }: SpendingOverTimeChartProps) {
             {
               data: data.map((d) => d.income),
               label: 'Income',
-              color: '#16a34a',
+              color: semantic.income,
               curve: 'natural',
               area: true,
             },
             {
               data: data.map((d) => d.expenses),
               label: 'Expenses',
-              color: '#dc2626',
+              color: semantic.expense,
               curve: 'natural',
               area: true,
             },

@@ -16,6 +16,13 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(255)
             .IsRequired();
 
+        builder.Property(u => u.CognitoSub)
+            .HasMaxLength(255)
+            .IsRequired(false);
+
+        builder.HasIndex(u => u.CognitoSub)
+            .IsUnique();
+
         builder.Property(u => u.CreatedAt)
             .HasDefaultValueSql("GETDATE()");
 
