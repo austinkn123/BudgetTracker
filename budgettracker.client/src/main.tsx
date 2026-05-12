@@ -5,6 +5,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { alpha, ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import './index.css'
+import './auth/amplifyConfig'
+import { AuthProvider } from './auth/AuthContext'
 import App from './App.tsx'
 
 const palette = {
@@ -74,12 +76,14 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <App />
-        </ThemeProvider>
-      </QueryClientProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <App />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

@@ -5,7 +5,9 @@ using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Server.Endpoints;
 using BudgetTracker.Server.Managers;
 using BudgetTracker.Server.Utilities;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,8 +15,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<BudgetTrackerDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("BudgetTrackerConnection")));
 
-// Current user provider (swap for CognitoCurrentUserProvider when auth is added)
-builder.Services.AddScoped<ICurrentUserProvider, HardcodedCurrentUserProvider>();
+// HTTP context accessor for Cognito claims extraction
+builder.Services.AddHttpContextAccessor();
+
+// Current user provider backed by Cognito
+builder.Services.AddScoped<ICurrentUserProvider, CognitoCurrentUserProvider>();
 
 // Accessors (data access)
 builder.Services.Scan(scan => scan
@@ -39,6 +44,28 @@ builder.Services.Scan(scan => scan
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// JWT Bearer authentication for Cognito
+var cognitoConfig = builder.Configuration.GetSection("Cognito");
+var authority = cognitoConfig["Authority"];
+var audience = cognitoConfig["ClientId"];
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = authority;
+        options.Audience = audience;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = authority,
+            ValidAudience = audience
+        };
+    });
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -55,13 +82,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Map endpoint groups
 var apiGroup = app.MapGroup("/api")
-    .WithOpenApi();
-    // .RequireAuthorization(); // Uncomment to require authentication for all API endpoints
-    // .AddEndpointFilter<LoggingFilter>(); // Add custom filters
+    .WithOpenApi()
+    .RequireAuthorization();
 
 // Transaction endpoints group
 var transactionGroup = apiGroup.MapGroup("/transactions")

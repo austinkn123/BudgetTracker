@@ -9,4 +9,5 @@ public interface IUserManager
     Task<Result<int>> CreateAsync(User user);
     Task<Result<bool>> UpdateAsync(User user);
     Task<Result<bool>> DeleteAsync(int id);
+    Task<Result<int>> GetOrProvisionByCognitoSubAsync(string sub, string email);
 }
