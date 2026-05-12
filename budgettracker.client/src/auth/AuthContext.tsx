@@ -1,4 +1,5 @@
 import { createContext, useEffect, useState, ReactNode } from 'react';
+import { Hub } from 'aws-amplify/utils';
 import {
   getCurrentUser,
   fetchAuthSession,
@@ -6,10 +7,9 @@ import {
   signUp,
   confirmSignUp,
   resendSignUpCode,
-  forgotPassword,
+  resetPassword,
   confirmResetPassword,
   signOut,
-  Hub,
 } from 'aws-amplify/auth';
 
 export type AuthUser = {
@@ -165,11 +165,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const handleForgotPassword = async (email: string) => {
     try {
-      const output = await forgotPassword({
+      const output = await resetPassword({
         username: email,
       });
       return {
-        deliveryMedium: output.codeDeliveryDetails?.deliveryMedium || 'email',
+        deliveryMedium: output.nextStep.codeDeliveryDetails?.deliveryMedium || 'email',
       };
     } catch (error) {
       const err = error as Error;
