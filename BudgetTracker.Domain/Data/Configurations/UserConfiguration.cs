@@ -20,8 +20,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(255)
             .IsRequired(false);
 
+        builder.HasIndex(u => u.Email)
+            .IsUnique()
+            .HasDatabaseName("UQ_Users_Email");
+
         builder.HasIndex(u => u.CognitoSub)
-            .IsUnique();
+            .IsUnique()
+            .HasDatabaseName("IX_Users_CognitoSub")
+            .HasFilter("[CognitoSub] IS NOT NULL");
 
         builder.Property(u => u.CreatedAt)
             .HasDefaultValueSql("GETDATE()");

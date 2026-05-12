@@ -16,6 +16,9 @@ export const amplifyConfig = {
       region,
       userPoolId,
       userPoolClientId,
+      loginWith: {
+        email: true,
+      },
     },
   },
 };
