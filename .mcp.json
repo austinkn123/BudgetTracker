@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "atlassian": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.atlassian.com/v1/mcp"]
+    },
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "c:\\Users\\Austin\\Projects\\BudgetTracker"]
+    },
+    "mssql": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@davesbingtranslator/mssql-mcp-server",
+        "--connection-string",
+        "Server=(localdb)\\MSSQLLocalDB;Database=BudgetTracker;Trusted_Connection=True;TrustServerCertificate=True;"
+      ]
+    }
+  }
+}

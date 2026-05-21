@@ -418,3 +418,9 @@ FodyWeavers.xsd
 *.msp
 
 .fake
+
+# Playwright MCP snapshots
+.playwright-mcp/
+
+# Screenshots
+screenshots/

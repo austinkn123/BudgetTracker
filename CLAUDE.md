@@ -35,3 +35,34 @@ You are an expert developer working on the BudgetTracker application. This proje
 ## Context
 - Always check `project-docs/` for architectural decisions before suggesting major changes.
 - Refer to `.claude/agents/christopher-product-manager.md` for product vision if unclear on requirements.
+- Jira project: **BUD** on `austinkn123.atlassian.net` — check for existing issues before creating new ones, and link completed work to its ticket when relevant.
+- Local database: **SQL Server LocalDB** — `Server=(localdb)\MSSQLLocalDB;Database=BudgetTracker;Trusted_Connection=True;TrustServerCertificate=True;` — use the `mssql` MCP server to inspect schema, run queries, and verify migrations directly.
+
+## Agent Roster
+
+| Agent | Role | Use when |
+|---|---|---|
+| christopher | Product Manager | Requirements, user stories, backlog priority, "what should we build" |
+| tony | Software Architect | Service boundaries, IDesign decisions, new feature impact analysis |
+| richie | Senior DBA | Schema design, indexes, query tuning, EF migration review |
+| paulie | Senior Full-Stack Dev | C#/.NET + React/TS implementation, TDD, bug fixes |
+| silvio | Senior QA | Test plans, coverage review, TDD verification, edge cases |
+| bobby | Docs Specialist | README and standalone .md files only — never code |
+
+## Common Workflows
+
+Default agent sequences. Delegate via the Task tool; chain by invoking the next agent with the prior agent's output as context.
+
+- **New feature**: christopher (story + AC) → tony (service boundaries) → paulie (TDD implementation) → silvio (test review) → bobby (README/docs touch-up if user-facing)
+- **Bug fix**: paulie (failing test + fix) → silvio (regression coverage review)
+- **Schema change**: tony (architectural impact) → richie (schema + index design) → paulie (EF migration + code) → silvio (data + integration tests)
+- **Docs-only update**: bobby
+- **Pre-commit review**: tony + silvio in parallel (already automated via `/review`)
+
+## Auto-delegation Rules
+
+- Default to delegating. The main thread is a router, not an implementer.
+- Only handle inline when the task is a trivial single-file edit (typo, one-line config tweak, rename) AND no agent description matches.
+- When multiple agents match, prefer the earliest in the relevant workflow chain.
+- For multi-step work, delegate each step to its specialist rather than asking one agent to cross lanes.
+- Surface the chosen agent and reason in one short sentence before invoking (e.g., "Routing to paulie — TDD implementation work").
