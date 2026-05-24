@@ -36,6 +36,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - Always check `project-docs/` for architectural decisions before suggesting major changes.
 - Refer to `.claude/agents/christopher-product-manager.md` for product vision if unclear on requirements.
 - Jira project: **BUD** on `austinkn123.atlassian.net` — check for existing issues before creating new ones, and link completed work to its ticket when relevant.
+- **Jira access via MCP**: The Atlassian MCP server is configured in `.mcp.json` and provides direct Jira access. When asked about any BUD ticket, **ALWAYS call the Atlassian MCP tools** — never say "I can't connect to Jira" without first attempting the call. Common tools: `mcp__atlassian__getIssue` (fetch a specific ticket), `mcp__atlassian__searchIssues` (JQL search), `mcp__atlassian__getAccessibleAtlassianResources` (list resources). If the call fails, report the actual error returned by the tool, not a pre-emptive refusal.
 - Local database: **SQL Server LocalDB** — `Server=(localdb)\MSSQLLocalDB;Database=BudgetTracker;Trusted_Connection=True;TrustServerCertificate=True;` — use the `mssql` MCP server to inspect schema, run queries, and verify migrations directly.
 
 ## Agent Roster
@@ -66,3 +67,19 @@ Default agent sequences. Delegate via the Task tool; chain by invoking the next 
 - When multiple agents match, prefer the earliest in the relevant workflow chain.
 - For multi-step work, delegate each step to its specialist rather than asking one agent to cross lanes.
 - Surface the chosen agent and reason in one short sentence before invoking (e.g., "Routing to paulie — TDD implementation work").
+
+## Guardrails
+
+Three layers of safety. Tagged actions surface a confirmation prompt; nothing is hard-blocked from override.
+
+**Destructive ops (require confirmation):** force pushes, hard resets, branch deletes, working-tree discards, stash drops, recursive deletes, process kills, EF migration removal, EF database drop. Enforced via the `permissions.ask` list in `.claude/settings.json`.
+
+**Sensitive files (require confirmation):** `.env*`, `appsettings.Production*.json`, `*.pfx/*.key/*.pem/*.p12`, anything under `.git/`, `.mcp.json`, `.claude/settings.json`, `.claude/scripts/*`, paths matching `*secrets*`. Enforced via PreToolUse hook `guard-sensitive-files.ps1`.
+
+**IDesign call chain (require confirmation if violated):**
+- Engines (`BudgetTracker.Domain\Engines\`) must not reference `Accessor`s, `DbContext`, or `EntityFrameworkCore`.
+- Accessors (`BudgetTracker.Domain\Accessors\`) must not reference `Engine`s.
+- Managers (`BudgetTracker.Server\Managers\`) must not reference `DbContext` or `EntityFrameworkCore` directly; route data access through Accessors.
+- Enforced via PreToolUse hook `guard-idesign.ps1`.
+
+**Override flow:** when a guardrail fires, Claude surfaces the block reason. To proceed, restate intent with explicit acknowledgement (e.g., "yes, deliberately bypassing the IDesign rule because this is a one-off snapshot for testing"). Do not silently weaken the rule itself — if a rule is consistently wrong, update the script.

@@ -1,50 +1,68 @@
-{
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "permissions": {
-    "allow": [
-      "Bash(dotnet *)",
-      "Bash(npm *)",
-      "Bash(git status*)",
-      "Bash(git diff*)",
-      "Bash(git log*)",
-      "Bash(git show*)",
-      "Bash(git branch)",
-      "Bash(git branch --list*)",
-      "Bash(git ls-files*)",
-      "Bash(git rev-parse*)",
-      "Bash(git fetch*)",
-      "Bash(git stash list*)",
-      "Bash(sqllocaldb *)",
-      "mcp__playwright__browser_take_screenshot",
-      "PowerShell(dotnet *)",
-      "PowerShell(npm *)",
-      "PowerShell(sqlcmd *)",
-      "mcp__playwright__browser_navigate",
-      "mcp__atlassian__getAccessibleAtlassianResources"
-    ],
-    "ask": [
-      "Bash(dotnet ef database drop*)",
-      "Bash(dotnet nuget delete*)",
-      "Bash(npm publish*)"
-    ]
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          { "type": "command", "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/session-summary.ps1" },
-          { "type": "command", "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/notify.ps1" }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          { "type": "command", "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/migration-reminder.ps1" },
-          { "type": "command", "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/format-cs.ps1" }
-        ]
-      }
-    ]
-  }
+﻿{
+    "$schema":  "https://json.schemastore.org/claude-code-settings.json",
+    "permissions":  {
+                        "allow":  [
+                                      "Bash(dotnet *)",
+                                      "Bash(npm *)",
+                                      "Bash(git status*)",
+                                      "Bash(git diff*)",
+                                      "Bash(git log*)",
+                                      "Bash(git show*)",
+                                      "Bash(git branch)",
+                                      "Bash(git branch --list*)",
+                                      "Bash(git ls-files*)",
+                                      "Bash(git rev-parse*)",
+                                      "Bash(git fetch*)",
+                                      "Bash(git stash list*)",
+                                      "Bash(sqllocaldb *)",
+                                      "mcp__playwright__browser_take_screenshot",
+                                      "PowerShell(dotnet *)",
+                                      "PowerShell(npm *)",
+                                      "PowerShell(sqlcmd *)",
+                                      "mcp__playwright__browser_navigate",
+                                      "mcp__atlassian__getAccessibleAtlassianResources"
+                                  ],
+                        "ask":  [
+                                    "Bash(dotnet ef database drop*)",
+                                    "Bash(dotnet nuget delete*)",
+                                    "Bash(npm publish*)"
+                                ]
+                    },
+    "hooks":  {
+                  "Stop":  [
+                               {
+                                   "hooks":  [
+                                                 {
+                                                     "type":  "command",
+                                                     "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/session-summary.ps1"
+                                                 },
+                                                 {
+                                                     "type":  "command",
+                                                     "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/notify.ps1"
+                                                 }
+                                             ]
+                               }
+                           ],
+                  "PostToolUse":  [
+                                      {
+                                          "matcher":  "Edit|Write",
+                                          "hooks":  [
+                                                        {
+                                                            "type":  "command",
+                                                            "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/migration-reminder.ps1"
+                                                        },
+                                                        {
+                                                            "type":  "command",
+                                                            "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/format-cs.ps1"
+                                                        }
+                                                    ]
+                                      }
+                                  ]
+              },
+    "enabledMcpjsonServers":  [
+                                  "atlassian",
+                                  "playwright",
+                                  "git",
+                                  "mssql"
+                              ]
 }

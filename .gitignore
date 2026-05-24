@@ -11,6 +11,9 @@
 *.sln.docstates
 *.env
 
+# Claude Code local logs (auto-approval audit trail)
+.claude/logs/
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
