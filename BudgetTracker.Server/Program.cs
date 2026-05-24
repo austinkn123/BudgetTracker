@@ -1,15 +1,21 @@
+// [SPIKE] BUD-4 — throwaway. Do not merge to main without replacing SpikePlaidAccessor.
 using BudgetTracker.Domain.Accessors;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Engines;
+using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Server.Endpoints;
 using BudgetTracker.Server.Managers;
+using BudgetTracker.Server.Options;
 using BudgetTracker.Server.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load local secrets file (gitignored — safe to store dev/sandbox credentials)
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 // Add services to the container.
 builder.Services.AddDbContext<BudgetTrackerDbContext>(options =>
@@ -22,9 +28,11 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserProvider, CognitoCurrentUserProvider>();
 
 // Accessors (data access)
+// SpikePlaidAccessor is excluded here because it requires constructor args injected below.
 builder.Services.Scan(scan => scan
     .FromAssemblies(typeof(TransactionAccessor).Assembly)
-        .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Accessor")))
+        .AddClasses(classes => classes.Where(c =>
+            c.Name.EndsWith("Accessor") && c.Name != nameof(SpikePlaidAccessor)))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
 
@@ -41,6 +49,24 @@ builder.Services.Scan(scan => scan
         .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Manager")))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
+
+// [SPIKE] BUD-4 — Plaid named HttpClient + accessor wiring.
+// SpikePlaidAccessor is registered manually because its constructor requires
+// clientId/secret resolved from configuration at registration time.
+var plaidConfig = builder.Configuration.GetSection("Plaid");
+var plaidOptions = plaidConfig.Get<PlaidOptions>() ?? new PlaidOptions();
+
+builder.Services.AddHttpClient("Plaid", client =>
+{
+    client.BaseAddress = new Uri(plaidOptions.BaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
+builder.Services.AddScoped<IPlaidAccessor>(sp =>
+    new SpikePlaidAccessor(
+        sp.GetRequiredService<IHttpClientFactory>(),
+        plaidOptions.ClientId,
+        plaidOptions.Secret));
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -110,6 +136,11 @@ budgetPlanGroup.MapBudgetPlanEndpoints();
 var userGroup = apiGroup.MapGroup("/users")
     .WithTags("Users");
 userGroup.MapUserEndpoints();
+
+// [SPIKE] BUD-4 — Plaid Link endpoints
+var plaidGroup = apiGroup.MapGroup("/plaid")
+    .WithTags("Plaid");
+plaidGroup.MapPlaidEndpoints();
 
 app.MapFallbackToFile("/index.html");
 

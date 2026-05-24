@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -7,6 +7,7 @@
     <SpaRoot>..\budgettracker.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>https://localhost:53608</SpaProxyServerUrl>
+    <UserSecretsId>bb366628-6b31-4dc6-801e-62f921ed5baf</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

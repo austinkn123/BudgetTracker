@@ -1,3 +1,4 @@
+// [SPIKE] BUD-4 — PlaidLinkButton import is throwaway. Remove when spike is done.
 import { useState } from 'react';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -6,6 +7,7 @@ import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../user/hooks/useUser';
 import UserSection from '../../user/UserSection';
 import { StatusBanner } from '../../../shared/components/StatusBanner';
+import { PlaidLinkButton } from '../../linked-accounts/components/PlaidLinkButton';
 
 const SettingsPage = () => {
   const { isLoading: loadingUser } = useUser();
@@ -38,6 +40,14 @@ const SettingsPage = () => {
       </div>
 
       <UserSection isLoading={loadingUser} />
+
+      {/* [SPIKE] BUD-4 — Linked Accounts card. Throwaway until spike is productionised. */}
+      <div className="border rounded-lg p-4 space-y-3">
+        <Typography variant="subtitle1" className="font-semibold text-gray-700">
+          Linked Accounts
+        </Typography>
+        <PlaidLinkButton />
+      </div>
 
       <div className="border rounded-lg p-4 space-y-3">
         <Typography variant="subtitle1" className="font-semibold text-gray-700">
