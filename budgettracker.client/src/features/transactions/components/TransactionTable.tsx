@@ -130,32 +130,46 @@ const TransactionTable = ({
 
           {selectedTransactions.length > 0 ? (
             <List disablePadding sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden' }}>
-              {selectedTransactions.map((transaction, index) => (
-                <Box key={transaction.id}>
-                  {index > 0 && <Divider component="li" />}
-                  <ListItemButton alignItems="flex-start" onClick={() => onRowClick(transaction)}>
-                    <ListItemText
-                      primary={transaction.payee || categoryMap.get(transaction.categoryId) || 'Uncategorized transaction'}
-                      secondary={
-                        [categoryMap.get(transaction.categoryId) ?? 'Uncategorized', transaction.notes || transaction.transactionType]
-                          .filter(Boolean)
-                          .join(' · ')
-                      }
-                    />
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: transaction.transactionType === 'Income' ? 'success.main' : 'error.main',
-                        fontWeight: 700,
-                        ml: 2,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {transaction.transactionType === 'Income' ? '+' : '-'}${Math.abs(transaction.amount).toFixed(2)}
-                    </Typography>
-                  </ListItemButton>
-                </Box>
-              ))}
+              {selectedTransactions.map((transaction, index) => {
+                // An Adjustment is a user-driven balance correction. Its sign carries
+                // semantic meaning: negative = balance was overstated (outflow correction,
+                // render as expense), positive = balance was understated (inflow correction,
+                // render as income). The engine accepts either sign for this type precisely
+                // because direction is the user's choice; the UI must honor that choice
+                // rather than forcing all Adjustments into the "outflow" bucket.
+                const isInflow =
+                  transaction.transactionType === 'Income' ||
+                  (transaction.transactionType === 'Adjustment' && transaction.amount > 0);
+                const color = isInflow ? 'success.main' : 'error.main';
+                const sign = isInflow ? '+' : '-';
+
+                return (
+                  <Box key={transaction.id}>
+                    {index > 0 && <Divider component="li" />}
+                    <ListItemButton alignItems="flex-start" onClick={() => onRowClick(transaction)}>
+                      <ListItemText
+                        primary={transaction.payee || categoryMap.get(transaction.categoryId) || 'Uncategorized transaction'}
+                        secondary={
+                          [categoryMap.get(transaction.categoryId) ?? 'Uncategorized', transaction.notes || transaction.transactionType]
+                            .filter(Boolean)
+                            .join(' · ')
+                        }
+                      />
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color,
+                          fontWeight: 700,
+                          ml: 2,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {sign}${Math.abs(transaction.amount).toFixed(2)}
+                      </Typography>
+                    </ListItemButton>
+                  </Box>
+                );
+              })}
             </List>
           ) : (
             <Box

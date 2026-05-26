@@ -26,6 +26,16 @@ export type TransactionMonthSummary = {
 const getOutflowMagnitude = (transaction: Transaction) =>
   transaction.amount < 0 ? -transaction.amount : transaction.amount;
 
+// An Adjustment is a user-driven balance correction. Its sign carries
+// semantic meaning: negative = balance was overstated (outflow correction,
+// render as expense), positive = balance was understated (inflow correction,
+// render as income). The engine accepts either sign for this type precisely
+// because direction is the user's choice; the UI must honor that choice
+// rather than forcing all Adjustments into the "outflow" bucket.
+const isInflowTransaction = (transaction: Transaction) =>
+  transaction.transactionType === 'Income' ||
+  (transaction.transactionType === 'Adjustment' && transaction.amount > 0);
+
 export const toDateKey = (value: Date | string) =>
   format(typeof value === 'string' ? parseISO(value) : value, 'yyyy-MM-dd');
 
@@ -35,14 +45,14 @@ export const buildTransactionDaySummaries = (transactions: Transaction[]) => {
   for (const transaction of transactions) {
     const occurredAt = parseISO(transaction.occurredAt);
     const dateKey = toDateKey(occurredAt);
-    const isIncome = transaction.transactionType === 'Income';
+    const isInflow = isInflowTransaction(transaction);
     const existing = summaries.get(dateKey);
 
     if (existing) {
       existing.transactions.push(transaction);
       existing.transactionCount += 1;
-      if (isIncome) {
-        existing.incomeTotal += transaction.amount;
+      if (isInflow) {
+        existing.incomeTotal += getOutflowMagnitude(transaction);
       } else {
         existing.outflowTotal += getOutflowMagnitude(transaction);
       }
@@ -55,8 +65,8 @@ export const buildTransactionDaySummaries = (transactions: Transaction[]) => {
       label: format(occurredAt, 'PPPP'),
       transactions: [transaction],
       transactionCount: 1,
-      incomeTotal: isIncome ? transaction.amount : 0,
-      outflowTotal: isIncome ? 0 : getOutflowMagnitude(transaction),
+      incomeTotal: isInflow ? getOutflowMagnitude(transaction) : 0,
+      outflowTotal: isInflow ? 0 : getOutflowMagnitude(transaction),
       netTotal: transaction.amount,
     });
   }
