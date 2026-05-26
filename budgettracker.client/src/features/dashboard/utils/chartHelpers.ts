@@ -25,6 +25,12 @@ export interface BudgetVsActualItem {
   actual: number;
 }
 
+// BUD-18: Transaction.amount is signed. Expense/Transfer rows carry a negative
+// magnitude on the wire; the dashboard aggregates use unsigned magnitudes so
+// "Total Expenses" reads as a positive dollar figure and netBalance subtracts
+// cleanly. The single helper below centralizes that convention.
+const expenseMagnitude = (amount: number) => (amount < 0 ? -amount : amount);
+
 export function computeSummaryTotals(transactions: Transaction[]): SummaryTotals {
   let totalIncome = 0;
   let totalExpenses = 0;
@@ -33,7 +39,7 @@ export function computeSummaryTotals(transactions: Transaction[]): SummaryTotals
     if (t.transactionType === 'Income') {
       totalIncome += t.amount;
     } else {
-      totalExpenses += t.amount;
+      totalExpenses += expenseMagnitude(t.amount);
     }
   }
 
@@ -83,7 +89,7 @@ export function aggregateByCategory(
 
   for (const t of transactions) {
     if (t.transactionType === 'Expense') {
-      totals.set(t.categoryId, (totals.get(t.categoryId) ?? 0) + t.amount);
+      totals.set(t.categoryId, (totals.get(t.categoryId) ?? 0) + expenseMagnitude(t.amount));
     }
   }
 
@@ -106,7 +112,7 @@ export function aggregateByMonth(transactions: Transaction[]): MonthlyDataPoint[
     if (t.transactionType === 'Income') {
       existing.income += t.amount;
     } else {
-      existing.expenses += t.amount;
+      existing.expenses += expenseMagnitude(t.amount);
     }
 
     monthMap.set(month, existing);
@@ -137,7 +143,10 @@ export function budgetVsActual(
 
   const actualByCategory = new Map<number, number>();
   for (const t of monthTransactions) {
-    actualByCategory.set(t.categoryId, (actualByCategory.get(t.categoryId) ?? 0) + t.amount);
+    actualByCategory.set(
+      t.categoryId,
+      (actualByCategory.get(t.categoryId) ?? 0) + expenseMagnitude(t.amount),
+    );
   }
 
   const budgetedByCategory = new Map<number, number>();
@@ -225,7 +234,7 @@ export function aggregateByCategoryMonthly(
     if (t.transactionType === 'Income') {
       series[idx].income += t.amount;
     } else {
-      series[idx].expenses += t.amount;
+      series[idx].expenses += expenseMagnitude(t.amount);
     }
   }
 

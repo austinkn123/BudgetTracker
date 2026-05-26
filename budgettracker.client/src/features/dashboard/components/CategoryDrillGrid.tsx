@@ -44,9 +44,11 @@ export function CategoryDrillGrid({
     const monthTxns = transactions.filter(
       (t) => t.occurredAt.substring(0, 7) === monthKey && t.transactionType === 'Expense',
     );
+    // BUD-18: Expense amounts are stored signed (negative); aggregate magnitude.
     const actualByCategory = new Map<number, number>();
     for (const t of monthTxns) {
-      actualByCategory.set(t.categoryId, (actualByCategory.get(t.categoryId) ?? 0) + t.amount);
+      const magnitude = t.amount < 0 ? -t.amount : t.amount;
+      actualByCategory.set(t.categoryId, (actualByCategory.get(t.categoryId) ?? 0) + magnitude);
     }
 
     // Per-category sparkline series (last 3 months).

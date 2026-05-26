@@ -12,8 +12,8 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         {
             t.HasCheckConstraint("CK_Transactions_TransactionType",
                 "TransactionType IN ('Expense', 'Income', 'Transfer', 'Adjustment')");
-            t.HasCheckConstraint("CK_Transactions_PositiveAmount",
-                "Amount > 0");
+            t.HasCheckConstraint("CK_Transactions_NonZeroAmount",
+                "Amount <> 0");
             t.HasCheckConstraint("CK_Transactions_TransferAccount",
                 "(TransactionType = 'Transfer' AND TransferAccountId IS NOT NULL) OR (TransactionType <> 'Transfer' AND TransferAccountId IS NULL)");
         });

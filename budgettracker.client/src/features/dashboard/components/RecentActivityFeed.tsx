@@ -106,7 +106,7 @@ export function RecentActivityFeed({ transactions, categories }: RecentActivityF
                     }}
                   >
                     {isIncome ? '+' : '-'}
-                    {currency.format(t.amount)}
+                    {currency.format(Math.abs(t.amount))}
                   </Typography>
                 </Box>
               );

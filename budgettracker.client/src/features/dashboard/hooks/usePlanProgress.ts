@@ -83,13 +83,16 @@ export function usePlanProgress({
     }
 
     // Aggregate actuals for the plan's month.
+    // BUD-18: Expense amounts are stored signed (negative). Convert to a
+    // positive magnitude so spentPct / projectedEnd / per-diem math stays sane.
     const actualByCategory = new Map<number, number>();
     let actualExpenses = 0;
     for (const t of transactions) {
       if (t.occurredAt.substring(0, 7) !== monthKey) continue;
       if (t.transactionType !== 'Expense') continue;
-      actualExpenses += t.amount;
-      actualByCategory.set(t.categoryId, (actualByCategory.get(t.categoryId) ?? 0) + t.amount);
+      const magnitude = t.amount < 0 ? -t.amount : t.amount;
+      actualExpenses += magnitude;
+      actualByCategory.set(t.categoryId, (actualByCategory.get(t.categoryId) ?? 0) + magnitude);
     }
 
     const spentPct = plannedExpenses > 0 ? actualExpenses / plannedExpenses : 0;
