@@ -20,8 +20,11 @@ export type TransactionMonthSummary = {
   netTotal: number;
 };
 
-const getSignedAmount = (transaction: Transaction) =>
-  transaction.transactionType === 'Income' ? transaction.amount : -transaction.amount;
+// BUD-18: Transaction.amount is already signed (Expense/Transfer negative,
+// Income positive). Display totals (incomeTotal, outflowTotal) are expressed
+// as non-negative magnitudes; netTotal carries the sign.
+const getOutflowMagnitude = (transaction: Transaction) =>
+  transaction.amount < 0 ? -transaction.amount : transaction.amount;
 
 export const toDateKey = (value: Date | string) =>
   format(typeof value === 'string' ? parseISO(value) : value, 'yyyy-MM-dd');
@@ -32,17 +35,18 @@ export const buildTransactionDaySummaries = (transactions: Transaction[]) => {
   for (const transaction of transactions) {
     const occurredAt = parseISO(transaction.occurredAt);
     const dateKey = toDateKey(occurredAt);
+    const isIncome = transaction.transactionType === 'Income';
     const existing = summaries.get(dateKey);
 
     if (existing) {
       existing.transactions.push(transaction);
       existing.transactionCount += 1;
-      if (transaction.transactionType === 'Income') {
+      if (isIncome) {
         existing.incomeTotal += transaction.amount;
       } else {
-        existing.outflowTotal += transaction.amount;
+        existing.outflowTotal += getOutflowMagnitude(transaction);
       }
-      existing.netTotal += getSignedAmount(transaction);
+      existing.netTotal += transaction.amount;
       continue;
     }
 
@@ -51,9 +55,9 @@ export const buildTransactionDaySummaries = (transactions: Transaction[]) => {
       label: format(occurredAt, 'PPPP'),
       transactions: [transaction],
       transactionCount: 1,
-      incomeTotal: transaction.transactionType === 'Income' ? transaction.amount : 0,
-      outflowTotal: transaction.transactionType === 'Income' ? 0 : transaction.amount,
-      netTotal: getSignedAmount(transaction),
+      incomeTotal: isIncome ? transaction.amount : 0,
+      outflowTotal: isIncome ? 0 : getOutflowMagnitude(transaction),
+      netTotal: transaction.amount,
     });
   }
 

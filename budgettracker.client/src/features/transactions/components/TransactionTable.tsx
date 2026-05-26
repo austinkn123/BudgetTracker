@@ -151,7 +151,7 @@ const TransactionTable = ({
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {transaction.transactionType === 'Income' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                      {transaction.transactionType === 'Income' ? '+' : '-'}${Math.abs(transaction.amount).toFixed(2)}
                     </Typography>
                   </ListItemButton>
                 </Box>

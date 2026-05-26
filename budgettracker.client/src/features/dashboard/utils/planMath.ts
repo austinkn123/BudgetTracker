@@ -106,10 +106,13 @@ export function buildWaterfall(
     .filter((t) => t.transactionType === 'Income')
     .reduce((sum, t) => sum + t.amount, 0);
 
+  // BUD-18: Expense amounts are now stored signed (negative). The waterfall
+  // chart expects unsigned magnitudes for bar heights, so flip the sign here.
   const expensesByCategory = new Map<number, number>();
   for (const t of monthTxns) {
     if (t.transactionType !== 'Expense') continue;
-    expensesByCategory.set(t.categoryId, (expensesByCategory.get(t.categoryId) ?? 0) + t.amount);
+    const magnitude = t.amount < 0 ? -t.amount : t.amount;
+    expensesByCategory.set(t.categoryId, (expensesByCategory.get(t.categoryId) ?? 0) + magnitude);
   }
 
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
@@ -184,7 +187,9 @@ export function aggregateByBucket(
   for (const t of monthTxns) {
     const bucket = bucketByCategory.get(t.categoryId);
     // Transactions whose category isn't represented in the plan fall back to Buffer.
-    actual[bucket ?? 'Buffer'] += t.amount;
+    // BUD-18: Expense amounts arrive signed (negative); accumulate magnitude.
+    const magnitude = t.amount < 0 ? -t.amount : t.amount;
+    actual[bucket ?? 'Buffer'] += magnitude;
   }
 
   return [

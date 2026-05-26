@@ -22,8 +22,20 @@ public class TransactionEngine : ITransactionEngine
             !ValidTransactionTypes.Contains(transaction.TransactionType))
             return "Transaction type must be one of: Expense, Income, Transfer, Adjustment";
 
-        if (transaction.Amount <= 0)
-            return "Amount must be greater than zero";
+        if (transaction.Amount == 0)
+            return "Amount cannot be zero";
+
+        // Sign-vs-type discipline. Signed-amount convention (BUD-18):
+        // Expense/Transfer are outflows (negative); Income is an inflow (positive);
+        // Adjustment may be either sign because it reconciles in either direction.
+        if (transaction.TransactionType == "Expense" && transaction.Amount > 0)
+            return "Expense amount must be negative";
+
+        if (transaction.TransactionType == "Income" && transaction.Amount < 0)
+            return "Income amount must be positive";
+
+        if (transaction.TransactionType == "Transfer" && transaction.Amount > 0)
+            return "Transfer source amount must be negative";
 
         if (transaction.OccurredAt > DateTime.UtcNow)
             return "Transaction date cannot be in the future";

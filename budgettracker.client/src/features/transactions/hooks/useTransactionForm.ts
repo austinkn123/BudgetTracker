@@ -49,7 +49,10 @@ export const useTransactionForm = (
     setInitialValues({
       accountId: transaction.accountId,
       categoryId: transaction.categoryId,
-      amount: transaction.amount,
+      // BUD-18: the wire amount is signed (negative for Expense/Transfer); the
+      // dialog input is always-positive UX, so present the magnitude here and
+      // re-apply the sign in the save handler based on transactionType.
+      amount: Math.abs(transaction.amount),
       occurredAt: format(new Date(transaction.occurredAt), 'yyyy-MM-dd'),
       payee: transaction.payee || '',
       notes: transaction.notes || '',
@@ -106,13 +109,31 @@ export const useTransactionForm = (
     },
   });
 
+  // BUD-18: apply sign at submit time based on transaction type. The form
+  // input is always-positive UX; the wire format is signed (Expense negative,
+  // Income positive, Transfer negative, Adjustment user-driven).
+  const applySign = (amount: number, transactionType: string) => {
+    const magnitude = Math.abs(amount);
+    switch (transactionType) {
+      case 'Income':
+        return magnitude;
+      case 'Expense':
+      case 'Transfer':
+        return -magnitude;
+      default:
+        // Adjustment (and any unknown type) preserves the user-entered sign.
+        return amount;
+    }
+  };
+
   const save = useCallback((formData: TransactionFormData) => {
     if (dialogMode === 'add') {
+      const transactionType = 'Expense';
       const payload: Omit<Transaction, 'id'> = {
         accountId: formData.accountId,
         categoryId: formData.categoryId,
-        transactionType: 'Expense',
-        amount: formData.amount,
+        transactionType,
+        amount: applySign(formData.amount, transactionType),
         occurredAt: new Date(`${formData.occurredAt}T00:00:00`).toISOString(),
         payee: formData.payee || undefined,
         notes: formData.notes || undefined,
@@ -128,7 +149,7 @@ export const useTransactionForm = (
         ...existing,
         accountId: formData.accountId,
         categoryId: formData.categoryId,
-        amount: formData.amount,
+        amount: applySign(formData.amount, existing.transactionType),
         occurredAt: new Date(`${formData.occurredAt}T00:00:00`).toISOString(),
         payee: formData.payee || undefined,
         notes: formData.notes || undefined,

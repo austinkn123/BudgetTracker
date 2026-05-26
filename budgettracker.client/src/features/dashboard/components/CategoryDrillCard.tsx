@@ -143,7 +143,7 @@ export function CategoryDrillCard({ data, expanded, onToggle }: CategoryDrillCar
                       }}
                     >
                       {t.transactionType === 'Income' ? '+' : '-'}
-                      {currencyPrecise.format(t.amount)}
+                      {currencyPrecise.format(Math.abs(t.amount))}
                     </Typography>
                   </ListItem>
                 ))}
