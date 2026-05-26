@@ -46,6 +46,17 @@ export const useTransactionForm = (
   }, [defaultAccountId, defaultCategoryId]);
 
   const openForEdit = useCallback((transaction: Transaction) => {
+    // [BUD-18] Guard against silent sign loss on non-Expense edit.
+    // Removed in BUD-19 when the TransactionType picker + sign-aware
+    // edit handling is implemented.
+    if (transaction.transactionType !== 'Expense') {
+      setStatusMessage(null);
+      setStatusError(
+        'Editing Income, Transfer, and Adjustment transactions is not yet supported (see BUD-19).',
+      );
+      return;
+    }
+
     setInitialValues({
       accountId: transaction.accountId,
       categoryId: transaction.categoryId,
@@ -60,7 +71,7 @@ export const useTransactionForm = (
     setEditingId(transaction.id);
     setDialogMode('edit');
     setDialogOpen(true);
-  }, []);
+  }, [setStatusError, setStatusMessage]);
 
   const closeDialog = useCallback(() => {
     setDialogOpen(false);
