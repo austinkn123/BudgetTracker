@@ -34,7 +34,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 
 ## Context
 - Always check `project-docs/` for architectural decisions before suggesting major changes.
-- Refer to `.claude/agents/christopher-product-manager.md` for product vision if unclear on requirements.
+- Refer to `.claude/agents/chrissy-product-manager.md` for product vision if unclear on requirements.
 - Jira project: **BUD** on `austinkn123.atlassian.net` — check for existing issues before creating new ones, and link completed work to its ticket when relevant.
 - **Jira access via MCP**: The Atlassian MCP server is configured in `.mcp.json` and provides direct Jira access. When asked about any BUD ticket, **ALWAYS call the Atlassian MCP tools** — never say "I can't connect to Jira" without first attempting the call. Common tools: `mcp__atlassian__getIssue` (fetch a specific ticket), `mcp__atlassian__searchIssues` (JQL search), `mcp__atlassian__getAccessibleAtlassianResources` (list resources). If the call fails, report the actual error returned by the tool, not a pre-emptive refusal.
 - Local database: **SQL Server LocalDB** — `Server=(localdb)\MSSQLLocalDB;Database=BudgetTracker;Trusted_Connection=True;TrustServerCertificate=True;` — use the `mssql` MCP server to inspect schema, run queries, and verify migrations directly.
@@ -43,22 +43,23 @@ You are an expert developer working on the BudgetTracker application. This proje
 
 | Agent | Role | Use when |
 |---|---|---|
-| christopher | Product Manager | Requirements, user stories, backlog priority, "what should we build" |
+| chrissy | Product Manager | Requirements, user stories, backlog priority, "what should we build" |
 | tony | Software Architect | Service boundaries, IDesign decisions, new feature impact analysis |
 | richie | Senior DBA | Schema design, indexes, query tuning, EF migration review |
-| paulie | Senior Full-Stack Dev | C#/.NET + React/TS implementation, TDD, bug fixes |
-| silvio | Senior QA | Test plans, coverage review, TDD verification, edge cases |
+| paulie | Senior Backend Dev | C#/.NET implementation, TDD, bug fixes |
+| silvio | Senior UI Dev | React/TS/Tailwind/MUI implementation, design system, component library |
+| johnny | Senior QA | Test plans, coverage review, TDD verification, edge cases |
 | bobby | Docs Specialist | README and standalone .md files only — never code |
 
 ## Common Workflows
 
 Default agent sequences. Delegate via the Task tool; chain by invoking the next agent with the prior agent's output as context.
 
-- **New feature**: christopher (story + AC) → tony (service boundaries) → paulie (TDD implementation) → silvio (test review) → bobby (README/docs touch-up if user-facing)
-- **Bug fix**: paulie (failing test + fix) → silvio (regression coverage review)
-- **Schema change**: tony (architectural impact) → richie (schema + index design) → paulie (EF migration + code) → silvio (data + integration tests)
+- **New feature**: chrissy (story + AC) → tony (service boundaries) → silvio (frontend) + paulie (backend) → johnny (test review) → bobby (README/docs touch-up if user-facing)
+- **Bug fix**: paulie or silvio (failing test + fix) → johnny (regression coverage review)
+- **Schema change**: tony (architectural impact) → richie (schema + index design) → paulie (EF migration + code) → johnny (data + integration tests)
 - **Docs-only update**: bobby
-- **Pre-commit review**: tony + silvio in parallel (already automated via `/review`)
+- **Pre-commit review**: tony + johnny in parallel (already automated via `/review`)
 
 ## Auto-delegation Rules
 

@@ -101,4 +101,4 @@ When handing off, output a structured block tagged with the recipient:
 
 - **→ tony** when a schema change adds, removes, or renames a table or column referenced by **more than one Manager**, or when a new table represents a **new bounded context** (new business domain entity).
 - **→ paulie** to author the EF migration and wire up the data access code.
-- **→ silvio** for data-integrity and integration-test coverage on the change.
+- **→ johnny** for data-integrity and integration-test coverage on the change.
