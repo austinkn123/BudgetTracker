@@ -45,6 +45,24 @@ public class TransactionManager(ITransactionEngine engine, ITransactionAccessor 
 
     public async Task<Result<bool>> UpdateAsync(Transaction transaction, int userId)
     {
+        // Fetch the current state first so we can detect tampering with read-only fields on imported rows.
+        var existing = await accessor.GetByIdAsync(transaction.Id, userId);
+        if (existing is null)
+            return Result<bool>.Failure("Transaction not found");
+
+        if (existing.IsImported)
+        {
+            // For Plaid-sourced rows only Category and Notes are editable; merchant/amount/date/account come from upstream.
+            if (existing.Amount != transaction.Amount
+                || existing.OccurredAt != transaction.OccurredAt
+                || existing.AccountId != transaction.AccountId
+                || existing.TransactionType != transaction.TransactionType
+                || !string.Equals(existing.Payee, transaction.Payee, StringComparison.Ordinal))
+            {
+                return Result<bool>.Failure("Imported transactions are read-only except for Category and Notes");
+            }
+        }
+
         var error = engine.ValidateTransaction(transaction);
         if (error is not null)
             return Result<bool>.Failure(error);

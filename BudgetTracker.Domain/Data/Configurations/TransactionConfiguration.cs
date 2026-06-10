@@ -39,6 +39,23 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.Property(t => t.CreatedAt)
             .HasDefaultValueSql("GETDATE()");
 
+        builder.Property(t => t.PlaidTransactionId)
+            .HasMaxLength(100);
+
+        builder.Property(t => t.PlaidAccountId)
+            .HasMaxLength(100);
+
+        builder.Property(t => t.IsImported)
+            .HasDefaultValue(false);
+
+        builder.Property(t => t.IsPending)
+            .HasDefaultValue(false);
+
+        builder.HasIndex(t => t.PlaidTransactionId)
+            .IsUnique()
+            .HasFilter("[PlaidTransactionId] IS NOT NULL")
+            .HasDatabaseName("UQ_Transactions_PlaidTransactionId");
+
         builder.HasIndex(t => new { t.AccountId, t.OccurredAt })
             .HasDatabaseName("IX_Transactions_AccountId_OccurredAt")
             .IncludeProperties(t => new { t.TransactionType, t.Amount, t.CategoryId });

@@ -1,7 +1,9 @@
 using BudgetTracker.Domain.Accessors;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Engines;
+using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Utilities;
+using BudgetTracker.Domain.Plaid;
 using BudgetTracker.Server.Endpoints;
 using BudgetTracker.Server.Managers;
 using BudgetTracker.Server.Utilities;
@@ -11,9 +13,24 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load local secrets overlay (Plaid sandbox credentials, etc). Gitignored — never present in CI.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
 // Add services to the container.
 builder.Services.AddDbContext<BudgetTrackerDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("BudgetTrackerConnection")));
+
+// Data Protection — used by PlaidItemAccessor to encrypt access_tokens at rest.
+builder.Services.AddDataProtection();
+
+// Plaid configuration + typed HttpClient (BaseAddress comes from Plaid:BaseUrl).
+builder.Services.Configure<PlaidOptions>(builder.Configuration.GetSection(PlaidOptions.SectionName));
+builder.Services.AddHttpClient<IPlaidAccessor, PlaidAccessor>((sp, client) =>
+{
+    var plaidOptions = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PlaidOptions>>().Value;
+    client.BaseAddress = new Uri(plaidOptions.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 
 // HTTP context accessor for Cognito claims extraction
 builder.Services.AddHttpContextAccessor();
@@ -21,10 +38,10 @@ builder.Services.AddHttpContextAccessor();
 // Current user provider backed by Cognito
 builder.Services.AddScoped<ICurrentUserProvider, CognitoCurrentUserProvider>();
 
-// Accessors (data access)
+// Accessors (data access). PlaidAccessor is excluded because it's registered above as a typed HttpClient.
 builder.Services.Scan(scan => scan
     .FromAssemblies(typeof(TransactionAccessor).Assembly)
-        .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Accessor")))
+        .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Accessor") && c != typeof(PlaidAccessor)))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
 
@@ -110,6 +127,11 @@ budgetPlanGroup.MapBudgetPlanEndpoints();
 var userGroup = apiGroup.MapGroup("/users")
     .WithTags("Users");
 userGroup.MapUserEndpoints();
+
+// Plaid endpoints group
+var plaidGroup = apiGroup.MapGroup("/plaid")
+    .WithTags("Plaid");
+plaidGroup.MapPlaidEndpoints();
 
 app.MapFallbackToFile("/index.html");
 

@@ -11,6 +11,8 @@ public class BudgetTrackerDbContext(DbContextOptions<BudgetTrackerDbContext> opt
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<BudgetPlan> BudgetPlans => Set<BudgetPlan>();
     public DbSet<BudgetPlanEntry> BudgetPlanEntries => Set<BudgetPlanEntry>();
+    public DbSet<PlaidItem> PlaidItems => Set<PlaidItem>();
+    public DbSet<PlaidAccount> PlaidAccounts => Set<PlaidAccount>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

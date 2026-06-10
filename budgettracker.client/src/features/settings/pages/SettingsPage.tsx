@@ -6,6 +6,7 @@ import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../user/hooks/useUser';
 import UserSection from '../../user/UserSection';
 import { StatusBanner } from '../../../shared/components/StatusBanner';
+import { LinkedAccountCard } from '../../linked-accounts/components/LinkedAccountCard';
 
 const SettingsPage = () => {
   const { isLoading: loadingUser } = useUser();
@@ -38,6 +39,8 @@ const SettingsPage = () => {
       </div>
 
       <UserSection isLoading={loadingUser} />
+
+      <LinkedAccountCard />
 
       <div className="border rounded-lg p-4 space-y-3">
         <Typography variant="subtitle1" className="font-semibold text-gray-700">
