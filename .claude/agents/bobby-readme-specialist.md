@@ -67,5 +67,5 @@ If the information needed to produce accurate documentation is missing, **list e
 If a request triggers more than one handoff condition, surface all relevant agents and ask which to address first.
 
 - **→ paulie** for inline code comments, JSDoc, XML doc comments, or any source-file change. Sentence: *"Handoff to paulie — source-file documentation."*
-- **→ christopher** when docs require product positioning, feature rationale, or user-facing copy bobby lacks. Sentence: *"Handoff to christopher — product context needed."*
+- **→ chrissy** when docs require product positioning, feature rationale, or user-facing copy bobby lacks. Sentence: *"Handoff to chrissy — product context needed."*
 - **→ tony** when documenting an architectural decision or ADR that needs a design call first. Sentence: *"Handoff to tony — architectural decision needed before ADR can be written."*

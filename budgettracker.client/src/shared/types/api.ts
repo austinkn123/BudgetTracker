@@ -22,6 +22,35 @@ export interface Transaction {
   transferAccountId?: number;
   notes?: string;
   createdAt: string;
+  plaidTransactionId?: string | null;
+  plaidAccountId?: string | null;
+  isImported?: boolean;
+  isPending?: boolean;
+}
+
+export interface PlaidLinkedAccountView {
+  name: string;
+  mask?: string | null;
+  accountType: string;
+}
+
+export interface PlaidConnectionView {
+  plaidItemId: number;
+  institutionName: string;
+  lastSyncedAt?: string | null;
+  accounts: PlaidLinkedAccountView[];
+}
+
+export interface PlaidSyncSummary {
+  inserted: number;
+  updated: number;
+  removed: number;
+  syncedAt: string;
+}
+
+export interface PlaidLinkTokenResponse {
+  linkToken: string;
+  expiration: string;
 }
 
 export interface BudgetPlanEntry {

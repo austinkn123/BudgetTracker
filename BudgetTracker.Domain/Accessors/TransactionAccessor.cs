@@ -78,4 +78,69 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
         context.Transactions.Remove(transaction);
         return await context.SaveChangesAsync() > 0;
     }
+
+    /// <inheritdoc />
+    public async Task<(int Inserted, int Updated)> UpsertImportedAsync(IEnumerable<Transaction> transactions)
+    {
+        var incoming = transactions.ToList();
+        if (incoming.Count == 0)
+            return (0, 0);
+
+        var ids = incoming
+            .Select(t => t.PlaidTransactionId)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Distinct()
+            .ToList();
+
+        var existing = await context.Transactions
+            .Where(t => t.PlaidTransactionId != null && ids.Contains(t.PlaidTransactionId))
+            .ToDictionaryAsync(t => t.PlaidTransactionId!, t => t);
+
+        var inserted = 0;
+        var updated = 0;
+
+        foreach (var incomingTxn in incoming)
+        {
+            if (incomingTxn.PlaidTransactionId is null)
+                continue;
+
+            if (existing.TryGetValue(incomingTxn.PlaidTransactionId, out var current))
+            {
+                current.Amount = incomingTxn.Amount;
+                current.OccurredAt = incomingTxn.OccurredAt;
+                current.Payee = incomingTxn.Payee;
+                current.TransactionType = incomingTxn.TransactionType;
+                current.IsPending = incomingTxn.IsPending;
+                current.PlaidAccountId = incomingTxn.PlaidAccountId;
+                updated++;
+            }
+            else
+            {
+                context.Transactions.Add(incomingTxn);
+                inserted++;
+            }
+        }
+
+        await context.SaveChangesAsync();
+        return (inserted, updated);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> DeleteByPlaidTransactionIdsAsync(IEnumerable<string> plaidTransactionIds)
+    {
+        var ids = plaidTransactionIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return 0;
+
+        var toRemove = await context.Transactions
+            .Where(t => t.PlaidTransactionId != null && ids.Contains(t.PlaidTransactionId))
+            .ToListAsync();
+
+        if (toRemove.Count == 0)
+            return 0;
+
+        context.Transactions.RemoveRange(toRemove);
+        await context.SaveChangesAsync();
+        return toRemove.Count;
+    }
 }
