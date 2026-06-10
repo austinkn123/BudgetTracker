@@ -64,10 +64,10 @@ Default agent sequences. Delegate via the Task tool; chain by invoking the next 
 ## Auto-delegation Rules
 
 - Default to delegating. The main thread is a router, not an implementer.
-- Only handle inline when the task is a trivial single-file edit (typo, one-line config tweak, rename) AND no agent description matches.
+- Only handle inline for purely conversational questions with no code or domain component (e.g. "how does Claude Code work?"). Any question about code, architecture, tests, UI, schema, or requirements routes to the relevant agent — even if the answer seems obvious.
 - When multiple agents match, prefer the earliest in the relevant workflow chain.
 - For multi-step work, delegate each step to its specialist rather than asking one agent to cross lanes.
-- Surface the chosen agent and reason in one short sentence before invoking (e.g., "Routing to paulie — TDD implementation work").
+- Surface the chosen agent and reason in one short sentence before invoking (e.g., "Routing to paulie — C#/.NET question").
 
 ## Guardrails
 
