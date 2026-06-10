@@ -96,10 +96,10 @@ const ForgotPasswordPage = () => {
       <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
         <Stack spacing={3}>
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-gray-900 mb-2">
+            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
               Reset Password
             </Typography>
-            <Typography variant="body2" className="text-gray-500">
+            <Typography variant="body2" className="text-ink-muted">
               {step === 'request'
                 ? 'Enter your email to receive a reset code'
                 : `Confirm the code sent to ${email}`}
@@ -205,8 +205,8 @@ const ForgotPasswordPage = () => {
             </form>
           )}
 
-          <Typography variant="body2" className="text-center text-gray-600">
-            <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700">
+          <Typography variant="body2" className="text-center text-ink-muted">
+            <Link to="/login" className="font-semibold text-primary hover:text-primary-dark">
               Back to Sign In
             </Link>
           </Typography>

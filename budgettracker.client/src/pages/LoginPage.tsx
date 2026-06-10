@@ -53,10 +53,10 @@ const LoginPage = () => {
       <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
         <Stack spacing={3}>
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-gray-900 mb-2">
+            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
               Sign In
             </Typography>
-            <Typography variant="body2" className="text-gray-500">
+            <Typography variant="body2" className="text-ink-muted">
               Welcome back to BudgetTracker
             </Typography>
           </div>
@@ -110,14 +110,14 @@ const LoginPage = () => {
           </form>
 
           <Stack spacing={2}>
-            <Typography variant="body2" className="text-center text-gray-600">
+            <Typography variant="body2" className="text-center text-ink-muted">
               Don't have an account?{' '}
-              <Link to="/signup" className="font-semibold text-blue-600 hover:text-blue-700">
+              <Link to="/signup" className="font-semibold text-primary hover:text-primary-dark">
                 Sign up
               </Link>
             </Typography>
-            <Typography variant="body2" className="text-center text-gray-600">
-              <Link to="/forgot" className="font-semibold text-blue-600 hover:text-blue-700">
+            <Typography variant="body2" className="text-center text-ink-muted">
+              <Link to="/forgot" className="font-semibold text-primary hover:text-primary-dark">
                 Forgot password?
               </Link>
             </Typography>

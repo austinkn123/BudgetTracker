@@ -56,10 +56,10 @@ const SignUpPage = () => {
       <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
         <Stack spacing={3}>
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-gray-900 mb-2">
+            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
               Create Account
             </Typography>
-            <Typography variant="body2" className="text-gray-500">
+            <Typography variant="body2" className="text-ink-muted">
               Join BudgetTracker to start managing your finances
             </Typography>
           </div>
@@ -158,9 +158,9 @@ const SignUpPage = () => {
             </Stack>
           </form>
 
-          <Typography variant="body2" className="text-center text-gray-600">
+          <Typography variant="body2" className="text-center text-ink-muted">
             Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700">
+            <Link to="/login" className="font-semibold text-primary hover:text-primary-dark">
               Sign in
             </Link>
           </Typography>

@@ -29,10 +29,10 @@ const SettingsPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <Typography variant="h4" className="font-bold text-gray-900">
+        <Typography variant="h4" className="font-bold text-ink">
           Settings
         </Typography>
-        <Typography variant="body2" className="text-gray-500 mt-1">
+        <Typography variant="body2" className="text-ink-muted mt-1">
           Your account information
         </Typography>
       </div>
@@ -40,7 +40,7 @@ const SettingsPage = () => {
       <UserSection isLoading={loadingUser} />
 
       <div className="border rounded-lg p-4 space-y-3">
-        <Typography variant="subtitle1" className="font-semibold text-gray-700">
+        <Typography variant="subtitle1" className="font-semibold text-ink">
           Session
         </Typography>
         <StatusBanner statusMessage={null} statusError={statusError} />

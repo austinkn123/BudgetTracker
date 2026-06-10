@@ -12,10 +12,10 @@ const TransactionsPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <Typography variant="h4" className="font-bold text-gray-900">
+        <Typography variant="h4" className="font-bold text-ink">
           Transactions
         </Typography>
-        <Typography variant="body2" className="text-gray-500 mt-1">
+        <Typography variant="body2" className="text-ink-muted mt-1">
           Browse your ledger by calendar day, then drill into that date to add or edit transactions
         </Typography>
       </div>

@@ -1,21 +1,24 @@
 import { alpha, type Theme } from '@mui/material/styles';
 
 /**
- * Semantic colors derived from the application's earthy MUI palette.
+ * Semantic colors derived from the BudgetTracker MUI theme (BUD-13 tokens).
  * Use these to color charts by meaning rather than by sequence.
+ *
+ * Every value resolves through `theme.palette`, which is built from
+ * src/shared/theme/tokens.ts — so editing tokens.ts propagates here.
  */
 export interface SemanticColors {
-  /** Positive money in (income, net surplus). */
+  /** Positive money in (income, net surplus). Success green. */
   income: string;
-  /** Negative money out (expense). */
+  /** Negative money out (expense). Muted slate so it reads as neutral fact, not failure. */
   expense: string;
-  /** Warm warning hue used when actuals exceed the plan. Clay tone. */
+  /** Used when actuals exceed the plan (net deficit, over-budget). Warning amber. */
   overspend: string;
-  /** Neutral / supporting tone (mist). */
+  /** Neutral / supporting accent (secondary teal). */
   neutral: string;
-  /** Backdrop / paper-like tone (parchment). */
+  /** Backdrop / page-background tone. */
   surface: string;
-  /** Strong text/structure tone (bark). */
+  /** Strong text/structure tone (primary text slate). */
   ink: string;
 }
 
@@ -25,35 +28,38 @@ export interface SemanticColors {
  */
 export function getSemanticColors(theme: Theme): SemanticColors {
   return {
-    income: theme.palette.primary.main,        // leaf
-    expense: theme.palette.text.secondary,     // bark
-    overspend: '#C97B4A',                      // clay (warm warning)
-    neutral: theme.palette.secondary.main,     // mist
-    surface: theme.palette.background.default, // parchment
-    ink: theme.palette.text.primary,           // forest black
+    income: theme.palette.success.main,
+    expense: theme.palette.text.secondary,
+    overspend: theme.palette.warning.main,
+    neutral: theme.palette.secondary.main,
+    surface: theme.palette.background.default,
+    ink: theme.palette.text.primary,
   };
 }
 
 /**
  * An ordered set of category colors for charts that render multiple series.
- * Derived from the theme (leaf, mist, bark) plus tints of each so the
- * sequence stays harmonious with the rest of the UI.
+ * Derived from the theme palette (brand blue, warning amber, accent teal,
+ * structural slate) plus 65% tints of each so the sequence stays harmonious
+ * with the rest of the UI. Ordered so adjacent series differ in hue and
+ * lightness. Success green is deliberately excluded — it is reserved for the
+ * `income` semantic and would mislead in a categorical sequence.
  */
 export function getChartPalette(theme: Theme): string[] {
-  const leaf = theme.palette.primary.main;
-  const mist = theme.palette.secondary.main;
-  const bark = theme.palette.text.secondary;
-  const clay = '#C97B4A';
+  const brand = theme.palette.primary.main;
+  const amber = theme.palette.warning.main;
+  const teal = theme.palette.secondary.main;
+  const slate = theme.palette.grey[600];
 
   return [
-    leaf,
-    mist,
-    bark,
-    clay,
-    alpha(leaf, 0.65),
-    alpha(mist, 0.65),
-    alpha(bark, 0.65),
-    alpha(clay, 0.65),
+    brand,
+    amber,
+    teal,
+    slate,
+    alpha(brand, 0.65),
+    alpha(amber, 0.65),
+    alpha(teal, 0.65),
+    alpha(slate, 0.65),
   ];
 }
 

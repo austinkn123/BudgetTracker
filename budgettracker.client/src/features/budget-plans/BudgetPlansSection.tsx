@@ -63,7 +63,7 @@ const BudgetPlansSection = ({
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Typography variant="h6" className="font-semibold text-gray-900">
+          <Typography variant="h6" className="font-semibold text-ink">
             Budget Plans
           </Typography>
           <Typography variant="body2" color="text.secondary">

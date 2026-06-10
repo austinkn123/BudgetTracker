@@ -33,8 +33,8 @@ export const Layout = () => {
   };
 
   return (
-    <Box className="min-h-screen bg-gray-50">
-      <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'white', borderBottom: '1px solid #e5e7eb' }}>
+    <Box className="min-h-screen bg-background">
+      <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
         <Toolbar className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
           {/* Mobile menu button */}
           <IconButton
@@ -52,7 +52,7 @@ export const Layout = () => {
             onClick={() => handleNav('/')}
             sx={{ flexGrow: { xs: 1, md: 0 }, mr: { md: 4 } }}
           >
-            <Wallet className="w-6 h-6" style={{ color: 'var(--mui-palette-primary-main)' }} />
+            <Wallet className="w-6 h-6 text-primary" />
             <Typography variant="h6" sx={{ color: 'grey.900', fontWeight: 700 }}>
               BudgetTracker
             </Typography>
@@ -71,11 +71,11 @@ export const Layout = () => {
                     textTransform: 'none',
                     color: isActive ? 'primary.main' : 'grey.600',
                     fontWeight: isActive ? 600 : 400,
-                    bgcolor: isActive ? 'primary.50' : 'transparent',
+                    bgcolor: isActive ? 'primary.subtle' : 'transparent',
                     borderRadius: 2,
                     px: 2,
                     '&:hover': {
-                      bgcolor: isActive ? 'primary.50' : 'grey.100',
+                      bgcolor: isActive ? 'primary.subtle' : 'grey.100',
                     },
                   }}
                 >
@@ -113,9 +113,9 @@ export const Layout = () => {
                     mx: 1,
                     borderRadius: 2,
                     '&.Mui-selected': {
-                      bgcolor: 'primary.50',
+                      bgcolor: 'primary.subtle',
                       color: 'primary.main',
-                      '&:hover': { bgcolor: 'primary.50' },
+                      '&:hover': { bgcolor: 'primary.subtle' },
                     },
                   }}
                 >

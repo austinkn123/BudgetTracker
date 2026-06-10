@@ -93,10 +93,10 @@ const ConfirmSignUpPage = () => {
       <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
         <Stack spacing={3}>
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-gray-900 mb-2">
+            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
               Verify Email
             </Typography>
-            <Typography variant="body2" className="text-gray-500">
+            <Typography variant="body2" className="text-ink-muted">
               {email ? `We sent a code to ${email}` : 'Enter the confirmation code'}
             </Typography>
           </div>
@@ -146,8 +146,8 @@ const ConfirmSignUpPage = () => {
               {isResending ? 'Resending...' : "Didn't receive a code? Resend"}
             </Button>
 
-            <Typography variant="body2" className="text-center text-gray-600">
-              <Link to="/signup" className="font-semibold text-blue-600 hover:text-blue-700">
+            <Typography variant="body2" className="text-center text-ink-muted">
+              <Link to="/signup" className="font-semibold text-primary hover:text-primary-dark">
                 Back to Sign Up
               </Link>
             </Typography>
