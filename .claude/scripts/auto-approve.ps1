@@ -1,4 +1,6 @@
-﻿$ErrorActionPreference = 'SilentlyContinue'
+﻿# PreToolUse hook: auto-approves safe read-only and MCP tool calls; blocks destructive patterns so they still prompt.
+
+$ErrorActionPreference = 'SilentlyContinue'
 
 try {
     $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json

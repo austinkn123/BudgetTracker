@@ -1,3 +1,5 @@
+﻿# PreToolUse hook: blocks Edit/Write on sensitive files (.env, appsettings.Production, certs, .git, .mcp.json, .claude/settings, scripts, secrets).
+
 $ErrorActionPreference = 'SilentlyContinue'
 
 try {

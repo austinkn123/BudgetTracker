@@ -1,3 +1,5 @@
+﻿# PostToolUse hook: runs 'dotnet format whitespace' on any .cs file that was just written or edited.
+
 $ErrorActionPreference = 'SilentlyContinue'
 
 try {

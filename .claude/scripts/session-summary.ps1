@@ -1,3 +1,5 @@
+﻿# Stop hook: prints a git diff --stat summary of what changed during the session, with a prompt to /review or /run.
+
 $ErrorActionPreference = 'SilentlyContinue'
 
 $changed = git status --short 2>$null

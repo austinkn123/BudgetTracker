@@ -1,3 +1,5 @@
+﻿# PostToolUse hook: prints a /migrate reminder when a Model or EF configuration file is edited, since those changes require a migration.
+
 $ErrorActionPreference = 'SilentlyContinue'
 
 try {

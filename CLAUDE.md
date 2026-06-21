@@ -55,11 +55,19 @@ You are an expert developer working on the BudgetTracker application. This proje
 
 Default agent sequences. Delegate via the Task tool; chain by invoking the next agent with the prior agent's output as context.
 
-- **New feature**: chrissy (story + AC) → tony (service boundaries) → silvio (frontend) + paulie (backend) → johnny (test review) → bobby (README/docs touch-up if user-facing)
+**Notation:**
+- `A → B` — **sequential**. B depends on A's output; finish A before starting B.
+- `[A ∥ B]` — **parallel**. No data dependency between A and B; launch them in a **single response with multiple Agent calls** so they run concurrently.
+
+**Execution rule:** a `[ ∥ ]` group only runs in parallel if its Agent calls are issued in the *same* message. Issuing them across separate turns silently degrades to sequential. Parallel agents start cold and cannot talk to each other mid-flight — so a step only belongs in a `[ ∥ ]` group if neither member needs the other's output. This is why **contracts come first**: once interfaces are defined, the frontend and backend slices have no runtime dependency and parallelize cleanly.
+
+- **New feature**: chrissy (story + AC) → tony (service boundaries + contracts) → `[silvio (frontend) ∥ paulie (backend)]` → johnny (test review) → bobby (README/docs touch-up if user-facing)
 - **Bug fix**: paulie or silvio (failing test + fix) → johnny (regression coverage review)
 - **Schema change**: tony (architectural impact) → richie (schema + index design) → paulie (EF migration + code) → johnny (data + integration tests)
 - **Docs-only update**: bobby
-- **Pre-commit review**: tony + johnny in parallel (already automated via `/review`)
+- **Pre-commit review**: `[tony ∥ johnny]` (already automated via `/review`)
+
+Within a single workflow, only the bracketed groups are parallel; everything joined by `→` is a genuine data dependency and stays serial.
 
 ## Auto-delegation Rules
 
@@ -67,6 +75,7 @@ Default agent sequences. Delegate via the Task tool; chain by invoking the next 
 - Only handle inline for purely conversational questions with no code or domain component (e.g. "how does Claude Code work?"). Any question about code, architecture, tests, UI, schema, or requirements routes to the relevant agent — even if the answer seems obvious.
 - When multiple agents match, prefer the earliest in the relevant workflow chain.
 - For multi-step work, delegate each step to its specialist rather than asking one agent to cross lanes.
+- When a workflow step is a `[A ∥ B]` group, issue both Agent calls in a single response so they run concurrently — don't degrade it to sequential by splitting across turns. If a dependency is discovered mid-flight, fall back to serial and say why.
 - Surface the chosen agent and reason in one short sentence before invoking (e.g., "Routing to paulie — C#/.NET question").
 
 ## Guardrails
