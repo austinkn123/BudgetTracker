@@ -46,6 +46,37 @@ public class PlaidItemAccessor : IPlaidItemAccessor
     }
 
     /// <inheritdoc />
+    public async Task<PlaidItem?> GetByPlaidItemIdAsync(string plaidItemId)
+    {
+        return await _context.PlaidItems
+            .AsNoTracking()
+            .Include(p => p.Accounts)
+            .FirstOrDefaultAsync(p => p.PlaidItemId == plaidItemId && p.IsActive);
+    }
+
+    /// <inheritdoc />
+    public async Task<string?> GetAccessTokenByPlaidItemIdAsync(string plaidItemId)
+    {
+        var encrypted = await _context.PlaidItems
+            .AsNoTracking()
+            .Where(p => p.PlaidItemId == plaidItemId && p.IsActive)
+            .Select(p => p.AccessTokenEncrypted)
+            .FirstOrDefaultAsync();
+
+        return encrypted is null ? null : _protector.Unprotect(encrypted);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PlaidItem>> GetAllActiveAsync()
+    {
+        return await _context.PlaidItems
+            .AsNoTracking()
+            .Include(p => p.Accounts)
+            .Where(p => p.IsActive)
+            .ToListAsync();
+    }
+
+    /// <inheritdoc />
     public async Task<int> ReplaceActiveAsync(
         int userId,
         string accessTokenPlaintext,

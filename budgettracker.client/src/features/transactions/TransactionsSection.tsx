@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { format, startOfDay, startOfMonth } from 'date-fns';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -9,6 +10,7 @@ import { Plus } from 'lucide-react';
 import { useTransactions } from './hooks/useTransactions';
 import { useTransactionForm } from './hooks/useTransactionForm';
 import { useCategories } from '../categories/hooks/useCategories';
+import { plaidService } from '../../shared/services/plaid.service';
 import TransactionDialog from './components/TransactionDialog';
 import TransactionTable from './components/TransactionTable';
 import {
@@ -33,12 +35,38 @@ const TransactionsSection = ({
   const { data: categories = [] } = useCategories();
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
 
+  // Read-only share of the Settings page connection cache (same query key) so we
+  // can resolve a Plaid account mask for each imported row. Never mutates.
+  const { data: connection } = useQuery({
+    queryKey: ['plaid', 'connection'],
+    queryFn: plaidService.getConnection,
+  });
+
+  const maskByPlaidAccountId = useMemo(
+    () => new Map(connection?.accounts.map((a) => [a.plaidAccountId, a.mask]) ?? []),
+    [connection],
+  );
+
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.categoryType === 'Expense' || c.categoryType === 'Both'),
     [categories],
   );
 
+  const incomeCategories = useMemo(
+    () => categories.filter((c) => c.categoryType === 'Income' || c.categoryType === 'Both'),
+    [categories],
+  );
+
   const form = useTransactionForm(transactions, expenseCategories, setStatusMessage, setStatusError);
+
+  // For a locked (imported) edit, offer categories matching the row's type so the
+  // dropdown isn't empty for Income rows, falling back to ALL categories.
+  const dialogCategories = useMemo(() => {
+    const editing = form.editingTransaction;
+    if (!editing || !form.locked) return expenseCategories;
+    const typed = editing.transactionType === 'Income' ? incomeCategories : expenseCategories;
+    return typed.length > 0 ? typed : categories;
+  }, [form.editingTransaction, form.locked, expenseCategories, incomeCategories, categories]);
 
   const daySummaries = useMemo(() => buildTransactionDaySummaries(transactions), [transactions]);
   const selectedDaySummary = useMemo(
@@ -103,6 +131,7 @@ const TransactionsSection = ({
             daySummaries={daySummaries}
             selectedDate={selectedDate}
             selectedDaySummary={selectedDaySummary}
+            maskByPlaidAccountId={maskByPlaidAccountId}
             onDateChange={setSelectedDate}
             onMonthChange={(month) => setSelectedDate(startOfMonth(month))}
             onAddTransaction={form.openForAdd}
@@ -115,8 +144,9 @@ const TransactionsSection = ({
         open={form.dialogOpen}
         mode={form.dialogMode}
         initialValues={form.initialValues}
-        categories={expenseCategories}
+        categories={dialogCategories}
         isSaving={form.isSaving}
+        locked={form.locked}
         onClose={form.closeDialog}
         onSave={form.save}
         onDelete={form.deleteTransaction}

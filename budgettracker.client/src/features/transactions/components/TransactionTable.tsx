@@ -27,6 +27,7 @@ type TransactionTableProps = {
   daySummaries: Map<string, TransactionDaySummary>;
   selectedDate: Date;
   selectedDaySummary: TransactionDaySummary | null;
+  maskByPlaidAccountId: Map<string, string | null | undefined>;
   onDateChange: (date: Date) => void;
   onMonthChange: (month: Date) => void;
   onAddTransaction: (occurredAt?: string) => void;
@@ -59,6 +60,7 @@ const TransactionTable = ({
   daySummaries,
   selectedDate,
   selectedDaySummary,
+  maskByPlaidAccountId,
   onDateChange,
   onMonthChange,
   onAddTransaction,
@@ -143,16 +145,49 @@ const TransactionTable = ({
                 const color = isInflow ? 'success.main' : 'error.main';
                 const sign = isInflow ? '+' : '-';
 
+                const mask = transaction.plaidAccountId
+                  ? maskByPlaidAccountId.get(transaction.plaidAccountId)
+                  : undefined;
+                const secondaryText = [
+                  categoryMap.get(transaction.categoryId) ?? 'Uncategorized',
+                  transaction.notes || transaction.transactionType,
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
+
                 return (
                   <Box key={transaction.id}>
                     {index > 0 && <Divider component="li" />}
                     <ListItemButton alignItems="flex-start" onClick={() => onRowClick(transaction)}>
                       <ListItemText
                         primary={transaction.payee || categoryMap.get(transaction.categoryId) || 'Uncategorized transaction'}
+                        secondaryTypographyProps={{ component: 'div' }}
                         secondary={
-                          [categoryMap.get(transaction.categoryId) ?? 'Uncategorized', transaction.notes || transaction.transactionType]
-                            .filter(Boolean)
-                            .join(' · ')
+                          <>
+                            <Typography variant="body2" color="text.secondary" component="span">
+                              {secondaryText}
+                            </Typography>
+                            {transaction.isImported && (
+                              <Stack
+                                direction="row"
+                                spacing={0.75}
+                                useFlexGap
+                                flexWrap="wrap"
+                                alignItems="center"
+                                sx={{ mt: 0.5 }}
+                              >
+                                <Chip size="small" variant="outlined" label="Imported" />
+                                {mask && (
+                                  <Typography variant="caption" color="text.secondary" component="span">
+                                    {`•••• ${mask}`}
+                                  </Typography>
+                                )}
+                                {transaction.isPending && (
+                                  <Chip size="small" color="warning" label="Pending" />
+                                )}
+                              </Stack>
+                            )}
+                          </>
                         }
                       />
                       <Typography

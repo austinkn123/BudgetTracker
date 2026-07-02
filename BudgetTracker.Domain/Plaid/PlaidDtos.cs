@@ -38,3 +38,17 @@ public record PlaidSyncResult(
     IReadOnlyList<PlaidTransactionDto> Modified,
     IReadOnlyList<string> RemovedTransactionIds,
     string NextCursor);
+
+/// <summary>
+/// Raw JSON Web Key returned by <c>/webhook_verification_key/get</c>, used to verify the ES256
+/// signature on Plaid's <c>Plaid-Verification</c> JWT. Carries the JWK fields verbatim — no
+/// interpretation happens in the accessor.
+/// </summary>
+public record PlaidJwkDto(
+    string? Kty,
+    string? Crv,
+    string? X,
+    string? Y,
+    string? Kid,
+    string? Use,
+    string? Alg);

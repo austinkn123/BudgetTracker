@@ -6,6 +6,7 @@ using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Domain.Plaid;
 using BudgetTracker.Server.Endpoints;
 using BudgetTracker.Server.Managers;
+using BudgetTracker.Server.Services;
 using BudgetTracker.Server.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,10 @@ builder.Services.AddDbContext<BudgetTrackerDbContext>(options =>
 
 // Data Protection — used by PlaidItemAccessor to encrypt access_tokens at rest.
 builder.Services.AddDataProtection();
+
+// In-memory cache — PlaidAccessor caches webhook verification keys (JWK) to avoid a per-webhook
+// round-trip to Plaid (closes the webhook-verification timing oracle).
+builder.Services.AddMemoryCache();
 
 // Plaid configuration + typed HttpClient (BaseAddress comes from Plaid:BaseUrl).
 builder.Services.Configure<PlaidOptions>(builder.Configuration.GetSection(PlaidOptions.SectionName));
@@ -58,6 +63,9 @@ builder.Services.Scan(scan => scan
         .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Manager")))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
+
+// Background sweep — periodic backup re-sync of all active Plaid items (BUD-6).
+builder.Services.AddHostedService<PlaidSyncSweepService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

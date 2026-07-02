@@ -33,6 +33,9 @@ export interface UseLinkedAccountResult {
 
 const CONNECTION_QUERY_KEY = ['plaid', 'connection'] as const;
 
+/** Poll cadence so server-side auto-sync (webhook + background) surfaces without a manual Refresh (BUD-6). */
+const CONNECTION_REFETCH_INTERVAL_MS = 60_000;
+
 const extractMessage = (err: unknown, fallback: string): string => {
   const responseError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
   if (responseError) return responseError;
@@ -50,6 +53,8 @@ export const useLinkedAccount = (): UseLinkedAccountResult => {
     queryKey: CONNECTION_QUERY_KEY,
     queryFn: plaidService.getConnection,
     staleTime: 30_000,
+    refetchInterval: CONNECTION_REFETCH_INTERVAL_MS,
+    refetchOnWindowFocus: true,
   });
 
   const prepareLinkMutation = useMutation({

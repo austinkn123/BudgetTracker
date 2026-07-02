@@ -56,6 +56,26 @@ public static class PlaidEndpoints
                 : Results.BadRequest(new { error = result.Error });
         });
 
+        // Plaid sends no auth token, so this route opts out of the group's RequireAuthorization().
+        // Logic lives in HandleWebhookAsync so the raw-body/header/always-200 contract is unit-testable.
+        plaidGroup.MapPost("/webhook", HandleWebhookAsync)
+            .AllowAnonymous();
+
         return plaidGroup;
+    }
+
+    /// <summary>
+    /// Handles an inbound Plaid webhook: reads the body verbatim (needed for the SHA-256 hash the JWT
+    /// signs) and the <c>Plaid-Verification</c> header, delegates verification/sync to the manager, and
+    /// ALWAYS returns a neutral 200 so verification success/failure is never revealed to the caller.
+    /// </summary>
+    public static async Task<IResult> HandleWebhookAsync(HttpRequest request, IPlaidManager manager)
+    {
+        using var reader = new StreamReader(request.Body);
+        var rawBody = await reader.ReadToEndAsync();
+        var verificationJwt = request.Headers["Plaid-Verification"].ToString();
+
+        await manager.HandleTransactionsWebhookAsync(verificationJwt, rawBody);
+        return Results.Ok();
     }
 }

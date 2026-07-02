@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Plaid;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace BudgetTracker.Domain.Accessors;
@@ -18,16 +19,27 @@ public class PlaidAccessor : IPlaidAccessor
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    /// <summary>
+    /// TTL for a cached webhook verification key. Plaid rotates these keys very rarely, so a few hours
+    /// is safe; caching removes the per-webhook round-trip so forged (locally-rejected) and
+    /// valid-but-unknown requests no longer differ in latency (closes the timing oracle).
+    /// </summary>
+    private static readonly TimeSpan JwkCacheTtl = TimeSpan.FromHours(6);
+
+    private const string JwkCacheKeyPrefix = "plaid:jwk:";
+
     private readonly HttpClient _http;
     private readonly PlaidOptions _options;
+    private readonly IMemoryCache _cache;
 
     /// <summary>
     /// Initializes the accessor. <paramref name="http"/> is configured by DI with the Plaid BaseUrl.
     /// </summary>
-    public PlaidAccessor(HttpClient http, IOptions<PlaidOptions> options)
+    public PlaidAccessor(HttpClient http, IOptions<PlaidOptions> options, IMemoryCache cache)
     {
         _http = http;
         _options = options.Value;
+        _cache = cache;
     }
 
     /// <inheritdoc />
@@ -41,7 +53,10 @@ public class PlaidAccessor : IPlaidAccessor
             country_codes = new[] { "US" },
             language = "en",
             user = new { client_user_id = clientUserId },
-            products = new[] { "transactions" }
+            products = new[] { "transactions" },
+            // Pass null (not "") when unset so JsonOptions.WhenWritingNull omits it entirely —
+            // Plaid rejects an empty webhook string, and sandbox without a tunnel must still work.
+            webhook = string.IsNullOrWhiteSpace(_options.WebhookUrl) ? null : _options.WebhookUrl
         };
 
         var response = await PostAsync("/link/token/create", body, cancellationToken);
@@ -184,6 +199,58 @@ public class PlaidAccessor : IPlaidAccessor
             // Idempotent: Plaid may return 400/ITEM_NOT_FOUND if already revoked. We ignore.
         }
     }
+
+    /// <inheritdoc />
+    public async Task UpdateWebhookAsync(string accessToken, CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            client_id = _options.ClientId,
+            secret = _options.Secret,
+            access_token = accessToken,
+            webhook = _options.WebhookUrl
+        };
+
+        _ = await PostAsync("/item/webhook/update", body, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<PlaidJwkDto> GetWebhookVerificationKeyAsync(string keyId, CancellationToken cancellationToken = default)
+    {
+        // Cache hit → no HTTP round-trip. In steady state (one active kid) there is no per-webhook
+        // Plaid call, so forged requests (rejected locally) and valid-but-unknown requests no longer
+        // differ in latency — the timing oracle collapses.
+        var cacheKey = JwkCacheKeyPrefix + keyId;
+        if (_cache.TryGetValue<PlaidJwkDto>(cacheKey, out var cached) && cached is not null)
+            return cached;
+
+        var body = new
+        {
+            client_id = _options.ClientId,
+            secret = _options.Secret,
+            key_id = keyId
+        };
+
+        var response = await PostAsync("/webhook_verification_key/get", body, cancellationToken);
+        var key = response.GetProperty("key");
+
+        var jwk = new PlaidJwkDto(
+            Kty: ReadString(key, "kty"),
+            Crv: ReadString(key, "crv"),
+            X: ReadString(key, "x"),
+            Y: ReadString(key, "y"),
+            Kid: ReadString(key, "kid"),
+            Use: ReadString(key, "use"),
+            Alg: ReadString(key, "alg"));
+
+        _cache.Set(cacheKey, jwk, JwkCacheTtl);
+        return jwk;
+    }
+
+    private static string? ReadString(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
+            ? prop.GetString()
+            : null;
 
     private async Task<JsonElement> PostAsync(string path, object body, CancellationToken cancellationToken)
     {

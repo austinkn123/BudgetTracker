@@ -34,6 +34,8 @@ export const useTransactionForm = (
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [initialValues, setInitialValues] = useState<TransactionFormData>(
     emptyForm(defaultAccountId, defaultCategoryId),
   );
@@ -41,15 +43,18 @@ export const useTransactionForm = (
   const openForAdd = useCallback((occurredAt?: string) => {
     setInitialValues(emptyForm(defaultAccountId, defaultCategoryId, occurredAt ?? todayInputValue));
     setEditingId(null);
+    setLocked(false);
+    setEditingTransaction(null);
     setDialogMode('add');
     setDialogOpen(true);
   }, [defaultAccountId, defaultCategoryId]);
 
   const openForEdit = useCallback((transaction: Transaction) => {
-    // [BUD-18] Guard against silent sign loss on non-Expense edit.
-    // Removed in BUD-19 when the TransactionType picker + sign-aware
-    // edit handling is implemented.
-    if (transaction.transactionType !== 'Expense') {
+    // [BUD-18] Guard against silent sign loss on non-Expense edit. Imported
+    // (Plaid) rows are exempt: their immutable fields are locked in the dialog,
+    // so a non-Expense imported row can open safely. Only MANUAL non-Expense
+    // edits remain blocked until BUD-19 ships the TransactionType picker.
+    if (!transaction.isImported && transaction.transactionType !== 'Expense') {
       setStatusMessage(null);
       setStatusError(
         'Editing Income, Transfer, and Adjustment transactions is not yet supported (see BUD-19).',
@@ -57,6 +62,8 @@ export const useTransactionForm = (
       return;
     }
 
+    setLocked(Boolean(transaction.isImported));
+    setEditingTransaction(transaction);
     setInitialValues({
       accountId: transaction.accountId,
       categoryId: transaction.categoryId,
@@ -156,18 +163,27 @@ export const useTransactionForm = (
       const existing = transactions.find((t) => t.id === editingId);
       if (!existing) return;
 
-      const payload: Transaction = {
-        ...existing,
-        accountId: formData.accountId,
-        categoryId: formData.categoryId,
-        amount: applySign(formData.amount, existing.transactionType),
-        occurredAt: new Date(`${formData.occurredAt}T00:00:00`).toISOString(),
-        payee: formData.payee || undefined,
-        notes: formData.notes || undefined,
-      };
+      // Imported (Plaid) rows are immutable except for category & notes. When
+      // locked, take ONLY those two from the form and preserve every other
+      // field (amount/sign, occurredAt, payee, accountId) from `...existing`.
+      const payload: Transaction = locked
+        ? {
+            ...existing,
+            categoryId: formData.categoryId,
+            notes: formData.notes || undefined,
+          }
+        : {
+            ...existing,
+            accountId: formData.accountId,
+            categoryId: formData.categoryId,
+            amount: applySign(formData.amount, existing.transactionType),
+            occurredAt: new Date(`${formData.occurredAt}T00:00:00`).toISOString(),
+            payee: formData.payee || undefined,
+            notes: formData.notes || undefined,
+          };
       updateMutation.mutate({ id: editingId, payload });
     }
-  }, [dialogMode, editingId, transactions, createMutation, updateMutation]);
+  }, [dialogMode, editingId, locked, transactions, createMutation, updateMutation]);
 
   const deleteTransaction = useCallback(() => {
     if (editingId !== null) {
@@ -181,6 +197,8 @@ export const useTransactionForm = (
     dialogOpen,
     dialogMode,
     initialValues,
+    locked,
+    editingTransaction,
     isSaving,
     openForAdd,
     openForEdit,

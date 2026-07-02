@@ -24,4 +24,16 @@ public interface IPlaidAccessor
 
     /// <summary>Revoke a Plaid item by access_token. Idempotent — safe to call if already removed.</summary>
     Task RemoveItemAsync(string accessToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Register/update the webhook URL on an existing item via <c>/item/webhook/update</c>.
+    /// Used to attach the webhook to links created before <see cref="PlaidOptions.WebhookUrl"/> was configured.
+    /// </summary>
+    Task UpdateWebhookAsync(string accessToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetch the JSON Web Key (by <paramref name="keyId"/>) used to verify a webhook's <c>Plaid-Verification</c>
+    /// JWT signature via <c>/webhook_verification_key/get</c>. Returns the raw JWK — no verification here.
+    /// </summary>
+    Task<PlaidJwkDto> GetWebhookVerificationKeyAsync(string keyId, CancellationToken cancellationToken = default);
 }

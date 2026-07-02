@@ -5,6 +5,7 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import Alert from '@mui/material/Alert';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
@@ -22,6 +23,7 @@ type TransactionDialogProps = {
   initialValues: TransactionFormData;
   categories: Category[];
   isSaving: boolean;
+  locked?: boolean;
   onClose: () => void;
   onSave: (values: TransactionFormData) => Promise<void> | void;
   onDelete?: () => void;
@@ -33,6 +35,7 @@ const TransactionDialog = ({
   initialValues,
   categories,
   isSaving,
+  locked = false,
   onClose,
   onSave,
   onDelete,
@@ -65,6 +68,11 @@ const TransactionDialog = ({
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{mode === 'add' ? 'Add Transaction' : 'Edit Transaction'}</DialogTitle>
       <DialogContent className="space-y-4 pt-4">
+        {locked && (
+          <Alert severity="info" variant="outlined">
+            Imported from your bank — only category &amp; notes can be edited.
+          </Alert>
+        )}
         <div className="grid grid-cols-2 gap-4 pt-2">
           <Controller
             name="amount"
@@ -78,6 +86,7 @@ const TransactionDialog = ({
                 onChange={(e) => field.onChange(Number(e.target.value))}
                 error={Boolean(errors.amount)}
                 helperText={errors.amount?.message}
+                disabled={locked}
                 fullWidth
                 required
               />
@@ -116,6 +125,7 @@ const TransactionDialog = ({
                 onChange={field.onChange}
                 error={Boolean(errors.occurredAt)}
                 helperText={errors.occurredAt?.message}
+                disabled={locked}
                 fullWidth
                 required
                 slotProps={{ inputLabel: { shrink: true } }}
@@ -132,6 +142,7 @@ const TransactionDialog = ({
                 onChange={field.onChange}
                 error={Boolean(errors.payee)}
                 helperText={errors.payee?.message}
+                disabled={locked}
                 fullWidth
               />
             )}
@@ -155,7 +166,7 @@ const TransactionDialog = ({
         />
       </DialogContent>
       <DialogActions className="px-6 pb-4">
-        {mode === 'edit' && onDelete && (
+        {mode === 'edit' && !locked && onDelete && (
           <Button color="error" onClick={onDelete} disabled={isSaving} className="mr-auto">
             Delete
           </Button>

@@ -1,9 +1,11 @@
+using System.Text.Json;
 using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Engines;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Models;
 using BudgetTracker.Domain.Plaid;
+using Microsoft.Extensions.Options;
 
 namespace BudgetTracker.Server.Managers;
 
@@ -17,8 +19,22 @@ public class PlaidManager(
     IPlaidItemAccessor itemAccessor,
     ITransactionAccessor transactionAccessor,
     IAccountAccessor accountAccessor,
-    IPlaidEngine engine) : IPlaidManager
+    IPlaidEngine engine,
+    IPlaidWebhookEngine webhookEngine,
+    IOptions<PlaidOptions> options,
+    ILogger<PlaidManager> logger) : IPlaidManager
 {
+    /// <summary>Transactions webhook codes that warrant a sync. Others (e.g. RECURRING_*) are ignored.</summary>
+    private static readonly HashSet<string> ActionableTransactionCodes =
+    [
+        "SYNC_UPDATES_AVAILABLE",
+        "DEFAULT_UPDATE",
+        "HISTORICAL_UPDATE",
+        "INITIAL_UPDATE"
+    ];
+
+    private readonly PlaidOptions _options = options.Value;
+
     /// <inheritdoc />
     public async Task<Result<PlaidLinkTokenResult>> CreateLinkTokenAsync(int userId, string cognitoSub)
     {
@@ -117,12 +133,7 @@ public class PlaidManager(
         if (plaidItem is null)
             return Result<PlaidSyncSummary>.Failure("No active bank connection to sync");
 
-        var accessToken = await itemAccessor.GetActiveAccessTokenAsync(userId);
-        if (accessToken is null)
-            return Result<PlaidSyncSummary>.Failure("No active bank connection to sync");
-
-        var userAccounts = await accountAccessor.GetByUserIdAsync(userId);
-        return await RunSyncAsync(userId, plaidItem.Id, accessToken, plaidItem.SyncCursor, userAccounts, plaidItem.Accounts.ToList());
+        return await SyncItemAsync(plaidItem);
     }
 
     /// <inheritdoc />
@@ -136,7 +147,7 @@ public class PlaidManager(
             plaidItem.Id,
             plaidItem.InstitutionName,
             plaidItem.LastSyncedAt,
-            plaidItem.Accounts.Select(a => new PlaidLinkedAccountView(a.Name, a.Mask, a.AccountType)).ToList());
+            plaidItem.Accounts.Select(a => new PlaidLinkedAccountView(a.PlaidAccountId, a.Name, a.Mask, a.AccountType)).ToList());
 
         return Result<PlaidConnectionView>.Success(view);
     }
@@ -159,6 +170,128 @@ public class PlaidManager(
 
         await itemAccessor.DeactivateActiveAsync(userId);
         return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> HandleTransactionsWebhookAsync(string plaidVerificationJwt, string rawBody)
+    {
+        // Verify — extract kid, fetch the matching JWK, verify signature + freshness + body hash.
+        // ANY failure is a silent no-op success so the endpoint returns a neutral 200 that leaks nothing.
+        var keyId = webhookEngine.ExtractKeyId(plaidVerificationJwt);
+        if (keyId is null)
+            return Result.Success();
+
+        PlaidJwkDto jwk;
+        try
+        {
+            jwk = await plaidAccessor.GetWebhookVerificationKeyAsync(keyId);
+        }
+        catch (Exception)
+        {
+            return Result.Success();
+        }
+
+        if (!webhookEngine.VerifyWebhook(plaidVerificationJwt, jwk, rawBody))
+            return Result.Success();
+
+        // Parse — act only on actionable TRANSACTIONS events; everything else is a no-op success.
+        if (!TryParseTransactionsWebhook(rawBody, out var itemId))
+            return Result.Success();
+
+        var item = await itemAccessor.GetByPlaidItemIdAsync(itemId);
+        if (item is null)
+            return Result.Success();
+
+        var sync = await SyncItemAsync(item);
+        return sync.IsSuccess ? Result.Success() : Result.Failure(sync.Error!);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SweepAllAsync()
+    {
+        var items = await itemAccessor.GetAllActiveAsync();
+        var registerWebhook = !string.IsNullOrWhiteSpace(_options.WebhookUrl);
+
+        foreach (var item in items)
+        {
+            try
+            {
+                var accessToken = await itemAccessor.GetAccessTokenByPlaidItemIdAsync(item.PlaidItemId);
+                if (accessToken is null)
+                    continue;
+
+                // Register the webhook on pre-existing links (those created before WebhookUrl was set).
+                // Best-effort in its OWN try/catch: a transient /item/webhook/update failure must never
+                // skip this item's actual sync, which is the sweep's primary job.
+                if (registerWebhook)
+                {
+                    try
+                    {
+                        await plaidAccessor.UpdateWebhookAsync(accessToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Webhook registration failed for PlaidItem {PlaidItemId}; syncing anyway.", item.Id);
+                    }
+                }
+
+                var userAccounts = await accountAccessor.GetByUserIdAsync(item.UserId);
+                await RunSyncAsync(item.UserId, item.Id, accessToken, item.SyncCursor, userAccounts, item.Accounts.ToList());
+            }
+            catch (Exception ex)
+            {
+                // One bad item must not abort the sweep. Never log the token/body.
+                logger.LogWarning(ex, "Sweep sync failed for PlaidItem {PlaidItemId}; continuing.", item.Id);
+            }
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Shared per-item sync: load the decrypted token (by Plaid item_id) and the user's accounts,
+    /// then delegate to <see cref="RunSyncAsync"/>. Used by on-demand sync, the webhook, and the sweep.
+    /// </summary>
+    private async Task<Result<PlaidSyncSummary>> SyncItemAsync(PlaidItem item)
+    {
+        var accessToken = await itemAccessor.GetAccessTokenByPlaidItemIdAsync(item.PlaidItemId);
+        if (accessToken is null)
+            return Result<PlaidSyncSummary>.Failure("No active bank connection to sync");
+
+        var userAccounts = await accountAccessor.GetByUserIdAsync(item.UserId);
+        return await RunSyncAsync(item.UserId, item.Id, accessToken, item.SyncCursor, userAccounts, item.Accounts.ToList());
+    }
+
+    /// <summary>
+    /// Parse a webhook body, returning true (with the Plaid <paramref name="itemId"/>) only for an
+    /// actionable <c>TRANSACTIONS</c> event. Malformed JSON or a non-actionable event yields false.
+    /// </summary>
+    private static bool TryParseTransactionsWebhook(string rawBody, out string itemId)
+    {
+        itemId = string.Empty;
+        try
+        {
+            using var doc = JsonDocument.Parse(rawBody);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("webhook_type", out var typeProp) || typeProp.GetString() != "TRANSACTIONS")
+                return false;
+
+            if (!root.TryGetProperty("webhook_code", out var codeProp) ||
+                codeProp.GetString() is not { } code ||
+                !ActionableTransactionCodes.Contains(code))
+                return false;
+
+            if (!root.TryGetProperty("item_id", out var itemProp) || itemProp.GetString() is not { } id)
+                return false;
+
+            itemId = id;
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

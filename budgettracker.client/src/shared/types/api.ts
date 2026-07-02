@@ -29,6 +29,7 @@ export interface Transaction {
 }
 
 export interface PlaidLinkedAccountView {
+  plaidAccountId: string;
   name: string;
   mask?: string | null;
   accountType: string;

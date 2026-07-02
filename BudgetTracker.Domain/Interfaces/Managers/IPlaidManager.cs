@@ -14,7 +14,7 @@ public record PlaidConnectionView(
     IReadOnlyList<PlaidLinkedAccountView> Accounts);
 
 /// <summary>One linked Plaid account, exposed to the client for display.</summary>
-public record PlaidLinkedAccountView(string Name, string? Mask, string AccountType);
+public record PlaidLinkedAccountView(string PlaidAccountId, string Name, string? Mask, string AccountType);
 
 /// <summary>Outcome of a sync operation.</summary>
 public record PlaidSyncSummary(int Inserted, int Updated, int Removed, DateTime SyncedAt);
@@ -36,6 +36,23 @@ public interface IPlaidManager
 
     /// <summary>Re-sync transactions for the user's active PlaidItem. Idempotent via Plaid.transaction_id dedupe.</summary>
     Task<Result<PlaidSyncSummary>> SyncAsync(int userId);
+
+    /// <summary>
+    /// Handle an inbound Plaid <c>transactions</c> webhook. Verifies the <c>Plaid-Verification</c> JWT
+    /// (ES256 + freshness + body hash); on any failure returns a silent no-op success so the endpoint
+    /// can answer a neutral 200 that leaks nothing. On a verified, actionable transactions webhook,
+    /// runs the existing sync for the identified item.
+    /// </summary>
+    /// <param name="plaidVerificationJwt">The raw JWT from the <c>Plaid-Verification</c> request header.</param>
+    /// <param name="rawBody">The verbatim webhook body (needed to verify the body-hash claim and to parse the event).</param>
+    Task<Result> HandleTransactionsWebhookAsync(string plaidVerificationJwt, string rawBody);
+
+    /// <summary>
+    /// Backup sweep: re-sync every active PlaidItem so stale data never persists. Per-item failures are
+    /// logged and skipped so one bad item never aborts the run. Also opportunistically registers the
+    /// configured webhook on pre-existing items.
+    /// </summary>
+    Task<Result> SweepAllAsync();
 
     /// <summary>Return the user's current active connection metadata, or a NotFound failure if none is linked.</summary>
     Task<Result<PlaidConnectionView>> GetConnectionAsync(int userId);

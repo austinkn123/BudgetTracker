@@ -54,22 +54,14 @@ const DashboardPage = () => {
   return (
     <div className="space-y-8">
       {/* Header row: title + range selector */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 2,
-        }}
-      >
+      <Box className="flex flex-col gap-4 rounded-2xl border border-border bg-surface px-5 py-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          <Typography variant="h4" className="font-bold text-ink">
             Dashboard
           </Typography>
           {activePlan && (
-            <Typography variant="body2" color="text.secondary">
-              Active plan: {activePlan.name}
+            <Typography variant="body2" className="mt-1 text-ink-muted">
+              Tracking against <span className="font-semibold text-ink">{activePlan.name}</span>
             </Typography>
           )}
         </Box>

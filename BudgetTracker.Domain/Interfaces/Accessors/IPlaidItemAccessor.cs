@@ -15,6 +15,18 @@ public interface IPlaidItemAccessor
     Task<string?> GetActiveAccessTokenAsync(int userId);
 
     /// <summary>
+    /// Returns the active PlaidItem (with its <see cref="PlaidItem.Accounts"/>) identified by Plaid's
+    /// string <c>item_id</c> — the identifier webhook payloads carry — or null if none is active.
+    /// </summary>
+    Task<PlaidItem?> GetByPlaidItemIdAsync(string plaidItemId);
+
+    /// <summary>Returns the decrypted access_token for the active item with the given Plaid <c>item_id</c>, or null.</summary>
+    Task<string?> GetAccessTokenByPlaidItemIdAsync(string plaidItemId);
+
+    /// <summary>Returns every active PlaidItem (with its <see cref="PlaidItem.Accounts"/>) for the backup sweep.</summary>
+    Task<IReadOnlyList<PlaidItem>> GetAllActiveAsync();
+
+    /// <summary>
     /// Atomically deactivates any existing active PlaidItem for the user and inserts the new one.
     /// Encrypts <paramref name="accessTokenPlaintext"/> before persisting.
     /// </summary>
