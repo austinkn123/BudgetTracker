@@ -5,8 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../user/hooks/useUser';
 import UserSection from '../../user/UserSection';
-import { StatusBanner } from '../../../shared/components/StatusBanner';
-import { LinkedAccountCard } from '../../linked-accounts/components/LinkedAccountCard';
+import StatusBanner from '../../../shared/components/StatusBanner';
+import LinkedAccountCard from '../../linked-accounts/components/LinkedAccountCard';
 
 const SettingsPage = () => {
   const { isLoading: loadingUser } = useUser();

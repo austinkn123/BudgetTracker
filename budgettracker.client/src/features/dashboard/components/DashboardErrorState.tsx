@@ -5,12 +5,12 @@ type DashboardErrorStateProps = {
   budgetPlansError: unknown;
 };
 
-export function DashboardErrorState({
+const DashboardErrorState = ({
   userError,
   categoriesError,
   transactionsError,
   budgetPlansError,
-}: DashboardErrorStateProps) {
+}: DashboardErrorStateProps) => {
   return (
     <div className="space-y-8">
       <div className="bg-error-subtle border border-error/30 rounded-lg p-4">
@@ -24,4 +24,6 @@ export function DashboardErrorState({
       </div>
     </div>
   );
-}
+};
+
+export default DashboardErrorState;

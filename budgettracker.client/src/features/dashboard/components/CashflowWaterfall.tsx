@@ -27,7 +27,7 @@ const currency = new Intl.NumberFormat('en-US', {
  * `series.color`, then push a transparent "base" series to float the bars
  * to their proper running-total position.
  */
-export function CashflowWaterfall({ plan, transactions, categories }: CashflowWaterfallProps) {
+const CashflowWaterfall = ({ plan, transactions, categories }: CashflowWaterfallProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
 
@@ -156,4 +156,6 @@ export function CashflowWaterfall({ plan, transactions, categories }: CashflowWa
       </CardContent>
     </Card>
   );
-}
+};
+
+export default CashflowWaterfall;

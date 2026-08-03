@@ -15,7 +15,7 @@ const OPTIONS: Array<{ value: DateRangeKey; label: string }> = [
   { value: 'all', label: 'All' },
 ];
 
-export function RangeSelector({ value, onChange }: RangeSelectorProps) {
+const RangeSelector = ({ value, onChange }: RangeSelectorProps) => {
   return (
     <ToggleButtonGroup
       size="small"
@@ -72,4 +72,6 @@ export function RangeSelector({ value, onChange }: RangeSelectorProps) {
       ))}
     </ToggleButtonGroup>
   );
-}
+};
+
+export default RangeSelector;

@@ -22,7 +22,7 @@ const currency = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
 });
 
-export function RecentActivityFeed({ transactions, categories }: RecentActivityFeedProps) {
+const RecentActivityFeed = ({ transactions, categories }: RecentActivityFeedProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
   const palette = getChartPalette(theme);
@@ -116,4 +116,6 @@ export function RecentActivityFeed({ transactions, categories }: RecentActivityF
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RecentActivityFeed;

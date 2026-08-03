@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Typography from '@mui/material/Typography';
 import { useBudgetPlans } from '../hooks/useBudgetPlans';
 import { useCategories } from '../../categories/hooks/useCategories';
-import { StatusBanner } from '../../../shared/components/StatusBanner';
+import StatusBanner from '../../../shared/components/StatusBanner';
 import BudgetPlansSection from '../BudgetPlansSection';
 import CategoriesSection from '../../categories/CategoriesSection';
 

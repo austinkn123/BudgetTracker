@@ -16,7 +16,7 @@ interface ReplaceConnectionDialogProps {
  * Confirmation dialog for AC-10: replacing an existing bank connection.
  * Surfaces the current institution name so the user knows what's being replaced.
  */
-export const ReplaceConnectionDialog = ({
+const ReplaceConnectionDialog = ({
   open,
   currentInstitutionName,
   onCancel,
@@ -40,3 +40,5 @@ export const ReplaceConnectionDialog = ({
     </DialogActions>
   </Dialog>
 );
+
+export default ReplaceConnectionDialog;

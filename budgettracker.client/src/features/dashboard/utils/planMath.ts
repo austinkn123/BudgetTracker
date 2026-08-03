@@ -21,7 +21,7 @@ export interface DaysElapsed {
  * If `now` is before the plan month we return `daysElapsed = 0`; if after, the full month.
  * `daysPct` is in [0, 1].
  */
-export function daysElapsedInMonth(now: Date, planMonth: Date): DaysElapsed {
+export const daysElapsedInMonth = (now: Date, planMonth: Date): DaysElapsed => {
   const daysInMonth = getDaysInMonth(planMonth);
   const start = startOfMonth(planMonth);
   const end = endOfMonth(planMonth);
@@ -39,31 +39,31 @@ export function daysElapsedInMonth(now: Date, planMonth: Date): DaysElapsed {
 
   const daysPct = daysInMonth === 0 ? 0 : daysElapsed / daysInMonth;
   return { daysElapsed, daysInMonth, daysPct };
-}
+};
 
 /**
  * Linearly project month-end spend from the run-rate so far.
  * If no days have elapsed yet, we cannot project — return the actual amount.
  */
-export function projectMonthEndSpend(
+export const projectMonthEndSpend = (
   actual: number,
   daysElapsed: number,
   daysInMonth: number,
-): number {
+): number => {
   if (daysElapsed <= 0) return actual;
   if (daysInMonth <= 0) return actual;
   return (actual / daysElapsed) * daysInMonth;
-}
+};
 
 /**
  * Warm, encouraging headline based on the pacing delta
  * (spentPct - daysPct). Negative delta = ahead of pace; positive = behind.
  */
-export function getStatusHeadline(
+export const getStatusHeadline = (
   spentPct: number,
   daysPct: number,
   planMonth: Date,
-): string {
+): string => {
   const monthName = format(planMonth, 'MMMM');
   const delta = spentPct - daysPct;
 
@@ -74,7 +74,7 @@ export function getStatusHeadline(
   if (delta < 0.15) return `A little brisk in ${monthName}`;
   if (delta < 0.3) return `Tightening up needed in ${monthName}`;
   return `Off the trail in ${monthName}`;
-}
+};
 
 /** A single bar in the cashflow waterfall chart. */
 export interface WaterfallItem {
@@ -91,11 +91,11 @@ export interface WaterfallItem {
  * Build the data for a waterfall chart for the plan's month:
  * income → top 5 expense categories → "Other" expenses → net.
  */
-export function buildWaterfall(
+export const buildWaterfall = (
   transactions: Transaction[],
   plan: BudgetPlan | undefined,
   categories: Category[],
-): WaterfallItem[] {
+): WaterfallItem[] => {
   if (!plan) return [];
 
   const planMonth = parseISO(plan.planMonth);
@@ -147,7 +147,7 @@ export function buildWaterfall(
   items.push({ label: 'Net', value: Math.abs(net), kind: 'net', signed: net });
 
   return items;
-}
+};
 
 /** A summary row for one budget bucket. */
 export interface BucketSummary {
@@ -160,10 +160,10 @@ export interface BucketSummary {
  * Aggregate planned amount per bucket from the budget plan and pair it
  * with actual expense totals (by category) for the plan's month.
  */
-export function aggregateByBucket(
+export const aggregateByBucket = (
   plan: BudgetPlan | undefined,
   transactions: Transaction[],
-): BucketSummary[] {
+): BucketSummary[] => {
   if (!plan) return [];
 
   const planMonth = plan.planMonth.substring(0, 7);
@@ -196,4 +196,4 @@ export function aggregateByBucket(
     { bucket: 'Core', planned: planned.Core, actual: actual.Core },
     { bucket: 'Buffer', planned: planned.Buffer, actual: actual.Buffer },
   ];
-}
+};

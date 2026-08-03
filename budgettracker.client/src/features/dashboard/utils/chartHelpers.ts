@@ -31,7 +31,7 @@ export interface BudgetVsActualItem {
 // cleanly. The single helper below centralizes that convention.
 const expenseMagnitude = (amount: number) => (amount < 0 ? -amount : amount);
 
-export function computeSummaryTotals(transactions: Transaction[]): SummaryTotals {
+export const computeSummaryTotals = (transactions: Transaction[]): SummaryTotals => {
   let totalIncome = 0;
   let totalExpenses = 0;
 
@@ -44,9 +44,9 @@ export function computeSummaryTotals(transactions: Transaction[]): SummaryTotals
   }
 
   return { totalIncome, totalExpenses, netBalance: totalIncome - totalExpenses };
-}
+};
 
-export function computeSummaryTotalsFromPlan(plan: BudgetPlan): SummaryTotals {
+export const computeSummaryTotalsFromPlan = (plan: BudgetPlan): SummaryTotals => {
   const totalIncome = plan.netIncomeMonthly;
 
   const totalExpenses = plan.entries
@@ -54,12 +54,12 @@ export function computeSummaryTotalsFromPlan(plan: BudgetPlan): SummaryTotals {
     .reduce((sum, line) => sum + line.monthlyEquivalent, 0);
 
   return { totalIncome, totalExpenses, netBalance: totalIncome - totalExpenses };
-}
+};
 
-export function aggregateByCategoryFromPlan(
+export const aggregateByCategoryFromPlan = (
   plan: BudgetPlan,
   categories: Category[],
-): CategorySlice[] {
+): CategorySlice[] => {
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
   const totals = new Map<number, number>();
 
@@ -78,12 +78,12 @@ export function aggregateByCategoryFromPlan(
       value,
     }))
     .sort((a, b) => b.value - a.value);
-}
+};
 
-export function aggregateByCategory(
+export const aggregateByCategory = (
   transactions: Transaction[],
   categories: Category[],
-): CategorySlice[] {
+): CategorySlice[] => {
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
   const totals = new Map<number, number>();
 
@@ -100,9 +100,9 @@ export function aggregateByCategory(
       value,
     }))
     .sort((a, b) => b.value - a.value);
-}
+};
 
-export function aggregateByMonth(transactions: Transaction[]): MonthlyDataPoint[] {
+export const aggregateByMonth = (transactions: Transaction[]): MonthlyDataPoint[] => {
   const monthMap = new Map<string, { income: number; expenses: number }>();
 
   for (const t of transactions) {
@@ -125,13 +125,13 @@ export function aggregateByMonth(transactions: Transaction[]): MonthlyDataPoint[
       income: data.income,
       expenses: data.expenses,
     }));
-}
+};
 
-export function budgetVsActual(
+export const budgetVsActual = (
   activePlan: BudgetPlan | undefined,
   transactions: Transaction[],
   categories: Category[],
-): BudgetVsActualItem[] {
+): BudgetVsActualItem[] => {
   if (!activePlan) return [];
 
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
@@ -171,35 +171,35 @@ export function budgetVsActual(
       actual: actualByCategory.get(id) ?? 0,
     }))
     .sort((a, b) => b.budgeted - a.budgeted);
-}
+};
 
 /**
  * Filter a list of transactions to those occurring within `[start, end]`
  * (inclusive on both ends — matches the {@link useDateRange} bounds).
  */
-export function filterTransactionsByRange(
+export const filterTransactionsByRange = (
   transactions: Transaction[],
   start: Date,
   end: Date,
-): Transaction[] {
+): Transaction[] => {
   const startMs = start.getTime();
   const endMs = end.getTime();
   return transactions.filter((t) => {
     const ts = parseISO(t.occurredAt).getTime();
     return ts >= startMs && ts <= endMs;
   });
-}
+};
 
 /**
  * Build a per-category, per-month expense timeline for the past `monthsBack`
  * months (inclusive of the current month). Each map entry is a chronologically
  * ordered series suitable for a sparkline.
  */
-export function aggregateByCategoryMonthly(
+export const aggregateByCategoryMonthly = (
   transactions: Transaction[],
   categories: Category[],
   monthsBack: number,
-): Map<number, MonthlyDataPoint[]> {
+): Map<number, MonthlyDataPoint[]> => {
   const now = new Date();
   // Build the month bucket order: oldest -> newest.
   const months: string[] = [];
@@ -239,4 +239,4 @@ export function aggregateByCategoryMonthly(
   }
 
   return result;
-}
+};

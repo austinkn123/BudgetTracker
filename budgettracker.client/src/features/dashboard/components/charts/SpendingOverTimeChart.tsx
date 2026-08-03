@@ -10,7 +10,7 @@ interface SpendingOverTimeChartProps {
   data: MonthlyDataPoint[];
 }
 
-export function SpendingOverTimeChart({ data }: SpendingOverTimeChartProps) {
+const SpendingOverTimeChart = ({ data }: SpendingOverTimeChartProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
 
@@ -70,4 +70,6 @@ export function SpendingOverTimeChart({ data }: SpendingOverTimeChartProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default SpendingOverTimeChart;

@@ -5,7 +5,7 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import type { BudgetPlan, Category, Transaction } from '../../../shared/types/api';
 import { aggregateByCategoryMonthly, filterTransactionsByRange } from '../utils/chartHelpers';
-import { CategoryDrillCard, type CategoryDrillCardData } from './CategoryDrillCard';
+import CategoryDrillCard, { type CategoryDrillCardData } from './CategoryDrillCard';
 
 interface CategoryDrillGridProps {
   plan: BudgetPlan | undefined;
@@ -17,13 +17,13 @@ interface CategoryDrillGridProps {
 
 const MAX_CARDS = 8;
 
-export function CategoryDrillGrid({
+const CategoryDrillGrid = ({
   plan,
   transactions,
   categories,
   start,
   end,
-}: CategoryDrillGridProps) {
+}: CategoryDrillGridProps) => {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const cards: CategoryDrillCardData[] = useMemo(() => {
@@ -120,4 +120,6 @@ export function CategoryDrillGrid({
       </Box>
     </Box>
   );
-}
+};
+
+export default CategoryDrillGrid;

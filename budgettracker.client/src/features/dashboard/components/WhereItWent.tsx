@@ -23,7 +23,7 @@ const currency = new Intl.NumberFormat('en-US', {
 
 const TOP_N = 8;
 
-export function WhereItWent({ transactions, categories }: WhereItWentProps) {
+const WhereItWent = ({ transactions, categories }: WhereItWentProps) => {
   const theme = useTheme();
   const palette = getChartPalette(theme);
   const semantic = getSemanticColors(theme);
@@ -99,4 +99,6 @@ export function WhereItWent({ transactions, categories }: WhereItWentProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default WhereItWent;

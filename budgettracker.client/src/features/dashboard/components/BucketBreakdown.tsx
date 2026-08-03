@@ -20,7 +20,7 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
-export function BucketBreakdown({ plan, transactions }: BucketBreakdownProps) {
+const BucketBreakdown = ({ plan, transactions }: BucketBreakdownProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
 
@@ -103,4 +103,6 @@ export function BucketBreakdown({ plan, transactions }: BucketBreakdownProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default BucketBreakdown;

@@ -4,8 +4,8 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useLinkedAccount } from '../hooks/useLinkedAccount';
-import { PlaidLinkLauncher } from './PlaidLinkLauncher';
-import { ReplaceConnectionDialog } from './ReplaceConnectionDialog';
+import PlaidLinkLauncher from './PlaidLinkLauncher';
+import ReplaceConnectionDialog from './ReplaceConnectionDialog';
 
 /**
  * Settings-page card that owns the bank-link UX:
@@ -13,7 +13,7 @@ import { ReplaceConnectionDialog } from './ReplaceConnectionDialog';
  *   - Connected state with Refresh + Disconnect when a PlaidItem is active (AC-2)
  *   - Replace-confirmation dialog when user clicks Connect while already linked (AC-10)
  */
-export const LinkedAccountCard = () => {
+const LinkedAccountCard = () => {
   const {
     connection,
     isLoadingConnection,
@@ -164,3 +164,5 @@ export const LinkedAccountCard = () => {
     </div>
   );
 };
+
+export default LinkedAccountCard;

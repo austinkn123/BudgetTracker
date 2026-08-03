@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { Layout } from './shared/components/Layout';
+import Layout from './shared/components/Layout';
 import DashboardPage from './features/dashboard/pages/DashboardPage';
 import TransactionsPage from './features/transactions/pages/TransactionsPage';
 import BudgetPlansPage from './features/budget-plans/pages/BudgetPlansPage';
@@ -8,7 +8,7 @@ import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import ConfirmSignUpPage from './pages/ConfirmSignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import { ProtectedRoute } from './auth/ProtectedRoute';
+import ProtectedRoute from './auth/ProtectedRoute';
 
 function App() {
   return (

@@ -45,7 +45,7 @@ const currencyPrecise = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
 });
 
-export function CategoryDrillCard({ data, expanded, onToggle }: CategoryDrillCardProps) {
+const CategoryDrillCard = ({ data, expanded, onToggle }: CategoryDrillCardProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
 
@@ -153,4 +153,6 @@ export function CategoryDrillCard({ data, expanded, onToggle }: CategoryDrillCar
       </Collapse>
     </Card>
   );
-}
+};
+
+export default CategoryDrillCard;

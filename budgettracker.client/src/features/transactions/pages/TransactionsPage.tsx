@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Typography from '@mui/material/Typography';
 import { useTransactions } from '../hooks/useTransactions';
-import { StatusBanner } from '../../../shared/components/StatusBanner';
+import StatusBanner from '../../../shared/components/StatusBanner';
 import TransactionsSection from '../TransactionsSection';
 
 const TransactionsPage = () => {

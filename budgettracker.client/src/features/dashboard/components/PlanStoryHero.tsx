@@ -31,12 +31,12 @@ const currencyPrecise = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
-function clampPct(value: number): number {
+const clampPct = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
-}
+};
 
-export function PlanStoryHero({ plan, progress }: PlanStoryHeroProps) {
+const PlanStoryHero = ({ plan, progress }: PlanStoryHeroProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
   const surface = getHeroSurface(theme);
@@ -236,7 +236,7 @@ export function PlanStoryHero({ plan, progress }: PlanStoryHeroProps) {
       </CardContent>
     </Card>
   );
-}
+};
 
 interface ProgressRowProps {
   label: string;
@@ -246,7 +246,7 @@ interface ProgressRowProps {
   textColor: string;
 }
 
-function ProgressRow({ label, detail, percent, color, textColor }: ProgressRowProps) {
+const ProgressRow = ({ label, detail, percent, color, textColor }: ProgressRowProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
   return (
@@ -272,4 +272,6 @@ function ProgressRow({ label, detail, percent, color, textColor }: ProgressRowPr
       />
     </Box>
   );
-}
+};
+
+export default PlanStoryHero;

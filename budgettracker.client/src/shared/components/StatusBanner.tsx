@@ -3,7 +3,7 @@ type StatusBannerProps = {
   statusError: string | null;
 };
 
-export function StatusBanner({ statusMessage, statusError }: StatusBannerProps) {
+const StatusBanner = ({ statusMessage, statusError }: StatusBannerProps) => {
   if (!statusMessage && !statusError) {
     return null;
   }
@@ -17,4 +17,6 @@ export function StatusBanner({ statusMessage, statusError }: StatusBannerProps) 
       {statusError || statusMessage}
     </section>
   );
-}
+};
+
+export default StatusBanner;

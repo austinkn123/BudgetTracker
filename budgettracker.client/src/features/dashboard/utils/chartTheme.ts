@@ -26,16 +26,14 @@ export interface SemanticColors {
  * Build the semantic-color map from the active theme.
  * Returns stable hex/rgba strings so they can be handed directly to chart components.
  */
-export function getSemanticColors(theme: Theme): SemanticColors {
-  return {
-    income: theme.palette.success.main,
-    expense: theme.palette.text.secondary,
-    overspend: theme.palette.warning.main,
-    neutral: theme.palette.secondary.main,
-    surface: theme.palette.background.default,
-    ink: theme.palette.text.primary,
-  };
-}
+export const getSemanticColors = (theme: Theme): SemanticColors => ({
+  income: theme.palette.success.main,
+  expense: theme.palette.text.secondary,
+  overspend: theme.palette.warning.main,
+  neutral: theme.palette.secondary.main,
+  surface: theme.palette.background.default,
+  ink: theme.palette.text.primary,
+});
 
 /**
  * An ordered set of category colors for charts that render multiple series.
@@ -45,7 +43,7 @@ export function getSemanticColors(theme: Theme): SemanticColors {
  * lightness. Success green is deliberately excluded — it is reserved for the
  * `income` semantic and would mislead in a categorical sequence.
  */
-export function getChartPalette(theme: Theme): string[] {
+export const getChartPalette = (theme: Theme): string[] => {
   const brand = theme.palette.primary.main;
   const amber = theme.palette.warning.main;
   const teal = theme.palette.secondary.main;
@@ -61,34 +59,31 @@ export function getChartPalette(theme: Theme): string[] {
     alpha(teal, 0.65),
     alpha(slate, 0.65),
   ];
-}
+};
 
 /**
  * Build a linear-gradient CSS string between two theme colors.
  * Useful for hero card backgrounds.
  */
-export function buildGradient(
+export const buildGradient = (
   fromColor: string,
   toColor: string,
   fromAlpha: number = 0.9,
   toAlpha: number = 0.5,
   angle: number = 160,
-): string {
-  return `linear-gradient(${angle}deg, ${alpha(fromColor, fromAlpha)} 0%, ${alpha(toColor, toAlpha)} 100%)`;
-}
+): string =>
+  `linear-gradient(${angle}deg, ${alpha(fromColor, fromAlpha)} 0%, ${alpha(toColor, toAlpha)} 100%)`;
 
 /**
  * Convenience wrapper that returns gradient + border tones in one call
  * for hero/featured card styling.
  */
-export function getHeroSurface(theme: Theme): { background: string; border: string } {
-  return {
-    background: buildGradient(
-      theme.palette.background.default,
-      theme.palette.secondary.main,
-      0.9,
-      0.5,
-    ),
-    border: alpha(theme.palette.primary.main, 0.45),
-  };
-}
+export const getHeroSurface = (theme: Theme): { background: string; border: string } => ({
+  background: buildGradient(
+    theme.palette.background.default,
+    theme.palette.secondary.main,
+    0.9,
+    0.5,
+  ),
+  border: alpha(theme.palette.primary.main, 0.45),
+});

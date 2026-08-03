@@ -12,7 +12,7 @@ import { getHeroSurface, getSemanticColors } from '../utils/chartTheme';
  * Fallback hero rendered when the user has no active budget plan.
  * Mirrors the live hero's visual weight so the dashboard layout doesn't jump.
  */
-export function PlanStoryHeroEmpty() {
+const PlanStoryHeroEmpty = () => {
   const theme = useTheme();
   const surface = getHeroSurface(theme);
   const semantic = getSemanticColors(theme);
@@ -73,4 +73,6 @@ export function PlanStoryHeroEmpty() {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default PlanStoryHeroEmpty;

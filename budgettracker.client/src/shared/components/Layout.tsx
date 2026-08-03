@@ -22,7 +22,7 @@ const NAV_ITEMS = [
   { label: 'Settings', path: '/settings', icon: Settings },
 ] as const;
 
-export const Layout = () => {
+const Layout = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -140,3 +140,5 @@ export const Layout = () => {
     </Box>
   );
 };
+
+export default Layout;

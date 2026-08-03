@@ -53,12 +53,12 @@ interface UsePlanProgressArgs {
  * Pure derivation of the plan-progress snapshot for the active plan.
  * Memoized on its inputs so consumers can render the hero cheaply.
  */
-export function usePlanProgress({
+export const usePlanProgress = ({
   plan,
   transactions,
   categories,
   now,
-}: UsePlanProgressArgs): PlanProgress | null {
+}: UsePlanProgressArgs): PlanProgress | null => {
   return useMemo(() => {
     if (!plan) return null;
 
@@ -147,4 +147,4 @@ export function usePlanProgress({
       perDiemToStay,
     };
   }, [plan, transactions, categories, now]);
-}
+};

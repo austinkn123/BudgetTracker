@@ -3,7 +3,7 @@ type DashboardStatusBannerProps = {
   statusError: string | null;
 };
 
-export function DashboardStatusBanner({ statusMessage, statusError }: DashboardStatusBannerProps) {
+const DashboardStatusBanner = ({ statusMessage, statusError }: DashboardStatusBannerProps) => {
   if (!statusMessage && !statusError) {
     return null;
   }
@@ -17,4 +17,6 @@ export function DashboardStatusBanner({ statusMessage, statusError }: DashboardS
       {statusError || statusMessage}
     </section>
   );
-}
+};
+
+export default DashboardStatusBanner;

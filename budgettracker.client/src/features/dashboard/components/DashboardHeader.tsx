@@ -1,6 +1,6 @@
 import Typography from '@mui/material/Typography';
 
-export function DashboardHeader() {
+const DashboardHeader = () => {
 
   return (
     <header className="bg-surface border-b border-border">
@@ -11,4 +11,6 @@ export function DashboardHeader() {
       </div>
     </header>
   );
-}
+};
+
+export default DashboardHeader;

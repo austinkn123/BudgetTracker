@@ -13,7 +13,7 @@ interface PlaidLinkLauncherProps {
  * as soon as <see cref="linkToken"/> becomes available and forwards the resulting
  * public_token (or exit) back to the parent.
  */
-export const PlaidLinkLauncher = ({ linkToken, onSuccess, onExit }: PlaidLinkLauncherProps) => {
+const PlaidLinkLauncher = ({ linkToken, onSuccess, onExit }: PlaidLinkLauncherProps) => {
   const { open, ready } = usePlaidLink({
     token: linkToken,
     onSuccess: (publicToken) => onSuccess(publicToken),
@@ -28,3 +28,5 @@ export const PlaidLinkLauncher = ({ linkToken, onSuccess, onExit }: PlaidLinkLau
 
   return null;
 };
+
+export default PlaidLinkLauncher;

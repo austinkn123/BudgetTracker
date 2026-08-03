@@ -6,7 +6,7 @@ type UserSectionProps = {
   isLoading: boolean;
 };
 
-export default function UserSection({ isLoading }: UserSectionProps) {
+const UserSection = ({ isLoading }: UserSectionProps) => {
   const { data: user } = useUser();
 
   if (isLoading) return null;
@@ -41,4 +41,6 @@ export default function UserSection({ isLoading }: UserSectionProps) {
       </div>
     </section>
   );
-}
+};
+
+export default UserSection;
