@@ -11,23 +11,11 @@ import Divider from '@mui/material/Divider';
 import { SparkLineChart } from '@mui/x-charts/SparkLineChart';
 import { alpha, useTheme } from '@mui/material/styles';
 import { format, parseISO } from 'date-fns';
-import type { Transaction } from '../../../shared/types/api';
-import type { MonthlyDataPoint } from '../utils/chartHelpers';
+import type { CategoryCard } from '../utils/selectors';
 import { getSemanticColors } from '../utils/chartTheme';
 
-export interface CategoryDrillCardData {
-  categoryId: number;
-  name: string;
-  planned: number;
-  actual: number;
-  /** Series ordered oldest -> newest. */
-  monthly: MonthlyDataPoint[];
-  /** Transactions belonging to this category within the active range. */
-  transactions: Transaction[];
-}
-
 interface CategoryDrillCardProps {
-  data: CategoryDrillCardData;
+  data: CategoryCard;
   expanded: boolean;
   onToggle: () => void;
 }
@@ -53,7 +41,7 @@ const CategoryDrillCard = ({ data, expanded, onToggle }: CategoryDrillCardProps)
   const over = data.planned > 0 && data.actual > data.planned;
   const barColor = over ? semantic.overspend : semantic.income;
 
-  const sparkData = data.monthly.map((m) => m.expenses);
+  const sparkData = data.monthly;
   const hasSpark = sparkData.some((v) => v > 0);
 
   return (
@@ -123,30 +111,26 @@ const CategoryDrillCard = ({ data, expanded, onToggle }: CategoryDrillCardProps)
             </Typography>
           ) : (
             <List dense disablePadding>
-              {data.transactions
-                .slice()
-                .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-                .slice(0, 10)
-                .map((t) => (
-                  <ListItem key={t.id} disableGutters sx={{ py: 0.25 }}>
-                    <ListItemText
-                      primary={t.payee || data.name}
-                      secondary={format(parseISO(t.occurredAt), 'MMM d, yyyy')}
-                      primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
-                      secondaryTypographyProps={{ variant: 'caption' }}
-                    />
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 600,
-                        color: t.transactionType === 'Income' ? semantic.income : semantic.expense,
-                      }}
-                    >
-                      {t.transactionType === 'Income' ? '+' : '-'}
-                      {currencyPrecise.format(Math.abs(t.amount))}
-                    </Typography>
-                  </ListItem>
-                ))}
+              {data.transactions.map((t) => (
+                <ListItem key={t.id} disableGutters sx={{ py: 0.25 }}>
+                  <ListItemText
+                    primary={t.payee || data.name}
+                    secondary={format(parseISO(t.occurredAt), 'MMM d, yyyy')}
+                    primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+                    secondaryTypographyProps={{ variant: 'caption' }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 600,
+                      color: t.transactionType === 'Income' ? semantic.income : semantic.expense,
+                    }}
+                  >
+                    {t.transactionType === 'Income' ? '+' : '-'}
+                    {currencyPrecise.format(Math.abs(t.amount))}
+                  </Typography>
+                </ListItem>
+              ))}
             </List>
           )}
         </Box>

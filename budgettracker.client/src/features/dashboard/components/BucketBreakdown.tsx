@@ -3,14 +3,12 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
-import { useMemo } from 'react';
-import type { BudgetPlan, Transaction } from '../../../shared/types/api';
-import { aggregateByBucket } from '../utils/planMath';
+import type { BucketPerformance } from '../../../shared/types/api';
 import { getSemanticColors } from '../utils/chartTheme';
 
 interface BucketBreakdownProps {
-  plan: BudgetPlan | undefined;
-  transactions: Transaction[];
+  /** Core/Buffer planned-vs-actual, straight from the analysis. */
+  rows: BucketPerformance[];
 }
 
 const currency = new Intl.NumberFormat('en-US', {
@@ -20,13 +18,11 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
-const BucketBreakdown = ({ plan, transactions }: BucketBreakdownProps) => {
+const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
 
-  const rows = useMemo(() => aggregateByBucket(plan, transactions), [plan, transactions]);
-
-  if (!plan || rows.every((r) => r.planned === 0 && r.actual === 0)) {
+  if (rows.length === 0 || rows.every((r) => r.planned === 0 && r.actual === 0)) {
     return (
       <Card className="h-full">
         <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px]">

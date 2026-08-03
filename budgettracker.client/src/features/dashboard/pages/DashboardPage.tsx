@@ -3,7 +3,6 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
-import { useBudgetPlans } from '../../budget-plans/hooks/useBudgetPlans';
 import { useUser } from '../../user/hooks/useUser';
 import DashboardLoadingState from '../components/DashboardLoadingState';
 import DashboardErrorState from '../components/DashboardErrorState';
@@ -16,37 +15,103 @@ import CategoryDrillGrid from '../components/CategoryDrillGrid';
 import BucketBreakdown from '../components/BucketBreakdown';
 import RecentActivityFeed from '../components/RecentActivityFeed';
 import { useDateRange } from '../hooks/useDateRange';
-import { usePlanProgress } from '../hooks/usePlanProgress';
-import { filterTransactionsByRange } from '../utils/chartHelpers';
+import { useBudgetAnalysis } from '../hooks/useBudgetAnalysis';
+import { getStatusHeadline } from '../utils/planCopy';
+import {
+  selectCategoryCards,
+  selectDrifting,
+  selectRecentActivity,
+  selectTopSpend,
+  selectWaterfall,
+} from '../utils/selectors';
+
+// How much of the server's analysis this particular screen chooses to show.
+const TREND_MONTHS = 3;
+const WATERFALL_CATEGORIES = 5;
+const SPEND_CATEGORIES = 8;
+const DRIFTING_CATEGORIES = 3;
+const RECENT_ACTIVITY_ITEMS = 8;
+const DRILL_TRANSACTIONS = 10;
 
 const DashboardPage = () => {
   const { isLoading: loadingUser, error: userError } = useUser();
   const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories();
   const { data: transactions = [], isLoading: loadingTransactions, error: transactionsError } = useTransactions();
-  const { data: budgetPlans = [], isLoading: loadingBudgetPlans, error: budgetPlansError } = useBudgetPlans();
-
   const { range, setRange, start, end } = useDateRange();
+  const { data: analysis, isLoading: loadingAnalysis, error: analysisError } =
+    useBudgetAnalysis(start, end, TREND_MONTHS);
 
-  const isLoading = loadingCategories || loadingTransactions || loadingUser || loadingBudgetPlans;
-  const hasErrors = categoriesError || transactionsError || userError || budgetPlansError;
-
-  const activePlan = useMemo(() => budgetPlans.find((p) => p.isActive), [budgetPlans]);
-  const progress = usePlanProgress({ plan: activePlan, transactions, categories });
-
-  const rangedTransactions = useMemo(
-    () => filterTransactionsByRange(transactions, start, end),
-    [transactions, start, end],
+  const categoryNames = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.name])),
+    [categories],
   );
+
+  const windowTransactions = useMemo(() => {
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    return transactions.filter((t) => {
+      const ts = new Date(t.occurredAt).getTime();
+      return ts >= startMs && ts <= endMs;
+    });
+  }, [transactions, start, end]);
+
+  const planMonth = analysis?.planMonth ?? null;
+
+  const hero = useMemo(() => {
+    if (!planMonth) return null;
+    return {
+      plan: planMonth.plan,
+      pacing: planMonth.pacing,
+      headline: getStatusHeadline(
+        planMonth.pacing.pacingDelta,
+        planMonth.pacing.daysPct,
+        planMonth.plan.planMonth,
+      ),
+      drifting: selectDrifting(planMonth.byCategory, categoryNames, DRIFTING_CATEGORIES),
+    };
+  }, [planMonth, categoryNames]);
+
+  const waterfall = useMemo(
+    () => (planMonth ? selectWaterfall(planMonth, categoryNames, WATERFALL_CATEGORIES) : []),
+    [planMonth, categoryNames],
+  );
+
+  const categoryCards = useMemo(
+    () =>
+      planMonth
+        ? selectCategoryCards(
+            planMonth,
+            analysis?.monthlyTrend ?? [],
+            windowTransactions,
+            categoryNames,
+            DRILL_TRANSACTIONS,
+          )
+        : [],
+    [planMonth, analysis?.monthlyTrend, windowTransactions, categoryNames],
+  );
+
+  const topSpend = useMemo(
+    () => selectTopSpend(analysis?.windowSpend ?? [], categoryNames, SPEND_CATEGORIES),
+    [analysis?.windowSpend, categoryNames],
+  );
+
+  const recentActivity = useMemo(
+    () => selectRecentActivity(windowTransactions, RECENT_ACTIVITY_ITEMS),
+    [windowTransactions],
+  );
+
+  const isLoading = loadingUser || loadingCategories || loadingTransactions || loadingAnalysis;
+  const hasErrors = userError || categoriesError || transactionsError || analysisError;
 
   if (isLoading) return <DashboardLoadingState />;
 
-  if (hasErrors) {
+  if (hasErrors || !analysis) {
     return (
       <DashboardErrorState
         userError={userError}
         categoriesError={categoriesError}
         transactionsError={transactionsError}
-        budgetPlansError={budgetPlansError}
+        analysisError={analysisError}
       />
     );
   }
@@ -59,9 +124,9 @@ const DashboardPage = () => {
           <Typography variant="h4" className="font-bold text-ink">
             Dashboard
           </Typography>
-          {activePlan && (
+          {hero && (
             <Typography variant="body2" className="mt-1 text-ink-muted">
-              Tracking against <span className="font-semibold text-ink">{activePlan.name}</span>
+              Tracking against <span className="font-semibold text-ink">{hero.plan.name}</span>
             </Typography>
           )}
         </Box>
@@ -69,8 +134,13 @@ const DashboardPage = () => {
       </Box>
 
       {/* Hero */}
-      {activePlan && progress ? (
-        <PlanStoryHero plan={activePlan} progress={progress} />
+      {hero ? (
+        <PlanStoryHero
+          plan={hero.plan}
+          pacing={hero.pacing}
+          headline={hero.headline}
+          drifting={hero.drifting}
+        />
       ) : (
         <PlanStoryHeroEmpty />
       )}
@@ -78,33 +148,18 @@ const DashboardPage = () => {
       {/* Cashflow waterfall + Where it went */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <CashflowWaterfall
-            plan={activePlan}
-            transactions={transactions}
-            categories={categories}
-          />
+          <CashflowWaterfall bars={waterfall} />
         </div>
-        <WhereItWent transactions={rangedTransactions} categories={categories} />
+        <WhereItWent rows={topSpend} />
       </div>
 
       {/* Category drill grid */}
-      {activePlan && (
-        <CategoryDrillGrid
-          plan={activePlan}
-          transactions={transactions}
-          categories={categories}
-          start={start}
-          end={end}
-        />
-      )}
+      {planMonth && <CategoryDrillGrid cards={categoryCards} />}
 
       {/* Bucket breakdown + recent activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <BucketBreakdown plan={activePlan} transactions={transactions} />
-        <RecentActivityFeed
-          transactions={rangedTransactions}
-          categories={categories}
-        />
+        <BucketBreakdown rows={planMonth?.byBucket ?? []} />
+        <RecentActivityFeed items={recentActivity} categories={categories} />
       </div>
     </div>
   );

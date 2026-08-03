@@ -11,6 +11,7 @@ using BudgetTracker.Server.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,6 +66,10 @@ builder.Services.Scan(scan => scan
 
 // Background sweep — periodic backup re-sync of all active Plaid items (BUD-6).
 builder.Services.AddHostedService<PlaidSyncSweepService>();
+
+// Serialize enums as names rather than ordinals so API consumers get e.g. "Ahead", not 0.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -132,6 +137,10 @@ userGroup.MapUserEndpoints();
 var plaidGroup = apiGroup.MapGroup("/plaid")
     .WithTags("Plaid");
 plaidGroup.MapPlaidEndpoints();
+
+var budgetAnalysisGroup = apiGroup.MapGroup("/budget-analysis")
+    .WithTags("Budget Analysis");
+budgetAnalysisGroup.MapBudgetAnalysisEndpoints();
 
 app.MapFallbackToFile("/index.html");
 

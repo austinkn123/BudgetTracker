@@ -8,13 +8,16 @@ import { Gauge, gaugeClasses } from '@mui/x-charts/Gauge';
 import { alpha, useTheme } from '@mui/material/styles';
 import { AlertTriangle, TrendingUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { BudgetPlan } from '../../../shared/types/api';
-import type { PlanProgress } from '../hooks/usePlanProgress';
+import type { AnalyzedPlan, PeriodPacing } from '../../../shared/types/api';
+import type { DriftingCategory } from '../utils/selectors';
 import { getHeroSurface, getSemanticColors } from '../utils/chartTheme';
 
 interface PlanStoryHeroProps {
-  plan: BudgetPlan;
-  progress: PlanProgress;
+  plan: AnalyzedPlan;
+  pacing: PeriodPacing;
+  /** Copy is composed client-side from the pacing numbers. */
+  headline: string;
+  drifting: DriftingCategory[];
 }
 
 const currency = new Intl.NumberFormat('en-US', {
@@ -36,22 +39,22 @@ const clampPct = (value: number): number => {
   return Math.max(0, Math.min(100, value));
 };
 
-const PlanStoryHero = ({ plan, progress }: PlanStoryHeroProps) => {
+const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
   const surface = getHeroSurface(theme);
 
-  const gaugeValue = clampPct(progress.spentPct * 100);
-  const onTrack = progress.pacingDelta <= 0;
+  const gaugeValue = clampPct(pacing.spentPct * 100);
+  const onTrack = pacing.pacingDelta <= 0;
   const gaugeColor = onTrack ? semantic.income : semantic.overspend;
-  const projectionPct = progress.plannedExpenses > 0
-    ? clampPct((progress.projectedEnd / progress.plannedExpenses) * 100)
+  const projectionPct = pacing.plannedExpenses > 0
+    ? clampPct((pacing.projectedEnd / pacing.plannedExpenses) * 100)
     : 0;
   const overshoot = projectionPct > 100;
 
-  const remainingLabel = progress.remaining >= 0
-    ? `${currency.format(progress.remaining)} left`
-    : `${currency.format(Math.abs(progress.remaining))} over`;
+  const remainingLabel = pacing.remaining >= 0
+    ? `${currency.format(pacing.remaining)} left`
+    : `${currency.format(Math.abs(pacing.remaining))} over`;
 
   const planMonthLabel = format(parseISO(plan.planMonth), 'MMMM yyyy');
 
@@ -67,7 +70,7 @@ const PlanStoryHero = ({ plan, progress }: PlanStoryHeroProps) => {
         <Box className="flex items-start justify-between flex-wrap gap-2 mb-4">
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: semantic.ink }}>
-              {progress.headline}
+              {headline}
             </Typography>
             <Typography variant="body2" sx={{ color: semantic.expense, mt: 0.5 }}>
               {plan.name} · {planMonthLabel}
@@ -132,16 +135,16 @@ const PlanStoryHero = ({ plan, progress }: PlanStoryHeroProps) => {
           <Box className="flex flex-col gap-4">
             <ProgressRow
               label="Days elapsed"
-              detail={`${progress.daysElapsed} / ${progress.daysInMonth}`}
-              percent={progress.daysPct * 100}
+              detail={`${pacing.daysElapsed} / ${pacing.daysInMonth}`}
+              percent={pacing.daysPct * 100}
               color={semantic.neutral}
               textColor={semantic.ink}
             />
 
             <ProgressRow
               label="Budget spent"
-              detail={`${currency.format(progress.actualExpenses)} / ${currency.format(progress.plannedExpenses)}`}
-              percent={progress.spentPct * 100}
+              detail={`${currency.format(pacing.actualExpenses)} / ${currency.format(pacing.plannedExpenses)}`}
+              percent={pacing.spentPct * 100}
               color={gaugeColor}
               textColor={semantic.ink}
             />
@@ -155,7 +158,7 @@ const PlanStoryHero = ({ plan, progress }: PlanStoryHeroProps) => {
                   Projection
                 </Typography>
                 <Typography variant="caption" sx={{ color: semantic.expense }}>
-                  {`Projects to ${currency.format(progress.projectedEnd)}`}
+                  {`Projects to ${currency.format(pacing.projectedEnd)}`}
                 </Typography>
               </Box>
               <Box sx={{ position: 'relative', mt: 1 }}>
@@ -193,7 +196,7 @@ const PlanStoryHero = ({ plan, progress }: PlanStoryHeroProps) => {
                       mt: 0.5,
                     }}
                   >
-                    {`Overshoot: +${currency.format(progress.projectedEnd - progress.plannedExpenses)}`}
+                    {`Overshoot: +${currency.format(pacing.projectedEnd - pacing.plannedExpenses)}`}
                   </Typography>
                 )}
               </Box>
@@ -201,15 +204,15 @@ const PlanStoryHero = ({ plan, progress }: PlanStoryHeroProps) => {
                 variant="caption"
                 sx={{ color: semantic.expense, mt: 0.5, display: 'block' }}
               >
-                {progress.perDiemToStay > 0
-                  ? `Stay-on-plan rate: ${currencyPrecise.format(progress.perDiemToStay)}/day`
+                {pacing.perDiemToStay > 0
+                  ? `Stay-on-plan rate: ${currencyPrecise.format(pacing.perDiemToStay)}/day`
                   : `No days remaining in this plan month`}
               </Typography>
             </Box>
           </Box>
         </Box>
 
-        {progress.driftingCategories.length > 0 && (
+        {drifting.length > 0 && (
           <Box sx={{ mt: 3, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
             <Typography
               variant="caption"
@@ -217,9 +220,9 @@ const PlanStoryHero = ({ plan, progress }: PlanStoryHeroProps) => {
             >
               Drifting:
             </Typography>
-            {progress.driftingCategories.map((d) => (
+            {drifting.map((d) => (
               <Chip
-                key={d.categoryId}
+                key={d.key}
                 label={`${d.name} +${currency.format(d.overBy)}`}
                 size="small"
                 variant="outlined"

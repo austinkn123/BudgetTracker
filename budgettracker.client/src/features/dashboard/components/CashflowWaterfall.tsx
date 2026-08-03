@@ -4,14 +4,12 @@ import Typography from '@mui/material/Typography';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { useTheme } from '@mui/material/styles';
 import { useMemo } from 'react';
-import type { BudgetPlan, Category, Transaction } from '../../../shared/types/api';
-import { buildWaterfall } from '../utils/planMath';
+import type { WaterfallBar } from '../utils/selectors';
 import { getSemanticColors } from '../utils/chartTheme';
 
 interface CashflowWaterfallProps {
-  plan: BudgetPlan | undefined;
-  transactions: Transaction[];
-  categories: Category[];
+  /** Ordered bars: income → top expense categories → Other → net. */
+  bars: WaterfallBar[];
 }
 
 const currency = new Intl.NumberFormat('en-US', {
@@ -27,14 +25,9 @@ const currency = new Intl.NumberFormat('en-US', {
  * `series.color`, then push a transparent "base" series to float the bars
  * to their proper running-total position.
  */
-const CashflowWaterfall = ({ plan, transactions, categories }: CashflowWaterfallProps) => {
+const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
   const theme = useTheme();
   const semantic = getSemanticColors(theme);
-
-  const items = useMemo(
-    () => buildWaterfall(transactions, plan, categories),
-    [transactions, plan, categories],
-  );
 
   const chartData = useMemo(() => {
     if (items.length === 0) {
@@ -83,7 +76,7 @@ const CashflowWaterfall = ({ plan, transactions, categories }: CashflowWaterfall
     return { bases, incomeData, expenseData, netPositive, netNegative };
   }, [items]);
 
-  if (!plan || !chartData) {
+  if (!chartData) {
     return (
       <Card className="h-full">
         <CardContent className="flex flex-col items-center justify-center h-full min-h-[320px]">

@@ -2,14 +2,14 @@ type DashboardErrorStateProps = {
   userError: unknown;
   categoriesError: unknown;
   transactionsError: unknown;
-  budgetPlansError: unknown;
+  analysisError: unknown;
 };
 
 const DashboardErrorState = ({
   userError,
   categoriesError,
   transactionsError,
-  budgetPlansError,
+  analysisError,
 }: DashboardErrorStateProps) => {
   return (
     <div className="space-y-8">
@@ -20,7 +20,7 @@ const DashboardErrorState = ({
         {Boolean(userError) && <p className="text-error-dark text-xs mt-2">User service: {String(userError)}</p>}
         {Boolean(categoriesError) && <p className="text-error-dark text-xs mt-2">Category service: {String(categoriesError)}</p>}
         {Boolean(transactionsError) && <p className="text-error-dark text-xs mt-2">Transaction service: {String(transactionsError)}</p>}
-        {Boolean(budgetPlansError) && <p className="text-error-dark text-xs mt-2">Budget plan service: {String(budgetPlansError)}</p>}
+        {Boolean(analysisError) && <p className="text-error-dark text-xs mt-2">Budget analysis service: {String(analysisError)}</p>}
       </div>
     </div>
   );
