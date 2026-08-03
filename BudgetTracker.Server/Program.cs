@@ -14,7 +14,6 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Load local secrets overlay (Plaid sandbox credentials, etc). Gitignored — never present in CI.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 // Add services to the container.
@@ -100,7 +99,6 @@ var app = builder.Build();
 app.UseDefaultFiles();
 app.MapStaticAssets();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -111,32 +109,26 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map endpoint groups
 var apiGroup = app.MapGroup("/api")
     .WithOpenApi()
     .RequireAuthorization();
 
-// Transaction endpoints group
 var transactionGroup = apiGroup.MapGroup("/transactions")
     .WithTags("Transactions");
 transactionGroup.MapTransactionEndpoints();
 
-// Category endpoints group
 var categoryGroup = apiGroup.MapGroup("/categories")
     .WithTags("Categories");
 categoryGroup.MapCategoryEndpoints();
 
-// Budget plan endpoints group
 var budgetPlanGroup = apiGroup.MapGroup("/budget-plans")
     .WithTags("Budget Plans");
 budgetPlanGroup.MapBudgetPlanEndpoints();
 
-// User endpoints group
 var userGroup = apiGroup.MapGroup("/users")
     .WithTags("Users");
 userGroup.MapUserEndpoints();
 
-// Plaid endpoints group
 var plaidGroup = apiGroup.MapGroup("/plaid")
     .WithTags("Plaid");
 plaidGroup.MapPlaidEndpoints();
