@@ -1,8 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import { Plus } from 'lucide-react';
+import { BudBadge, BudButton } from '../../shared/components/ui';
 import { useBudgetPlans } from './hooks/useBudgetPlans';
 import { useBudgetPlanForm } from './hooks/useBudgetPlanForm';
 import { useBudgetPlanManagement } from './hooks/useBudgetPlanManagement';
@@ -73,21 +72,13 @@ const BudgetPlansSection = ({
 
         <div className="flex items-center gap-2">
           {planManagement.activePlan ? (
-            <Chip
-              size="small"
-              color="success"
-              label={`Active: ${planManagement.activePlan.name}`}
-            />
+            <BudBadge color="success" label={`Active: ${planManagement.activePlan.name}`} />
           ) : (
-            <Chip size="small" label="No Active Plan" />
+            <BudBadge label="No Active Plan" />
           )}
-          <Button
-            variant="contained"
-            startIcon={<Plus className="h-4 w-4" />}
-            onClick={planManagement.openForAdd}
-          >
+          <BudButton startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
             Add Plan
-          </Button>
+          </BudButton>
         </div>
       </div>
 

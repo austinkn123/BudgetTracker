@@ -1,8 +1,7 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
+import BudCard from '../../../shared/components/ui/BudCard';
 import type { BucketPerformance } from '../../../shared/types/api';
 import { getSemanticColors } from '../utils/chartTheme';
 
@@ -24,28 +23,28 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
 
   if (rows.length === 0 || rows.every((r) => r.planned === 0 && r.actual === 0)) {
     return (
-      <Card className="h-full">
-        <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px]">
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-            Bucket Breakdown
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            No bucket data for this plan yet
-          </Typography>
-        </CardContent>
-      </Card>
+      <BudCard
+        title="Bucket Breakdown"
+        fullHeight
+        contentSx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 200,
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          No bucket data for this plan yet
+        </Typography>
+      </BudCard>
     );
   }
 
   const maxValue = rows.reduce((m, r) => Math.max(m, r.planned, r.actual), 0);
 
   return (
-    <Card className="h-full">
-      <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-          Bucket Breakdown
-        </Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+    <BudCard title="Bucket Breakdown" fullHeight>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
           {rows.map((row) => {
             const baseWidth = maxValue > 0 ? (Math.min(row.planned, row.actual) / maxValue) * 100 : 0;
             const overage = Math.max(0, row.actual - row.planned);
@@ -95,9 +94,8 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
               </Box>
             );
           })}
-        </Box>
-      </CardContent>
-    </Card>
+      </Box>
+    </BudCard>
   );
 };
 

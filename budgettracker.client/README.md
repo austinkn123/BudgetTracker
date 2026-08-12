@@ -1,6 +1,50 @@
-# React + TypeScript + Vite
+# BudgetTracker Client — React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Navigation & app shell
+
+Authenticated routes render inside `<AppShell>` (`src/shared/components/layout/AppShell.tsx`),
+a React Router layout route wrapped by `<ProtectedRoute>`. The shell is sidebar-first:
+
+| Viewport | Behavior |
+| --- | --- |
+| `>= lg` (1024px) | Permanent sidebar, 240px wide, no top bar |
+| `< lg` | Slim top bar with a hamburger that opens a temporary drawer |
+
+Both drawers stay mounted and are toggled with `display`, so there is no first-render
+flash and no focus loss from remounting.
+
+### Routes
+
+| Nav label | Path | Page |
+| --- | --- | --- |
+| Dashboard | `/` | `features/dashboard/pages/DashboardPage.tsx` |
+| Budget Plans | `/budget-plans` | `features/budget-plans/pages/BudgetPlansPage.tsx` |
+| Transactions | `/transactions` | `features/transactions/pages/TransactionsPage.tsx` |
+| Settings | `/settings` | `features/settings/pages/SettingsPage.tsx` |
+
+Nav items live in `src/shared/components/layout/navItems.ts`; add entries there rather
+than in the sidebar markup. Links use `NavLink`, so the active item gets `aria-current="page"`
+and prefix matching keeps a parent highlighted on nested routes.
+
+The sidebar footer shows the signed-in account and hosts the **only** sign-out action
+(`src/shared/hooks/useSignOut.ts`). `SIDEBAR_WIDTH` is exported from
+`src/shared/components/layout/constants.ts` — never inline the number.
+
+### Design system
+
+Color, typography, spacing, and breakpoints come from `src/shared/theme/`.
+`tokens.ts` is the single source of truth and is consumed by both `theme.ts` (MUI)
+and `tailwind.config.ts`. MUI breakpoints deliberately mirror Tailwind's scale
+(`sm 640 / md 768 / lg 1024 / xl 1280`) so `sx` and `className` agree.
+
+A contract test fails the build on any hardcoded hex outside the theme folder —
+use palette paths like `sx={{ bgcolor: 'primary.subtle' }}`.
+
+---
+
+## Tooling
+
+This project uses Vite with HMR and ESLint rules.
 
 Currently, two official plugins are available:
 

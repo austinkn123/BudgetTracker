@@ -1,14 +1,15 @@
-import { useEffect } from 'react';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import Button from '@mui/material/Button';
+import { useEffect, useState } from 'react';
+import Box from '@mui/material/Box';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import TextField from '@mui/material/TextField';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  BudConfirmModal,
+  BudInput,
+  BudModal,
+  BudModalActions,
+} from '../../../shared/components/ui';
 import {
   budgetPlanSchema,
   type BudgetPlanFormData,
@@ -35,12 +36,9 @@ const BudgetPlanDialog = ({
   onSave,
   onDelete,
 }: BudgetPlanDialogProps) => {
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<BudgetPlanFormData>({
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const { control, handleSubmit, reset } = useForm<BudgetPlanFormData>({
     resolver: zodResolver(budgetPlanSchema),
     defaultValues: initialValues,
   });
@@ -48,6 +46,7 @@ const BudgetPlanDialog = ({
   useEffect(() => {
     if (open) {
       reset(initialValues);
+      setConfirmDelete(false);
     }
   }, [open, initialValues, reset]);
 
@@ -60,61 +59,46 @@ const BudgetPlanDialog = ({
   });
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{mode === 'add' ? 'Add Budget Plan' : 'Edit Budget Plan'}</DialogTitle>
-      <DialogContent className="space-y-4 pt-4">
-        <div className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2">
-          <Controller
+    <>
+      <BudModal
+        open={open}
+        onClose={onClose}
+        title={mode === 'add' ? 'Add Budget Plan' : 'Edit Budget Plan'}
+        maxWidth="sm"
+        disableBackdropClose={isSaving}
+        actions={
+          <BudModalActions
+            onCancel={onClose}
+            onConfirm={() => void submit()}
+            confirmLabel={mode === 'add' ? 'Create Plan' : 'Save Changes'}
+            onDelete={mode === 'edit' && onDelete ? () => setConfirmDelete(true) : undefined}
+            deleteLabel="Delete Plan"
+            isPending={isSaving}
+          />
+        }
+      >
+        <Box
+          sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}
+        >
+          <BudInput
+            control={control}
             name="name"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Plan Name"
-                value={field.value}
-                onChange={field.onChange}
-                error={Boolean(errors.name)}
-                helperText={errors.name?.message}
-                fullWidth
-                required
-                className="sm:col-span-2"
-              />
-            )}
+            label="Plan Name"
+            required
+            sx={{ gridColumn: { sm: '1 / -1' } }}
           />
-          <Controller
-            name="planMonth"
+          <BudInput control={control} name="planMonth" label="Plan Month" type="month" required />
+          <BudInput
             control={control}
-            render={({ field }) => (
-              <TextField
-                label="Plan Month"
-                type="month"
-                value={field.value}
-                onChange={field.onChange}
-                error={Boolean(errors.planMonth)}
-                helperText={errors.planMonth?.message}
-                fullWidth
-                required
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
-            )}
-          />
-          <Controller
             name="netIncomeMonthly"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Net Monthly Income"
-                type="number"
-                inputProps={{ min: 0, step: '0.01' }}
-                value={field.value || ''}
-                onChange={(event) => field.onChange(Number(event.target.value))}
-                error={Boolean(errors.netIncomeMonthly)}
-                helperText={errors.netIncomeMonthly?.message}
-                fullWidth
-                required
-              />
-            )}
+            label="Net Monthly Income"
+            type="number"
+            valueAs="number"
+            min={0}
+            step="0.01"
+            required
           />
-        </div>
+        </Box>
 
         <Controller
           name="isActive"
@@ -131,30 +115,22 @@ const BudgetPlanDialog = ({
             />
           )}
         />
-      </DialogContent>
-      <DialogActions className="px-6 pb-4">
-        {mode === 'edit' && onDelete && (
-          <Button
-            color="error"
-            onClick={() => {
-              if (window.confirm('Delete this budget plan and all of its lines?')) {
-                void onDelete();
-              }
-            }}
-            disabled={isSaving}
-            className="mr-auto"
-          >
-            Delete Plan
-          </Button>
-        )}
-        <Button onClick={onClose} disabled={isSaving}>
-          Cancel
-        </Button>
-        <Button variant="contained" onClick={() => void submit()} disabled={isSaving}>
-          {isSaving ? 'Saving...' : mode === 'add' ? 'Create Plan' : 'Save Changes'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+      </BudModal>
+
+      <BudConfirmModal
+        open={confirmDelete}
+        title="Delete budget plan?"
+        message="This removes the plan and all of its lines. This cannot be undone."
+        confirmLabel="Delete Plan"
+        destructive
+        isPending={isSaving}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void onDelete?.();
+        }}
+      />
+    </>
   );
 };
 

@@ -1,14 +1,14 @@
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
-import Alert from '@mui/material/Alert';
-import { Controller, useForm } from 'react-hook-form';
+import Box from '@mui/material/Box';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import {
+  BudAlert,
+  BudInput,
+  BudModal,
+  BudModalActions,
+  BudSelect,
+} from '../../../shared/components/ui';
 import type { Category } from '../../../shared/types/api';
 import {
   transactionSchema,
@@ -40,12 +40,7 @@ const TransactionDialog = ({
   onSave,
   onDelete,
 }: TransactionDialogProps) => {
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<TransactionFormData>({
+  const { control, handleSubmit, reset } = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
     defaultValues: initialValues,
   });
@@ -56,6 +51,11 @@ const TransactionDialog = ({
     }
   }, [open, initialValues, reset]);
 
+  const categoryOptions = useMemo(
+    () => categories.map((cat) => ({ value: cat.id, label: cat.name })),
+    [categories],
+  );
+
   const submit = handleSubmit(async (values) => {
     try {
       await onSave(values);
@@ -65,120 +65,70 @@ const TransactionDialog = ({
   });
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{mode === 'add' ? 'Add Transaction' : 'Edit Transaction'}</DialogTitle>
-      <DialogContent className="space-y-4 pt-4">
-        {locked && (
-          <Alert severity="info" variant="outlined">
-            Imported from your bank — only category &amp; notes can be edited.
-          </Alert>
-        )}
-        <div className="grid grid-cols-2 gap-4 pt-2">
-          <Controller
-            name="amount"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Amount"
-                type="number"
-                inputProps={{ min: 0, step: '0.01' }}
-                value={field.value || ''}
-                onChange={(e) => field.onChange(Number(e.target.value))}
-                error={Boolean(errors.amount)}
-                helperText={errors.amount?.message}
-                disabled={locked}
-                fullWidth
-                required
-              />
-            )}
-          />
-          <Controller
-            name="categoryId"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Category"
-                select
-                value={field.value || ''}
-                onChange={(e) => field.onChange(Number(e.target.value))}
-                error={Boolean(errors.categoryId)}
-                helperText={errors.categoryId?.message}
-                fullWidth
-                required
-              >
-                {categories.map((cat) => (
-                  <MenuItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
-          />
-          <Controller
-            name="occurredAt"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Date"
-                type="date"
-                value={field.value}
-                onChange={field.onChange}
-                error={Boolean(errors.occurredAt)}
-                helperText={errors.occurredAt?.message}
-                disabled={locked}
-                fullWidth
-                required
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
-            )}
-          />
-          <Controller
-            name="payee"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Payee"
-                value={field.value}
-                onChange={field.onChange}
-                error={Boolean(errors.payee)}
-                helperText={errors.payee?.message}
-                disabled={locked}
-                fullWidth
-              />
-            )}
-          />
-        </div>
-        <Controller
-          name="notes"
-          control={control}
-          render={({ field }) => (
-            <TextField
-              label="Notes"
-              value={field.value}
-              onChange={field.onChange}
-              error={Boolean(errors.notes)}
-              helperText={errors.notes?.message}
-              fullWidth
-              multiline
-              rows={2}
-            />
-          )}
+    <BudModal
+      open={open}
+      onClose={onClose}
+      title={mode === 'add' ? 'Add Transaction' : 'Edit Transaction'}
+      maxWidth="sm"
+      disableBackdropClose={isSaving}
+      actions={
+        <BudModalActions
+          onCancel={onClose}
+          onConfirm={submit}
+          confirmLabel={mode === 'add' ? 'Add' : 'Save'}
+          onDelete={mode === 'edit' && !locked && onDelete ? onDelete : undefined}
+          isPending={isSaving}
         />
-      </DialogContent>
-      <DialogActions className="px-6 pb-4">
-        {mode === 'edit' && !locked && onDelete && (
-          <Button color="error" onClick={onDelete} disabled={isSaving} className="mr-auto">
-            Delete
-          </Button>
-        )}
-        <Button onClick={onClose} disabled={isSaving}>
-          Cancel
-        </Button>
-        <Button variant="contained" onClick={submit} disabled={isSaving}>
-          {isSaving ? 'Saving...' : mode === 'add' ? 'Add' : 'Save'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+      }
+    >
+      {locked && (
+        <BudAlert
+          severity="info"
+          variant="outlined"
+          message="Imported from your bank — only category & notes can be edited."
+        />
+      )}
+
+      {/* Single column on phones so the pair never overflows a 375px viewport. */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+          gap: 2,
+        }}
+      >
+        <BudInput
+          control={control}
+          name="amount"
+          label="Amount"
+          type="number"
+          valueAs="number"
+          min={0}
+          step="0.01"
+          disabled={locked}
+          required
+        />
+        <BudSelect
+          control={control}
+          name="categoryId"
+          label="Category"
+          options={categoryOptions}
+          valueAs="number"
+          required
+        />
+        <BudInput
+          control={control}
+          name="occurredAt"
+          label="Date"
+          type="date"
+          disabled={locked}
+          required
+        />
+        <BudInput control={control} name="payee" label="Payee" disabled={locked} />
+      </Box>
+
+      <BudInput control={control} name="notes" label="Notes" multiline rows={2} />
+    </BudModal>
   );
 };
 

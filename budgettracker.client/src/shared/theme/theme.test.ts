@@ -40,11 +40,35 @@ describe('budgetTrackerTheme', () => {
 
   it('uses Inter as the primary font family', () => {
     expect(budgetTrackerTheme.typography.fontFamily).toMatch(/^"Inter"/);
-    for (const variant of ['h1', 'h2', 'h3', 'h4', 'body1', 'body2', 'caption', 'overline'] as const) {
+    for (const variant of [
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'subtitle1',
+      'subtitle2',
+      'body1',
+      'body2',
+      'caption',
+      'overline',
+    ] as const) {
       const { fontSize, fontWeight, lineHeight } = budgetTrackerTheme.typography[variant];
       expect(fontSize).toBeDefined();
       expect(fontWeight).toBeDefined();
       expect(lineHeight).toBeDefined();
+    }
+  });
+
+  it('gives h5/h6/subtitle their own scale rather than MUI Roboto defaults', () => {
+    // Before BUD-14 these fell through to MUI defaults, where h6 (1.25rem/500)
+    // collided with the token-defined h4 (1.25rem/600).
+    expect(budgetTrackerTheme.typography.h6.fontSize).not.toBe(
+      budgetTrackerTheme.typography.h4.fontSize,
+    );
+    for (const variant of ['h5', 'h6', 'subtitle1', 'subtitle2'] as const) {
+      expect(budgetTrackerTheme.typography[variant].fontWeight).toBe(600);
     }
   });
 

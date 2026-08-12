@@ -1,3 +1,6 @@
+import Typography from '@mui/material/Typography';
+import BudAlert from '../../../shared/components/ui/BudAlert';
+
 type DashboardErrorStateProps = {
   userError: unknown;
   categoriesError: unknown;
@@ -11,17 +14,26 @@ const DashboardErrorState = ({
   transactionsError,
   analysisError,
 }: DashboardErrorStateProps) => {
+  const failures = [
+    { label: 'User service', error: userError },
+    { label: 'Category service', error: categoriesError },
+    { label: 'Transaction service', error: transactionsError },
+    { label: 'Budget analysis service', error: analysisError },
+  ].filter((entry) => Boolean(entry.error));
+
   return (
     <div className="space-y-8">
-      <div className="bg-error-subtle border border-error/30 rounded-lg p-4">
-        <p className="text-error-dark text-sm">
-          <strong>Error:</strong> Unable to connect to the database. Please ensure the database is running and properly configured.
-        </p>
-        {Boolean(userError) && <p className="text-error-dark text-xs mt-2">User service: {String(userError)}</p>}
-        {Boolean(categoriesError) && <p className="text-error-dark text-xs mt-2">Category service: {String(categoriesError)}</p>}
-        {Boolean(transactionsError) && <p className="text-error-dark text-xs mt-2">Transaction service: {String(transactionsError)}</p>}
-        {Boolean(analysisError) && <p className="text-error-dark text-xs mt-2">Budget analysis service: {String(analysisError)}</p>}
-      </div>
+      <BudAlert
+        severity="error"
+        title="Unable to load your dashboard"
+        message="We couldn't reach the API. Check that the server and database are running."
+      >
+        {failures.map(({ label, error }) => (
+          <Typography key={label} variant="caption" sx={{ display: 'block', mt: 1 }}>
+            {label}: {String(error)}
+          </Typography>
+        ))}
+      </BudAlert>
     </div>
   );
 };

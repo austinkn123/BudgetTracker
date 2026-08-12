@@ -1,19 +1,19 @@
 import { useMemo } from 'react';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  BudBadge,
+  BudButton,
+  BudCard,
+  BudConfirmModal,
+  BudInput,
+  BudModal,
+  BudModalActions,
+  BudSelect,
+} from '../../shared/components/ui';
 import type { Category } from '../../shared/types/api';
 import { categorySchema, type CategoryFormValues } from '../../shared/validation/categorySchema';
 import { useTransactions } from '../transactions/hooks/useTransactions';
@@ -33,6 +33,12 @@ const GROUPS: { label: string; type: string; color: 'success' | 'error' | 'info'
   { label: 'Both', type: 'Both', color: 'info' },
 ];
 
+const CATEGORY_TYPE_OPTIONS = [
+  { value: 'Income', label: 'Income' },
+  { value: 'Expense', label: 'Expense' },
+  { value: 'Both', label: 'Both' },
+] as const;
+
 const CategoriesSection = ({
   isLoading,
   setStatusMessage,
@@ -50,12 +56,7 @@ const CategoriesSection = ({
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<CategoryFormValues>({
+  const { control, handleSubmit, reset } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
       name: '',
@@ -168,16 +169,15 @@ const CategoriesSection = ({
   const isSaving = createCategory.isPending || updateCategory.isPending || deleteCategory.isPending;
 
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <Typography variant="subtitle1" fontWeight={600}>
-            Categories
-          </Typography>
-          <Button variant="contained" size="small" onClick={openAddDialog}>
-            Add Category
-          </Button>
-        </div>
+    <BudCard
+      title="Categories"
+      actions={
+        <BudButton size="sm" onClick={openAddDialog}>
+          Add Category
+        </BudButton>
+      }
+    >
+      <>
         {categories.length === 0 ? (
           <Typography color="text.secondary" fontStyle="italic">
             No categories found
@@ -199,14 +199,15 @@ const CategoriesSection = ({
 
                       return (
                         <Tooltip key={cat.id} title={tooltipLabel} arrow>
-                          <Chip
-                            label={`${cat.name} (${usage.total})`}
-                            size="small"
-                            color={group.color}
-                            variant="outlined"
-                            onClick={() => openEditDialog(cat)}
-                            onDelete={() => setDeleteTarget(cat)}
-                          />
+                          <span>
+                            <BudBadge
+                              label={`${cat.name} (${usage.total})`}
+                              color={group.color}
+                              variant="outline"
+                              onClick={() => openEditDialog(cat)}
+                              onDelete={() => setDeleteTarget(cat)}
+                            />
+                          </span>
                         </Tooltip>
                       );
                     })}
@@ -216,72 +217,53 @@ const CategoriesSection = ({
             })}
           </div>
         )}
-      </CardContent>
+      </>
 
-      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="xs" fullWidth>
-        <DialogTitle>{dialogMode === 'add' ? 'Add Category' : 'Edit Category'}</DialogTitle>
-        <DialogContent className="space-y-4 pt-4">
-          <Controller
-            name="name"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Name"
-                fullWidth
-                autoFocus
-                error={Boolean(errors.name)}
-                helperText={errors.name?.message}
-                {...field}
-              />
-            )}
+      <BudModal
+        open={dialogOpen}
+        onClose={closeDialog}
+        title={dialogMode === 'add' ? 'Add Category' : 'Edit Category'}
+        maxWidth="xs"
+        disableBackdropClose={isSaving}
+        actions={
+          <BudModalActions
+            onCancel={closeDialog}
+            onConfirm={onSave}
+            confirmLabel={dialogMode === 'add' ? 'Create' : 'Save'}
+            isPending={isSaving}
           />
-          <Controller
-            name="categoryType"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Type"
-                select
-                fullWidth
-                error={Boolean(errors.categoryType)}
-                helperText={errors.categoryType?.message}
-                {...field}
-              >
-                <MenuItem value="Income">Income</MenuItem>
-                <MenuItem value="Expense">Expense</MenuItem>
-                <MenuItem value="Both">Both</MenuItem>
-              </TextField>
-            )}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDialog} disabled={isSaving}>Cancel</Button>
-          <Button onClick={onSave} variant="contained" disabled={isSaving}>
-            {isSaving ? 'Saving...' : dialogMode === 'add' ? 'Create' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        }
+      >
+        <BudInput control={control} name="name" label="Name" autoFocus />
+        <BudSelect
+          control={control}
+          name="categoryType"
+          label="Type"
+          options={CATEGORY_TYPE_OPTIONS}
+        />
+      </BudModal>
 
-      <Dialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete Category</DialogTitle>
-        <DialogContent>
-          {deleteTarget && (
-            <Typography variant="caption" color="text.secondary" className="mb-2 block">
-              Used in {getUsage(deleteTarget.id).transactions} transactions and {getUsage(deleteTarget.id).planEntries} budget plan entries.
-            </Typography>
-          )}
-          <Typography variant="body2">
-            Delete {deleteTarget?.name}? This cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={isSaving}>Cancel</Button>
-          <Button color="error" onClick={onConfirmDelete} disabled={isSaving}>
-            {isSaving ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Card>
+      <BudConfirmModal
+        open={deleteTarget !== null}
+        title="Delete Category"
+        message={
+          deleteTarget ? (
+            <>
+              Delete <strong>{deleteTarget.name}</strong>? It is used in{' '}
+              {getUsage(deleteTarget.id).transactions} transactions and{' '}
+              {getUsage(deleteTarget.id).planEntries} budget plan entries. This cannot be undone.
+            </>
+          ) : (
+            ''
+          )
+        }
+        confirmLabel="Delete"
+        destructive
+        isPending={isSaving}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={onConfirmDelete}
+      />
+    </BudCard>
   );
 };
 

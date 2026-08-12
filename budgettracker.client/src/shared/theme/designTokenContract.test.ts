@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import defaultTheme from 'tailwindcss/defaultTheme';
 import tailwindConfig from '../../../tailwind.config';
+import { budgetTrackerTheme } from './theme';
 import { colorTokens } from './tokens';
 
 /**
@@ -43,6 +45,26 @@ describe('tailwind config token parity', () => {
   it('uses Inter as the leading sans font, matching the MUI theme', () => {
     const sans = tailwindConfig.theme?.extend?.fontFamily?.sans as string[];
     expect(sans[0]).toBe('Inter');
+  });
+});
+
+/**
+ * BUD-14 — breakpoint parity.
+ *
+ * MUI defaults to lg: 1200 while Tailwind's `lg:` is 1024, so `sx={{ display: { lg } }}`
+ * and `className="lg:..."` fired at different widths. The MUI theme now mirrors
+ * Tailwind's scale; this test keeps the two from drifting apart again.
+ */
+describe('breakpoint parity between MUI and Tailwind', () => {
+  const tailwindScreens = defaultTheme.screens as Record<string, string>;
+
+  it.each(['sm', 'md', 'lg', 'xl'] as const)('MUI %s matches the Tailwind screen', (key) => {
+    const tailwindPx = Number.parseInt(tailwindScreens[key], 10);
+    expect(budgetTrackerTheme.breakpoints.values[key]).toBe(tailwindPx);
+  });
+
+  it('starts the xs breakpoint at zero', () => {
+    expect(budgetTrackerTheme.breakpoints.values.xs).toBe(0);
   });
 });
 

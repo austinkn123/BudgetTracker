@@ -1,8 +1,7 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
+import BudCard from '../../../shared/components/ui/BudCard';
 import type { SpendSlice } from '../utils/selectors';
 import { getChartPalette, getSemanticColors } from '../utils/chartTheme';
 
@@ -26,11 +25,8 @@ const WhereItWent = ({ rows }: WhereItWentProps) => {
   const max = rows.reduce((m, r) => Math.max(m, r.value), 0);
 
   return (
-    <Card className="h-full">
-      <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-          Where It Went
-        </Typography>
+    <BudCard title="Where It Went" fullHeight>
+      <>
         {rows.length === 0 ? (
           <Box className="flex items-center justify-center" sx={{ minHeight: 240 }}>
             <Typography variant="body2" color="text.secondary">
@@ -79,8 +75,8 @@ const WhereItWent = ({ rows }: WhereItWentProps) => {
             })}
           </Box>
         )}
-      </CardContent>
-    </Card>
+      </>
+    </BudCard>
   );
 };
 

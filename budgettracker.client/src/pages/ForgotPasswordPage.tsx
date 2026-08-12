@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import Alert from '@mui/material/Alert';
+import { BudAlert, BudButton, BudCard, BudInput } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import {
   forgotPasswordSchema,
@@ -93,7 +90,7 @@ const ForgotPasswordPage = () => {
       bgcolor="background.default"
       p={2}
     >
-      <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
+      <BudCard padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
         <Stack spacing={3}>
           <div>
             <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
@@ -106,101 +103,61 @@ const ForgotPasswordPage = () => {
             </Typography>
           </div>
 
-          {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
+          {error && <BudAlert severity="error" message={error} />}
+          {success && <BudAlert severity="success" message={success} />}
 
           {step === 'request' ? (
             <form onSubmit={handleRequestCode}>
               <Stack spacing={3}>
-                <Controller
-                  name="email"
+                <BudInput
                   control={requestForm.control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Email"
-                      type="email"
-                      fullWidth
-                      error={Boolean(requestForm.formState.errors.email)}
-                      helperText={requestForm.formState.errors.email?.message}
-                      disabled={isSubmitting}
-                    />
-                  )}
+                  name="email"
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  disabled={isSubmitting}
                 />
 
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  size="large"
-                  disabled={isSubmitting}
-                >
+                <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
                   {isSubmitting ? 'Sending Code...' : 'Send Reset Code'}
-                </Button>
+                </BudButton>
               </Stack>
             </form>
           ) : (
             <form onSubmit={handleResetPassword}>
               <Stack spacing={3}>
-                <Controller
+                <BudInput
+                  control={resetForm.control}
                   name="code"
-                  control={resetForm.control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Confirmation Code"
-                      placeholder="000000"
-                      fullWidth
-                      inputProps={{ maxLength: 6, pattern: '[0-9]*' }}
-                      error={Boolean(resetForm.formState.errors.code)}
-                      helperText={resetForm.formState.errors.code?.message}
-                      disabled={isSubmitting}
-                      autoComplete="one-time-code"
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="newPassword"
-                  control={resetForm.control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="New Password"
-                      type="password"
-                      fullWidth
-                      error={Boolean(resetForm.formState.errors.newPassword)}
-                      helperText={resetForm.formState.errors.newPassword?.message}
-                      disabled={isSubmitting}
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="confirmPassword"
-                  control={resetForm.control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Confirm Password"
-                      type="password"
-                      fullWidth
-                      error={Boolean(resetForm.formState.errors.confirmPassword)}
-                      helperText={resetForm.formState.errors.confirmPassword?.message}
-                      disabled={isSubmitting}
-                    />
-                  )}
-                />
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  size="large"
+                  label="Confirmation Code"
+                  placeholder="000000"
+                  maxLength={6}
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
                   disabled={isSubmitting}
-                >
+                />
+
+                <BudInput
+                  control={resetForm.control}
+                  name="newPassword"
+                  label="New Password"
+                  type="password"
+                  autoComplete="new-password"
+                  disabled={isSubmitting}
+                />
+
+                <BudInput
+                  control={resetForm.control}
+                  name="confirmPassword"
+                  label="Confirm Password"
+                  type="password"
+                  autoComplete="new-password"
+                  disabled={isSubmitting}
+                />
+
+                <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
                   {isSubmitting ? 'Resetting Password...' : 'Reset Password'}
-                </Button>
+                </BudButton>
               </Stack>
             </form>
           )}
@@ -211,7 +168,7 @@ const ForgotPasswordPage = () => {
             </Link>
           </Typography>
         </Stack>
-      </Card>
+      </BudCard>
     </Box>
   );
 };

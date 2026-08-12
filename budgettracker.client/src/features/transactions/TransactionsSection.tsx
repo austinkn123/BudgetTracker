@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfDay, startOfMonth } from 'date-fns';
-import Button from '@mui/material/Button';
-import Card from '@mui/material/Card';
-import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { Plus } from 'lucide-react';
+import { BudBadge, BudButton, BudCard } from '../../shared/components/ui';
 import { useTransactions } from './hooks/useTransactions';
 import { useTransactionForm } from './hooks/useTransactionForm';
 import { useCategories } from '../categories/hooks/useCategories';
@@ -100,32 +98,31 @@ const TransactionsSection = ({
             </Typography>
           </div>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
-            <Button variant="outlined" onClick={handleToday}>
+            <BudButton variant="secondary" onClick={handleToday}>
               Today
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<Plus className="w-4 h-4" />}
+            </BudButton>
+            <BudButton
+              startIcon={<Plus size={16} />}
               onClick={() => form.openForAdd(toDateKey(selectedDate))}
             >
               Add Transaction
-            </Button>
+            </BudButton>
           </Stack>
         </div>
 
-        <Card variant="outlined" sx={{ p: 2 }}>
+        <BudCard padding="sm">
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.25} useFlexGap flexWrap="wrap">
-            <Chip label={`Selected ${format(selectedDate, 'PP')}`} color="primary" variant="outlined" />
-            <Chip label={`Income $${visibleMonthSummary.incomeTotal.toFixed(2)}`} color="success" variant="outlined" />
-            <Chip label={`Outflow $${visibleMonthSummary.outflowTotal.toFixed(2)}`} color="error" variant="outlined" />
-            <Chip
+            <BudBadge label={`Selected ${format(selectedDate, 'PP')}`} color="primary" variant="outline" />
+            <BudBadge label={`Income $${visibleMonthSummary.incomeTotal.toFixed(2)}`} color="success" variant="outline" />
+            <BudBadge label={`Outflow $${visibleMonthSummary.outflowTotal.toFixed(2)}`} color="error" variant="outline" />
+            <BudBadge
               label={`Net ${visibleMonthSummary.netTotal >= 0 ? '+' : '-'}$${Math.abs(visibleMonthSummary.netTotal).toFixed(2)}`}
               color={visibleMonthSummary.netTotal >= 0 ? 'success' : 'error'}
             />
           </Stack>
-        </Card>
+        </BudCard>
 
-        <Card variant="outlined">
+        <BudCard padding="none">
           <TransactionTable
             categories={categories}
             daySummaries={daySummaries}
@@ -137,7 +134,7 @@ const TransactionsSection = ({
             onAddTransaction={form.openForAdd}
             onRowClick={form.openForEdit}
           />
-        </Card>
+        </BudCard>
       </Stack>
 
       <TransactionDialog

@@ -1,7 +1,6 @@
 import { format, startOfDay } from 'date-fns';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
+import { BudBadge, BudButton } from '../../../shared/components/ui';
 import Divider from '@mui/material/Divider';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -120,11 +119,10 @@ const TransactionTable = ({
           </Box>
 
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Chip size="small" label={`${selectedTransactions.length} item${selectedTransactions.length === 1 ? '' : 's'}`} />
-            <Chip size="small" variant="outlined" color="success" label={`Income $${selectedIncomeTotal.toFixed(2)}`} />
-            <Chip size="small" variant="outlined" color="error" label={`Outflow $${selectedOutflowTotal.toFixed(2)}`} />
-            <Chip
-              size="small"
+            <BudBadge label={`${selectedTransactions.length} item${selectedTransactions.length === 1 ? '' : 's'}`} />
+            <BudBadge variant="outline" color="success" label={`Income $${selectedIncomeTotal.toFixed(2)}`} />
+            <BudBadge variant="outline" color="error" label={`Outflow $${selectedOutflowTotal.toFixed(2)}`} />
+            <BudBadge
               color={selectedNetTotal >= 0 ? 'success' : 'error'}
               label={`Net ${selectedNetTotal >= 0 ? '+' : '-'}$${Math.abs(selectedNetTotal).toFixed(2)}`}
             />
@@ -176,14 +174,14 @@ const TransactionTable = ({
                                 alignItems="center"
                                 sx={{ mt: 0.5 }}
                               >
-                                <Chip size="small" variant="outlined" label="Imported" />
+                                <BudBadge variant="outline" label="Imported" />
                                 {mask && (
                                   <Typography variant="caption" color="text.secondary" component="span">
                                     {`•••• ${mask}`}
                                   </Typography>
                                 )}
                                 {transaction.isPending && (
-                                  <Chip size="small" color="warning" label="Pending" />
+                                  <BudBadge color="warning" label="Pending" />
                                 )}
                               </Stack>
                             )}
@@ -223,9 +221,9 @@ const TransactionTable = ({
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, mb: 2 }}>
                 Choose another date on the calendar or add a transaction for this day.
               </Typography>
-              <Button variant="contained" onClick={() => onAddTransaction(selectedDateKey)}>
+              <BudButton onClick={() => onAddTransaction(selectedDateKey)}>
                 Add Transaction for This Day
-              </Button>
+              </BudButton>
             </Box>
           )}
         </Stack>

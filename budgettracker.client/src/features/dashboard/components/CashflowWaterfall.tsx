@@ -1,8 +1,7 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { useTheme } from '@mui/material/styles';
+import BudCard from '../../../shared/components/ui/BudCard';
 import { useMemo } from 'react';
 import type { WaterfallBar } from '../utils/selectors';
 import { getSemanticColors } from '../utils/chartTheme';
@@ -78,28 +77,28 @@ const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
 
   if (!chartData) {
     return (
-      <Card className="h-full">
-        <CardContent className="flex flex-col items-center justify-center h-full min-h-[320px]">
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-            Cashflow Waterfall
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            No transactions yet this plan month
-          </Typography>
-        </CardContent>
-      </Card>
+      <BudCard
+        title="Cashflow Waterfall"
+        fullHeight
+        contentSx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 320,
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          No transactions yet this plan month
+        </Typography>
+      </BudCard>
     );
   }
 
   const labels = items.map((i) => i.label);
 
   return (
-    <Card className="h-full">
-      <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-          Cashflow Waterfall
-        </Typography>
-        <BarChart
+    <BudCard title="Cashflow Waterfall" fullHeight>
+      <BarChart
           height={320}
           xAxis={[{ data: labels, scaleType: 'band' }]}
           series={[
@@ -146,8 +145,7 @@ const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
             },
           }}
         />
-      </CardContent>
-    </Card>
+    </BudCard>
   );
 };
 

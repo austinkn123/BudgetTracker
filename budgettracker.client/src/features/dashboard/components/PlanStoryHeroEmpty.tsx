@@ -1,11 +1,9 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
+import { BudButton, BudCard } from '../../../shared/components/ui';
 import { getHeroSurface, getSemanticColors } from '../utils/chartTheme';
 
 /**
@@ -18,23 +16,24 @@ const PlanStoryHeroEmpty = () => {
   const semantic = getSemanticColors(theme);
 
   return (
-    <Card
+    <BudCard
+      padding="none"
       sx={{
         background: surface.background,
         border: `1px solid ${surface.border}`,
         overflow: 'hidden',
       }}
+      contentSx={{
+        p: { xs: 4, md: 6 },
+        '&:last-child': { pb: { xs: 4, md: 6 } },
+        display: 'flex',
+        flexDirection: { xs: 'column', md: 'row' },
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 3,
+      }}
     >
-      <CardContent
-        sx={{
-          p: { xs: 4, md: 6 },
-          display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 3,
-        }}
-      >
+      <>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           <Box
             sx={{
@@ -61,17 +60,16 @@ const PlanStoryHeroEmpty = () => {
             </Typography>
           </Box>
         </Box>
-        <Button
+        <BudButton
           component={RouterLink}
           to="/budget-plans"
-          variant="contained"
-          size="large"
+          size="lg"
           sx={{ flexShrink: 0 }}
         >
           Create a plan
-        </Button>
-      </CardContent>
-    </Card>
+        </BudButton>
+      </>
+    </BudCard>
   );
 };
 

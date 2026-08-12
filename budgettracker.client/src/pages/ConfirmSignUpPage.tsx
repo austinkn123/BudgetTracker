@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import Alert from '@mui/material/Alert';
+import { BudAlert, BudButton, BudCard, BudInput } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import { confirmSignUpSchema, type ConfirmSignUpFormData } from '../shared/validation/auth';
 
@@ -22,7 +19,7 @@ const ConfirmSignUpPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<ConfirmSignUpFormData>({
+  const { control, handleSubmit } = useForm<ConfirmSignUpFormData>({
     resolver: zodResolver(confirmSignUpSchema),
     defaultValues: {
       code: '',
@@ -90,7 +87,7 @@ const ConfirmSignUpPage = () => {
       bgcolor="background.default"
       p={2}
     >
-      <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
+      <BudCard padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
         <Stack spacing={3}>
           <div>
             <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
@@ -101,50 +98,37 @@ const ConfirmSignUpPage = () => {
             </Typography>
           </div>
 
-          {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
+          {error && <BudAlert severity="error" message={error} />}
+          {success && <BudAlert severity="success" message={success} />}
 
           <form onSubmit={onSubmit}>
             <Stack spacing={3}>
-              <Controller
-                name="code"
+              <BudInput
                 control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Confirmation Code"
-                    placeholder="000000"
-                    fullWidth
-                    inputProps={{ maxLength: 6, pattern: '[0-9]*' }}
-                    error={Boolean(errors.code)}
-                    helperText={errors.code?.message}
-                    disabled={isSubmitting}
-                    autoComplete="one-time-code"
-                  />
-                )}
+                name="code"
+                label="Confirmation Code"
+                placeholder="000000"
+                maxLength={6}
+                pattern="[0-9]*"
+                autoComplete="one-time-code"
+                disabled={isSubmitting}
               />
 
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
-                disabled={isSubmitting}
-              >
+              <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
                 {isSubmitting ? 'Confirming...' : 'Confirm'}
-              </Button>
+              </BudButton>
             </Stack>
           </form>
 
           <Stack spacing={2}>
-            <Button
-              variant="text"
+            <BudButton
+              variant="ghost"
               fullWidth
               onClick={handleResendCode}
-              disabled={isResending}
+              loading={isResending}
             >
               {isResending ? 'Resending...' : "Didn't receive a code? Resend"}
-            </Button>
+            </BudButton>
 
             <Typography variant="body2" className="text-center text-ink-muted">
               <Link to="/signup" className="font-semibold text-primary hover:text-primary-dark">
@@ -153,7 +137,7 @@ const ConfirmSignUpPage = () => {
             </Typography>
           </Stack>
         </Stack>
-      </Card>
+      </BudCard>
     </Box>
   );
 };

@@ -41,6 +41,17 @@ export const budgetTrackerTheme = createTheme({
     divider: colorTokens.neutral.border,
   },
 
+  /**
+   * Breakpoints deliberately mirror Tailwind's defaults (BUD-14).
+   *
+   * MUI ships lg: 1200 while Tailwind's `lg:` is 1024, so `sx={{ display: { lg: ... } }}`
+   * and `className="lg:..."` used to fire at different widths. Aligning them here is the
+   * same single-source-of-truth fix BUD-13 applied to color.
+   */
+  breakpoints: {
+    values: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 },
+  },
+
   typography: {
     // Inter is self-hosted via @fontsource/inter (imported in main.tsx).
     fontFamily:
@@ -49,6 +60,10 @@ export const budgetTrackerTheme = createTheme({
     h2: { fontSize: '1.875rem', fontWeight: 700, lineHeight: 1.25 },
     h3: { fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.3 },
     h4: { fontSize: '1.25rem', fontWeight: 600, lineHeight: 1.4 },
+    h5: { fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.4 },
+    h6: { fontSize: '1rem', fontWeight: 600, lineHeight: 1.5 },
+    subtitle1: { fontSize: '1rem', fontWeight: 600, lineHeight: 1.5 },
+    subtitle2: { fontSize: '0.875rem', fontWeight: 600, lineHeight: 1.45 },
     body1: { fontSize: '1rem', fontWeight: 400, lineHeight: 1.5 },
     body2: { fontSize: '0.875rem', fontWeight: 400, lineHeight: 1.5 },
     caption: { fontSize: '0.75rem', fontWeight: 400, lineHeight: 1.4 },
@@ -59,6 +74,7 @@ export const budgetTrackerTheme = createTheme({
       letterSpacing: '0.08em',
       textTransform: 'uppercase',
     },
+    button: { fontWeight: 600, textTransform: 'none' },
   },
 
   /**

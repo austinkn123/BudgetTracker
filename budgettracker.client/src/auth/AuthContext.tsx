@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useEffect, useState, type ReactNode } from 'react';
 import { Hub } from 'aws-amplify/utils';
 import {
   getCurrentUser,
@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       await signUp({
         username: email,
         password,
-        userAttributes: attributes,
+        options: { userAttributes: attributes },
       });
     } catch (error) {
       const err = error as Error;

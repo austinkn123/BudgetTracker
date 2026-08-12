@@ -1,6 +1,5 @@
-import Card from '@mui/material/Card';
 import CardActionArea from '@mui/material/CardActionArea';
-import CardContent from '@mui/material/CardContent';
+import BudCard from '../../../shared/components/ui/BudCard';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
@@ -45,9 +44,15 @@ const CategoryDrillCard = ({ data, expanded, onToggle }: CategoryDrillCardProps)
   const hasSpark = sparkData.some((v) => v > 0);
 
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <BudCard
+      padding="none"
+      fullHeight
+      sx={{ display: 'flex', flexDirection: 'column' }}
+      contentSx={{ p: 0, '&:last-child': { pb: 0 }, flex: 1 }}
+    >
+      {/* Only the header toggles; the expanded list below stays non-interactive. */}
       <CardActionArea onClick={onToggle} sx={{ flex: 1 }}>
-        <CardContent>
+        <Box sx={{ p: 2 }}>
           <Box className="flex items-baseline justify-between gap-2">
             <Typography
               variant="subtitle2"
@@ -100,7 +105,7 @@ const CategoryDrillCard = ({ data, expanded, onToggle }: CategoryDrillCardProps)
               </Typography>
             )}
           </Box>
-        </CardContent>
+        </Box>
       </CardActionArea>
       <Collapse in={expanded} unmountOnExit>
         <Divider />
@@ -135,7 +140,7 @@ const CategoryDrillCard = ({ data, expanded, onToggle }: CategoryDrillCardProps)
           )}
         </Box>
       </Collapse>
-    </Card>
+    </BudCard>
   );
 };
 

@@ -1,11 +1,9 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
-import Chip from '@mui/material/Chip';
 import Box from '@mui/material/Box';
 import { Gauge, gaugeClasses } from '@mui/x-charts/Gauge';
 import { alpha, useTheme } from '@mui/material/styles';
+import { BudBadge, BudCard } from '../../../shared/components/ui';
 import { AlertTriangle, TrendingUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { AnalyzedPlan, PeriodPacing } from '../../../shared/types/api';
@@ -59,14 +57,16 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
   const planMonthLabel = format(parseISO(plan.planMonth), 'MMMM yyyy');
 
   return (
-    <Card
+    <BudCard
+      padding="none"
       sx={{
         background: surface.background,
         border: `1px solid ${surface.border}`,
         overflow: 'hidden',
       }}
+      contentSx={{ p: { xs: 3, md: 4 }, '&:last-child': { pb: { xs: 3, md: 4 } } }}
     >
-      <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+      <>
         <Box className="flex items-start justify-between flex-wrap gap-2 mb-4">
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: semantic.ink }}>
@@ -76,14 +76,13 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
               {plan.name} · {planMonthLabel}
             </Typography>
           </Box>
-          <Chip
+          <BudBadge
             icon={onTrack ? <TrendingUp size={14} /> : <AlertTriangle size={14} />}
             label={onTrack ? 'On pace' : 'Watch your pace'}
-            size="small"
             sx={{
               backgroundColor: alpha(gaugeColor, 0.18),
+              borderColor: 'transparent',
               color: semantic.ink,
-              fontWeight: 600,
               borderRadius: 999,
             }}
           />
@@ -221,23 +220,21 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
               Drifting:
             </Typography>
             {drifting.map((d) => (
-              <Chip
+              <BudBadge
                 key={d.key}
                 label={`${d.name} +${currency.format(d.overBy)}`}
-                size="small"
-                variant="outlined"
+                variant="outline"
                 sx={{
                   borderColor: semantic.overspend,
                   color: semantic.ink,
                   backgroundColor: alpha(semantic.overspend, 0.08),
-                  fontWeight: 500,
                 }}
               />
             ))}
           </Box>
         )}
-      </CardContent>
-    </Card>
+      </>
+    </BudCard>
   );
 };
 

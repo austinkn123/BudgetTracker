@@ -1,9 +1,7 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import { alpha, useTheme } from '@mui/material/styles';
+import { BudBadge, BudCard } from '../../../shared/components/ui';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { useMemo } from 'react';
 import type { Category, Transaction } from '../../../shared/types/api';
@@ -43,11 +41,8 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
   }, [categories, palette]);
 
   return (
-    <Card className="h-full">
-      <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-          Recent Activity
-        </Typography>
+    <BudCard title="Recent Activity" fullHeight>
+      <>
         {items.length === 0 ? (
           <Box className="flex items-center justify-center" sx={{ minHeight: 160 }}>
             <Typography variant="body2" color="text.secondary">
@@ -73,13 +68,12 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
                     py: 0.5,
                   }}
                 >
-                  <Chip
+                  <BudBadge
                     label={name}
-                    size="small"
                     sx={{
                       backgroundColor: alpha(color, 0.18),
+                      borderColor: 'transparent',
                       color: semantic.ink,
-                      fontWeight: 600,
                       borderRadius: 999,
                       maxWidth: 140,
                     }}
@@ -112,8 +106,8 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
             })}
           </Box>
         )}
-      </CardContent>
-    </Card>
+      </>
+    </BudCard>
   );
 };
 

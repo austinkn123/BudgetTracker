@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import Alert from '@mui/material/Alert';
+import { BudAlert, BudButton, BudCard, BudInput } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import { signUpSchema, type SignUpFormData } from '../shared/validation/auth';
 
@@ -18,7 +15,7 @@ const SignUpPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<SignUpFormData>({
+  const { control, handleSubmit } = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
       email: '',
@@ -53,7 +50,7 @@ const SignUpPage = () => {
       bgcolor="background.default"
       p={2}
     >
-      <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
+      <BudCard padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
         <Stack spacing={3}>
           <div>
             <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
@@ -64,97 +61,56 @@ const SignUpPage = () => {
             </Typography>
           </div>
 
-          {error && <Alert severity="error">{error}</Alert>}
+          {error && <BudAlert severity="error" message={error} />}
 
           <form onSubmit={onSubmit}>
             <Stack spacing={3}>
-              <Controller
+              <BudInput
+                control={control}
                 name="email"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Email"
-                    type="email"
-                    fullWidth
-                    error={Boolean(errors.email)}
-                    helperText={errors.email?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Controller
-                name="firstName"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="First Name (optional)"
-                    fullWidth
-                    error={Boolean(errors.firstName)}
-                    helperText={errors.firstName?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Controller
-                name="lastName"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Last Name (optional)"
-                    fullWidth
-                    error={Boolean(errors.lastName)}
-                    helperText={errors.lastName?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Controller
-                name="password"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Password"
-                    type="password"
-                    fullWidth
-                    error={Boolean(errors.password)}
-                    helperText={errors.password?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Controller
-                name="confirmPassword"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Confirm Password"
-                    type="password"
-                    fullWidth
-                    error={Boolean(errors.confirmPassword)}
-                    helperText={errors.confirmPassword?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
+                label="Email"
+                type="email"
+                autoComplete="email"
                 disabled={isSubmitting}
-              >
+              />
+
+              <BudInput
+                control={control}
+                name="firstName"
+                label="First Name (optional)"
+                autoComplete="given-name"
+                disabled={isSubmitting}
+              />
+
+              <BudInput
+                control={control}
+                name="lastName"
+                label="Last Name (optional)"
+                autoComplete="family-name"
+                disabled={isSubmitting}
+              />
+
+              <BudInput
+                control={control}
+                name="password"
+                label="Password"
+                type="password"
+                autoComplete="new-password"
+                disabled={isSubmitting}
+              />
+
+              <BudInput
+                control={control}
+                name="confirmPassword"
+                label="Confirm Password"
+                type="password"
+                autoComplete="new-password"
+                disabled={isSubmitting}
+              />
+
+              <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
                 {isSubmitting ? 'Creating Account...' : 'Sign Up'}
-              </Button>
+              </BudButton>
             </Stack>
           </form>
 
@@ -165,7 +121,7 @@ const SignUpPage = () => {
             </Link>
           </Typography>
         </Stack>
-      </Card>
+      </BudCard>
     </Box>
   );
 };

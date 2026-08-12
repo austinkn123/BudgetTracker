@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
+import BudCard from '../../../shared/components/ui/BudCard';
 import type { CategoryCard } from '../utils/selectors';
 import CategoryDrillCard from './CategoryDrillCard';
 
@@ -15,16 +14,11 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
 
   if (cards.length === 0) {
     return (
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-            Category Drill-Down
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Add expense line items to your plan to drill into category performance.
-          </Typography>
-        </CardContent>
-      </Card>
+      <BudCard title="Category Drill-Down">
+        <Typography variant="body2" color="text.secondary">
+          Add expense line items to your plan to drill into category performance.
+        </Typography>
+      </BudCard>
     );
   }
 
