@@ -1,3 +1,83 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Global baseline (BUD-20). Fills the gaps Tailwind preflight does NOT cover
+ * after removing MUI's CssBaseline:
+ *   - body background/color (preflight leaves body transparent + UA text color)
+ *   - font smoothing (without it text renders heavy on macOS)
+ *   - base size / line-height
+ *   - color-scheme (native scrollbars, date inputs, autofill)
+ *   - global tracking (Stripe-leaning -0.011em)
+ */
+@layer base {
+  html {
+    letter-spacing: -0.011em;
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-background text-body text-ink antialiased;
+  }
+
+  @media print {
+    body {
+      print-color-adjust: exact;
+    }
+  }
+
+  /* react-day-picker theme hooks — composed with the classNames API in
+     Calendar.tsx; these vars cover what classNames can't reach. */
+  .rdp-root {
+    --rdp-accent-color: rgb(var(--bud-primary));
+    --rdp-accent-background-color: rgb(var(--bud-primary-subtle));
+    --rdp-day-height: 2.5rem;
+    --rdp-day-width: 2.5rem;
+    --rdp-day_button-height: 2.25rem;
+    --rdp-day_button-width: 2.25rem;
+    --rdp-day_button-border-radius: theme(borderRadius.DEFAULT);
+    font-family: theme(fontFamily.sans);
+  }
+}
+
+@layer components {
+  /* The one focus treatment, applied to every interactive element. Uses
+     native :focus-visible — keyboard only, no mouse-click rings. */
+  .focus-ring {
+    @apply outline-none focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/25;
+  }
+
+  /* Transactions calendar day tinting (BUD-20). Classes rather than inline
+     utilities because they must compose with react-day-picker's .rdp-selected
+     modifier on the same element. */
+  .day-pos {
+    @apply border border-success/[0.32] bg-success/[0.14] font-semibold text-success-dark;
+  }
+  .day-pos:hover,
+  .day-pos:focus-visible {
+    @apply bg-success/[0.22];
+  }
+  .day-pos.rdp-selected,
+  .day-pos[data-selected='true'] {
+    @apply bg-success text-white;
+  }
+  .day-pos.rdp-selected:hover {
+    @apply bg-success-dark;
+  }
+
+  .day-neg {
+    @apply border border-error/[0.32] bg-error/[0.14] font-semibold text-error-dark;
+  }
+  .day-neg:hover,
+  .day-neg:focus-visible {
+    @apply bg-error/[0.22];
+  }
+  .day-neg.rdp-selected,
+  .day-neg[data-selected='true'] {
+    @apply bg-error text-white;
+  }
+  .day-neg.rdp-selected:hover {
+    @apply bg-error-dark;
+  }
+}
