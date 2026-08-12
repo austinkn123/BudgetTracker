@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import { BudAlert, BudButton, BudCard, BudInput } from '../shared/components/ui';
+import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import {
   forgotPasswordSchema,
@@ -90,7 +90,7 @@ const ForgotPasswordPage = () => {
       bgcolor="background.default"
       p={2}
     >
-      <BudCard padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
+      <Card padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
         <Stack spacing={3}>
           <div>
             <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
@@ -103,13 +103,13 @@ const ForgotPasswordPage = () => {
             </Typography>
           </div>
 
-          {error && <BudAlert severity="error" message={error} />}
-          {success && <BudAlert severity="success" message={success} />}
+          {error && <Alert severity="error" message={error} />}
+          {success && <Alert severity="success" message={success} />}
 
           {step === 'request' ? (
             <form onSubmit={handleRequestCode}>
               <Stack spacing={3}>
-                <BudInput
+                <Input
                   control={requestForm.control}
                   name="email"
                   label="Email"
@@ -118,15 +118,15 @@ const ForgotPasswordPage = () => {
                   disabled={isSubmitting}
                 />
 
-                <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
+                <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                   {isSubmitting ? 'Sending Code...' : 'Send Reset Code'}
-                </BudButton>
+                </Button>
               </Stack>
             </form>
           ) : (
             <form onSubmit={handleResetPassword}>
               <Stack spacing={3}>
-                <BudInput
+                <Input
                   control={resetForm.control}
                   name="code"
                   label="Confirmation Code"
@@ -137,7 +137,7 @@ const ForgotPasswordPage = () => {
                   disabled={isSubmitting}
                 />
 
-                <BudInput
+                <Input
                   control={resetForm.control}
                   name="newPassword"
                   label="New Password"
@@ -146,7 +146,7 @@ const ForgotPasswordPage = () => {
                   disabled={isSubmitting}
                 />
 
-                <BudInput
+                <Input
                   control={resetForm.control}
                   name="confirmPassword"
                   label="Confirm Password"
@@ -155,9 +155,9 @@ const ForgotPasswordPage = () => {
                   disabled={isSubmitting}
                 />
 
-                <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
+                <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                   {isSubmitting ? 'Resetting Password...' : 'Reset Password'}
-                </BudButton>
+                </Button>
               </Stack>
             </form>
           )}
@@ -168,7 +168,7 @@ const ForgotPasswordPage = () => {
             </Link>
           </Typography>
         </Stack>
-      </BudCard>
+      </Card>
     </Box>
   );
 };

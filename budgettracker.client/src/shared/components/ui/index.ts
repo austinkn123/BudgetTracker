@@ -1,37 +1,76 @@
 /**
- * Shared UI component library (BUD-16).
+ * Shared UI component library (BUD-16, rebuilt on Radix + Tailwind in BUD-20).
  *
- * Feature code imports every button, input, card, modal, table, badge, and
- * alert from here — direct MUI imports of those primitives are blocked by an
- * ESLint rule so the design system stays the single styling channel.
+ * Feature code imports every primitive from here — direct MUI/emotion imports
+ * are banned by ESLint so the design system stays the single styling channel.
+ * Components carry plain names; the import path conveys ownership.
  */
 
-export { default as BudAlert } from './BudAlert';
-export type { BudAlertProps, BudAlertSeverity } from './BudAlert';
+export { default as Alert } from './Alert';
+export type { AlertProps, AlertSeverity } from './Alert';
 
-export { default as BudBadge } from './BudBadge';
-export type { BudBadgeColor, BudBadgeProps, BudBadgeVariant } from './BudBadge';
+export { default as Avatar } from './Avatar';
+export type { AvatarProps } from './Avatar';
 
-export { default as BudButton } from './BudButton';
-export type { BudButtonProps, BudButtonSize, BudButtonVariant } from './BudButton';
+export { default as Badge } from './Badge';
+export type { BadgeColor, BadgeProps, BadgeVariant } from './Badge';
 
-export { default as BudCard } from './BudCard';
-export type { BudCardPadding, BudCardProps, BudCardVariant } from './BudCard';
+export { default as Button } from './Button';
+export type { ButtonProps, ButtonSize, ButtonVariant } from './Button';
 
-export { default as BudConfirmModal } from './BudConfirmModal';
-export type { BudConfirmModalProps } from './BudConfirmModal';
+export { default as Calendar } from './Calendar';
+export type { CalendarProps } from './Calendar';
 
-export { default as BudInput } from './BudInput';
-export type { BudInputProps, BudInputType, BudInputValueAs } from './BudInput';
+export { default as Card } from './Card';
+export type { CardPadding, CardProps, CardVariant } from './Card';
 
-export { default as BudModal } from './BudModal';
-export type { BudModalMaxWidth, BudModalProps } from './BudModal';
+export { default as Checkbox } from './Checkbox';
+export type { CheckboxProps } from './Checkbox';
 
-export { default as BudModalActions } from './BudModalActions';
-export type { BudModalActionsProps } from './BudModalActions';
+export { default as Collapsible } from './Collapsible';
+export type { CollapsibleProps } from './Collapsible';
 
-export { default as BudSelect } from './BudSelect';
-export type { BudSelectOption, BudSelectProps } from './BudSelect';
+export { default as ConfirmModal } from './ConfirmModal';
+export type { ConfirmModalProps } from './ConfirmModal';
 
-export { default as BudTable } from './BudTable';
-export type { BudTableColumn, BudTableProps } from './BudTable';
+export { default as Gauge } from './Gauge';
+export type { GaugeProps } from './Gauge';
+
+export { default as Input } from './Input';
+export type { InputProps, InputType, InputValueAs } from './Input';
+
+export { default as Modal } from './Modal';
+export type { ModalMaxWidth, ModalProps } from './Modal';
+
+export { default as ModalActions } from './ModalActions';
+export type { ModalActionsProps } from './ModalActions';
+
+export { default as Progress } from './Progress';
+export type { ProgressProps } from './Progress';
+
+export { default as Select } from './Select';
+export type { SelectOption, SelectProps } from './Select';
+
+export { default as Separator } from './Separator';
+export type { SeparatorProps } from './Separator';
+
+export { default as Sheet } from './Sheet';
+export type { SheetProps } from './Sheet';
+
+export { default as Skeleton } from './Skeleton';
+export type { SkeletonProps } from './Skeleton';
+
+export { default as Sparkline } from './Sparkline';
+export type { SparklineProps } from './Sparkline';
+
+export { default as Spinner } from './Spinner';
+export type { SpinnerProps } from './Spinner';
+
+export { default as Table } from './Table';
+export type { TableColumn, TableProps } from './Table';
+
+export { default as ToggleGroup } from './ToggleGroup';
+export type { ToggleGroupOption, ToggleGroupProps } from './ToggleGroup';
+
+export { default as Tooltip } from './Tooltip';
+export type { TooltipProps } from './Tooltip';

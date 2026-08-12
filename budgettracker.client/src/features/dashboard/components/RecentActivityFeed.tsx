@@ -1,7 +1,7 @@
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
-import { BudBadge, BudCard } from '../../../shared/components/ui';
+import { Badge, Card } from '../../../shared/components/ui';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { useMemo } from 'react';
 import type { Category, Transaction } from '../../../shared/types/api';
@@ -41,7 +41,7 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
   }, [categories, palette]);
 
   return (
-    <BudCard title="Recent Activity" fullHeight>
+    <Card title="Recent Activity" fullHeight>
       <>
         {items.length === 0 ? (
           <Box className="flex items-center justify-center" sx={{ minHeight: 160 }}>
@@ -68,7 +68,7 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
                     py: 0.5,
                   }}
                 >
-                  <BudBadge
+                  <Badge
                     label={name}
                     sx={{
                       backgroundColor: alpha(color, 0.18),
@@ -107,7 +107,7 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
           </Box>
         )}
       </>
-    </BudCard>
+    </Card>
   );
 };
 

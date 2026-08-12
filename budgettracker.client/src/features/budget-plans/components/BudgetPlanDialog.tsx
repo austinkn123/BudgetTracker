@@ -5,10 +5,10 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  BudConfirmModal,
-  BudInput,
-  BudModal,
-  BudModalActions,
+  ConfirmModal,
+  Input,
+  Modal,
+  ModalActions,
 } from '../../../shared/components/ui';
 import {
   budgetPlanSchema,
@@ -60,14 +60,14 @@ const BudgetPlanDialog = ({
 
   return (
     <>
-      <BudModal
+      <Modal
         open={open}
         onClose={onClose}
         title={mode === 'add' ? 'Add Budget Plan' : 'Edit Budget Plan'}
         maxWidth="sm"
         disableBackdropClose={isSaving}
         actions={
-          <BudModalActions
+          <ModalActions
             onCancel={onClose}
             onConfirm={() => void submit()}
             confirmLabel={mode === 'add' ? 'Create Plan' : 'Save Changes'}
@@ -80,15 +80,15 @@ const BudgetPlanDialog = ({
         <Box
           sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}
         >
-          <BudInput
+          <Input
             control={control}
             name="name"
             label="Plan Name"
             required
             sx={{ gridColumn: { sm: '1 / -1' } }}
           />
-          <BudInput control={control} name="planMonth" label="Plan Month" type="month" required />
-          <BudInput
+          <Input control={control} name="planMonth" label="Plan Month" type="month" required />
+          <Input
             control={control}
             name="netIncomeMonthly"
             label="Net Monthly Income"
@@ -115,9 +115,9 @@ const BudgetPlanDialog = ({
             />
           )}
         />
-      </BudModal>
+      </Modal>
 
-      <BudConfirmModal
+      <ConfirmModal
         open={confirmDelete}
         title="Delete budget plan?"
         message="This removes the plan and all of its lines. This cannot be undone."

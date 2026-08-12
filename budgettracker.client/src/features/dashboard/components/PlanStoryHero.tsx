@@ -3,7 +3,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import Box from '@mui/material/Box';
 import { Gauge, gaugeClasses } from '@mui/x-charts/Gauge';
 import { alpha, useTheme } from '@mui/material/styles';
-import { BudBadge, BudCard } from '../../../shared/components/ui';
+import { Badge, Card } from '../../../shared/components/ui';
 import { AlertTriangle, TrendingUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { AnalyzedPlan, PeriodPacing } from '../../../shared/types/api';
@@ -57,7 +57,7 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
   const planMonthLabel = format(parseISO(plan.planMonth), 'MMMM yyyy');
 
   return (
-    <BudCard
+    <Card
       padding="none"
       sx={{
         background: surface.background,
@@ -76,7 +76,7 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
               {plan.name} · {planMonthLabel}
             </Typography>
           </Box>
-          <BudBadge
+          <Badge
             icon={onTrack ? <TrendingUp size={14} /> : <AlertTriangle size={14} />}
             label={onTrack ? 'On pace' : 'Watch your pace'}
             sx={{
@@ -220,7 +220,7 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
               Drifting:
             </Typography>
             {drifting.map((d) => (
-              <BudBadge
+              <Badge
                 key={d.key}
                 label={`${d.name} +${currency.format(d.overBy)}`}
                 variant="outline"
@@ -234,7 +234,7 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
           </Box>
         )}
       </>
-    </BudCard>
+    </Card>
   );
 };
 

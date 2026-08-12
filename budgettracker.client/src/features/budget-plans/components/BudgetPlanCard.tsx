@@ -5,8 +5,8 @@ import Stack from '@mui/material/Stack';
 import { alpha } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { BudBadge, BudButton, BudCard, BudTable } from '../../../shared/components/ui';
-import type { BudTableColumn } from '../../../shared/components/ui';
+import { Badge, Button, Card, Table } from '../../../shared/components/ui';
+import type { TableColumn } from '../../../shared/components/ui';
 import type { BudgetPlan, BudgetPlanEntry } from '../../../shared/types/api';
 
 type BudgetPlanCardProps = {
@@ -84,7 +84,7 @@ const BudgetPlanCard = ({
     [plan.entries],
   );
 
-  const columns: BudTableColumn<BudgetPlanEntry>[] = useMemo(
+  const columns: TableColumn<BudgetPlanEntry>[] = useMemo(
     () => [
       {
         key: 'categoryId',
@@ -96,7 +96,7 @@ const BudgetPlanCard = ({
         key: 'lineType',
         header: 'Type',
         render: (entry) => (
-          <BudBadge
+          <Badge
             label={entry.lineType}
             color={entry.lineType === 'Income' ? 'success' : 'error'}
             variant="outline"
@@ -126,11 +126,11 @@ const BudgetPlanCard = ({
   );
 
   return (
-    <BudCard
+    <Card
       title={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {plan.name}
-          <BudBadge
+          <Badge
             label={plan.isActive ? 'Active' : 'Inactive'}
             color={plan.isActive ? 'success' : 'neutral'}
           />
@@ -140,29 +140,29 @@ const BudgetPlanCard = ({
       actions={
         <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
           {!plan.isActive && (
-            <BudButton
+            <Button
               size="sm"
               variant="secondary"
               onClick={() => onSwitchActive(plan.id)}
               disabled={isSwitchingPlan}
             >
               Set Active
-            </BudButton>
+            </Button>
           )}
-          <BudButton size="sm" variant="ghost" startIcon={<Plus size={16} />} onClick={() => onAddLine(plan.id)}>
+          <Button size="sm" variant="ghost" startIcon={<Plus size={16} />} onClick={() => onAddLine(plan.id)}>
             Add Entry
-          </BudButton>
-          <BudButton size="sm" variant="ghost" startIcon={<Pencil size={16} />} onClick={() => onEditPlan(plan)}>
+          </Button>
+          <Button size="sm" variant="ghost" startIcon={<Pencil size={16} />} onClick={() => onEditPlan(plan)}>
             Edit
-          </BudButton>
-          <BudButton
+          </Button>
+          <Button
             size="sm"
             variant="destructive-ghost"
             startIcon={<Trash2 size={16} />}
             onClick={() => onDeletePlan(plan)}
           >
             Delete
-          </BudButton>
+          </Button>
         </Stack>
       }
     >
@@ -179,7 +179,7 @@ const BudgetPlanCard = ({
         <SummaryTile label="Monthly Net" value={monthlyNet} tone="primary" signed />
       </Box>
 
-      <BudTable
+      <Table
         columns={columns}
         rows={sortedEntries}
         rowKey={(entry) => entry.id}
@@ -187,7 +187,7 @@ const BudgetPlanCard = ({
         emptyMessage='No plan entries — click "Add Entry" to get started'
         ariaLabel={`${plan.name} plan entries`}
       />
-    </BudCard>
+    </Card>
   );
 };
 

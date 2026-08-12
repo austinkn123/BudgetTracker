@@ -1,7 +1,7 @@
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
-import BudCard from '../../../shared/components/ui/BudCard';
+import Card from '../../../shared/components/ui/Card';
 import type { BucketPerformance } from '../../../shared/types/api';
 import { getSemanticColors } from '../utils/chartTheme';
 
@@ -23,7 +23,7 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
 
   if (rows.length === 0 || rows.every((r) => r.planned === 0 && r.actual === 0)) {
     return (
-      <BudCard
+      <Card
         title="Bucket Breakdown"
         fullHeight
         contentSx={{
@@ -36,14 +36,14 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
         <Typography variant="body2" color="text.secondary">
           No bucket data for this plan yet
         </Typography>
-      </BudCard>
+      </Card>
     );
   }
 
   const maxValue = rows.reduce((m, r) => Math.max(m, r.planned, r.actual), 0);
 
   return (
-    <BudCard title="Bucket Breakdown" fullHeight>
+    <Card title="Bucket Breakdown" fullHeight>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
           {rows.map((row) => {
             const baseWidth = maxValue > 0 ? (Math.min(row.planned, row.actual) / maxValue) * 100 : 0;
@@ -95,7 +95,7 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
             );
           })}
       </Box>
-    </BudCard>
+    </Card>
   );
 };
 

@@ -5,10 +5,10 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo } from 'react';
 import {
-  BudInput,
-  BudModal,
-  BudModalActions,
-  BudSelect,
+  Input,
+  Modal,
+  ModalActions,
+  Select,
 } from '../../../shared/components/ui';
 import type { Category } from '../../../shared/types/api';
 import {
@@ -74,14 +74,14 @@ const PlanLineDialog = ({
   });
 
   return (
-    <BudModal
+    <Modal
       open={open}
       onClose={onClose}
       title={mode === 'add' ? 'Add Plan Line' : 'Edit Plan Line'}
       maxWidth="sm"
       disableBackdropClose={isSaving}
       actions={
-        <BudModalActions
+        <ModalActions
           onCancel={onClose}
           onConfirm={submit}
           confirmLabel={mode === 'add' ? 'Add' : 'Save'}
@@ -91,7 +91,7 @@ const PlanLineDialog = ({
       }
     >
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-        <BudSelect
+        <Select
           control={control}
           name="categoryId"
           label="Category"
@@ -99,7 +99,7 @@ const PlanLineDialog = ({
           valueAs="number"
           required
         />
-        <BudInput
+        <Input
           control={control}
           name="amount"
           label="Amount"
@@ -109,11 +109,11 @@ const PlanLineDialog = ({
           step="0.01"
           required
         />
-        <BudSelect control={control} name="bucket" label="Bucket" options={BUCKET_OPTIONS} />
-        <BudSelect control={control} name="cadence" label="Cadence" options={CADENCE_OPTIONS} />
+        <Select control={control} name="bucket" label="Bucket" options={BUCKET_OPTIONS} />
+        <Select control={control} name="cadence" label="Cadence" options={CADENCE_OPTIONS} />
       </Box>
 
-      <BudInput control={control} name="notes" label="Notes" multiline rows={2} />
+      <Input control={control} name="notes" label="Notes" multiline rows={2} />
 
       <Controller
         name="isStressFactor"
@@ -130,7 +130,7 @@ const PlanLineDialog = ({
           />
         )}
       />
-    </BudModal>
+    </Modal>
   );
 };
 

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import BudModal from './BudModal';
-import BudModalActions from './BudModalActions';
+import Modal from './Modal';
+import ModalActions from './ModalActions';
 
-export interface BudConfirmModalProps {
+export interface ConfirmModalProps {
   open: boolean;
   title: ReactNode;
   message: ReactNode;
@@ -14,8 +14,8 @@ export interface BudConfirmModalProps {
   onConfirm: () => void;
 }
 
-/** Confirm-only dialog (BUD-16) — replaces the ad-hoc confirm dialogs. */
-const BudConfirmModal = ({
+/** Confirm-only dialog (BUD-20). */
+const ConfirmModal = ({
   open,
   title,
   message,
@@ -25,8 +25,8 @@ const BudConfirmModal = ({
   isPending = false,
   onCancel,
   onConfirm,
-}: BudConfirmModalProps) => (
-  <BudModal
+}: ConfirmModalProps) => (
+  <Modal
     open={open}
     onClose={onCancel}
     title={title}
@@ -34,7 +34,7 @@ const BudConfirmModal = ({
     maxWidth="xs"
     disableBackdropClose={isPending}
     actions={
-      <BudModalActions
+      <ModalActions
         onCancel={onCancel}
         cancelLabel={cancelLabel}
         onConfirm={onConfirm}
@@ -46,4 +46,4 @@ const BudConfirmModal = ({
   />
 );
 
-export default BudConfirmModal;
+export default ConfirmModal;

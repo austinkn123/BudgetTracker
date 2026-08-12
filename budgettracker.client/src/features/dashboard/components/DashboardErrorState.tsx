@@ -1,5 +1,5 @@
 import Typography from '@mui/material/Typography';
-import BudAlert from '../../../shared/components/ui/BudAlert';
+import Alert from '../../../shared/components/ui/Alert';
 
 type DashboardErrorStateProps = {
   userError: unknown;
@@ -23,7 +23,7 @@ const DashboardErrorState = ({
 
   return (
     <div className="space-y-8">
-      <BudAlert
+      <Alert
         severity="error"
         title="Unable to load your dashboard"
         message="We couldn't reach the API. Check that the server and database are running."
@@ -33,7 +33,7 @@ const DashboardErrorState = ({
             {label}: {String(error)}
           </Typography>
         ))}
-      </BudAlert>
+      </Alert>
     </div>
   );
 };

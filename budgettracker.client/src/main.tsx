@@ -10,9 +10,8 @@ import '@fontsource/inter/400.css'
 import '@fontsource/inter/500.css'
 import '@fontsource/inter/600.css'
 import '@fontsource/inter/700.css'
-// react-day-picker base styles must load BEFORE index.css so Tailwind
-// utilities (equal specificity, later in the sheet) win ties (BUD-20).
-import 'react-day-picker/style.css'
+// Note: react-day-picker's stylesheet is deliberately NOT imported — the
+// Calendar component styles every part via the classNames API (BUD-20).
 import './index.css'
 import './auth/amplifyConfig'
 import { AuthProvider } from './auth/AuthContext'

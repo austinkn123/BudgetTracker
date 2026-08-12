@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import { BudAlert, BudButton, BudCard, BudInput } from '../shared/components/ui';
+import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import { signUpSchema, type SignUpFormData } from '../shared/validation/auth';
 
@@ -50,7 +50,7 @@ const SignUpPage = () => {
       bgcolor="background.default"
       p={2}
     >
-      <BudCard padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
+      <Card padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
         <Stack spacing={3}>
           <div>
             <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
@@ -61,11 +61,11 @@ const SignUpPage = () => {
             </Typography>
           </div>
 
-          {error && <BudAlert severity="error" message={error} />}
+          {error && <Alert severity="error" message={error} />}
 
           <form onSubmit={onSubmit}>
             <Stack spacing={3}>
-              <BudInput
+              <Input
                 control={control}
                 name="email"
                 label="Email"
@@ -74,7 +74,7 @@ const SignUpPage = () => {
                 disabled={isSubmitting}
               />
 
-              <BudInput
+              <Input
                 control={control}
                 name="firstName"
                 label="First Name (optional)"
@@ -82,7 +82,7 @@ const SignUpPage = () => {
                 disabled={isSubmitting}
               />
 
-              <BudInput
+              <Input
                 control={control}
                 name="lastName"
                 label="Last Name (optional)"
@@ -90,7 +90,7 @@ const SignUpPage = () => {
                 disabled={isSubmitting}
               />
 
-              <BudInput
+              <Input
                 control={control}
                 name="password"
                 label="Password"
@@ -99,7 +99,7 @@ const SignUpPage = () => {
                 disabled={isSubmitting}
               />
 
-              <BudInput
+              <Input
                 control={control}
                 name="confirmPassword"
                 label="Confirm Password"
@@ -108,9 +108,9 @@ const SignUpPage = () => {
                 disabled={isSubmitting}
               />
 
-              <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
+              <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                 {isSubmitting ? 'Creating Account...' : 'Sign Up'}
-              </BudButton>
+              </Button>
             </Stack>
           </form>
 
@@ -121,7 +121,7 @@ const SignUpPage = () => {
             </Link>
           </Typography>
         </Stack>
-      </BudCard>
+      </Card>
     </Box>
   );
 };

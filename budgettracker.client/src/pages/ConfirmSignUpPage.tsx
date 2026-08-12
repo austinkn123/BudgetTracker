@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import { BudAlert, BudButton, BudCard, BudInput } from '../shared/components/ui';
+import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import { confirmSignUpSchema, type ConfirmSignUpFormData } from '../shared/validation/auth';
 
@@ -87,7 +87,7 @@ const ConfirmSignUpPage = () => {
       bgcolor="background.default"
       p={2}
     >
-      <BudCard padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
+      <Card padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
         <Stack spacing={3}>
           <div>
             <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
@@ -98,12 +98,12 @@ const ConfirmSignUpPage = () => {
             </Typography>
           </div>
 
-          {error && <BudAlert severity="error" message={error} />}
-          {success && <BudAlert severity="success" message={success} />}
+          {error && <Alert severity="error" message={error} />}
+          {success && <Alert severity="success" message={success} />}
 
           <form onSubmit={onSubmit}>
             <Stack spacing={3}>
-              <BudInput
+              <Input
                 control={control}
                 name="code"
                 label="Confirmation Code"
@@ -114,21 +114,21 @@ const ConfirmSignUpPage = () => {
                 disabled={isSubmitting}
               />
 
-              <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
+              <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                 {isSubmitting ? 'Confirming...' : 'Confirm'}
-              </BudButton>
+              </Button>
             </Stack>
           </form>
 
           <Stack spacing={2}>
-            <BudButton
+            <Button
               variant="ghost"
               fullWidth
               onClick={handleResendCode}
               loading={isResending}
             >
               {isResending ? 'Resending...' : "Didn't receive a code? Resend"}
-            </BudButton>
+            </Button>
 
             <Typography variant="body2" className="text-center text-ink-muted">
               <Link to="/signup" className="font-semibold text-primary hover:text-primary-dark">
@@ -137,7 +137,7 @@ const ConfirmSignUpPage = () => {
             </Typography>
           </Stack>
         </Stack>
-      </BudCard>
+      </Card>
     </Box>
   );
 };

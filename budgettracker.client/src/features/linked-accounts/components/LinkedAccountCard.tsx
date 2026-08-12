@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
-import { BudAlert, BudBadge, BudButton, BudCard } from '../../../shared/components/ui';
+import { Alert, Badge, Button, Card } from '../../../shared/components/ui';
 import { useLinkedAccount } from '../hooks/useLinkedAccount';
 import PlaidLinkLauncher from './PlaidLinkLauncher';
 import ReplaceConnectionDialog from './ReplaceConnectionDialog';
@@ -61,7 +61,7 @@ const LinkedAccountCard = () => {
   })();
 
   return (
-    <BudCard title="Linked Bank" contentSx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+    <Card title="Linked Bank" contentSx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       {isLoadingConnection ? (
         <div className="flex items-center gap-2 text-ink-muted">
           <CircularProgress size={16} />
@@ -73,12 +73,12 @@ const LinkedAccountCard = () => {
             <Typography variant="body1" className="font-medium">
               Connected to {connection.institutionName}
             </Typography>
-            <BudBadge label="Active" color="success" />
+            <Badge label="Active" color="success" />
           </div>
           {connection.accounts.length > 0 && (
             <div className="flex gap-2 flex-wrap">
               {connection.accounts.map((account) => (
-                <BudBadge
+                <Badge
                   key={`${account.name}-${account.mask ?? ''}`}
                   label={`${account.name}${account.mask ? ` ••${account.mask}` : ''}`}
                   variant="outline"
@@ -90,24 +90,24 @@ const LinkedAccountCard = () => {
             Last synced: {formattedLastSync}
           </Typography>
           <div className="flex gap-2 flex-wrap">
-            <BudButton onClick={refresh} loading={isSyncing} disabled={isDisconnecting}>
+            <Button onClick={refresh} loading={isSyncing} disabled={isDisconnecting}>
               {isSyncing ? 'Refreshing…' : 'Refresh'}
-            </BudButton>
-            <BudButton
+            </Button>
+            <Button
               variant="secondary"
               onClick={handleConnectClick}
               disabled={isPreparingLink || isSyncing || isDisconnecting || isExchanging}
             >
               {isPreparingLink ? 'Preparing…' : 'Connect a different bank'}
-            </BudButton>
-            <BudButton
+            </Button>
+            <Button
               variant="destructive"
               onClick={disconnect}
               loading={isDisconnecting}
               disabled={isSyncing}
             >
               {isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
-            </BudButton>
+            </Button>
           </div>
         </div>
       ) : (
@@ -115,12 +115,12 @@ const LinkedAccountCard = () => {
           <Typography variant="body2" className="text-ink-muted">
             Link your bank so transactions import automatically.
           </Typography>
-          <BudButton
+          <Button
             onClick={handleConnectClick}
             loading={isPreparingLink || isExchanging}
           >
             {isPreparingLink ? 'Preparing…' : isExchanging ? 'Linking…' : 'Connect a bank'}
-          </BudButton>
+          </Button>
         </div>
       )}
 
@@ -130,7 +130,7 @@ const LinkedAccountCard = () => {
         </Typography>
       )}
 
-      {errorMessage && <BudAlert severity="error" message={errorMessage} />}
+      {errorMessage && <Alert severity="error" message={errorMessage} />}
 
       {linkToken && (
         <PlaidLinkLauncher
@@ -146,7 +146,7 @@ const LinkedAccountCard = () => {
         onCancel={() => setReplaceDialogOpen(false)}
         onConfirm={handleConfirmReplace}
       />
-    </BudCard>
+    </Card>
   );
 };
 

@@ -3,11 +3,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo } from 'react';
 import {
-  BudAlert,
-  BudInput,
-  BudModal,
-  BudModalActions,
-  BudSelect,
+  Alert,
+  Input,
+  Modal,
+  ModalActions,
+  Select,
 } from '../../../shared/components/ui';
 import type { Category } from '../../../shared/types/api';
 import {
@@ -65,14 +65,14 @@ const TransactionDialog = ({
   });
 
   return (
-    <BudModal
+    <Modal
       open={open}
       onClose={onClose}
       title={mode === 'add' ? 'Add Transaction' : 'Edit Transaction'}
       maxWidth="sm"
       disableBackdropClose={isSaving}
       actions={
-        <BudModalActions
+        <ModalActions
           onCancel={onClose}
           onConfirm={submit}
           confirmLabel={mode === 'add' ? 'Add' : 'Save'}
@@ -82,7 +82,7 @@ const TransactionDialog = ({
       }
     >
       {locked && (
-        <BudAlert
+        <Alert
           severity="info"
           variant="outlined"
           message="Imported from your bank — only category & notes can be edited."
@@ -97,7 +97,7 @@ const TransactionDialog = ({
           gap: 2,
         }}
       >
-        <BudInput
+        <Input
           control={control}
           name="amount"
           label="Amount"
@@ -108,7 +108,7 @@ const TransactionDialog = ({
           disabled={locked}
           required
         />
-        <BudSelect
+        <Select
           control={control}
           name="categoryId"
           label="Category"
@@ -116,7 +116,7 @@ const TransactionDialog = ({
           valueAs="number"
           required
         />
-        <BudInput
+        <Input
           control={control}
           name="occurredAt"
           label="Date"
@@ -124,11 +124,11 @@ const TransactionDialog = ({
           disabled={locked}
           required
         />
-        <BudInput control={control} name="payee" label="Payee" disabled={locked} />
+        <Input control={control} name="payee" label="Payee" disabled={locked} />
       </Box>
 
-      <BudInput control={control} name="notes" label="Notes" multiline rows={2} />
-    </BudModal>
+      <Input control={control} name="notes" label="Notes" multiline rows={2} />
+    </Modal>
   );
 };
 

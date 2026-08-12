@@ -1,4 +1,4 @@
-import BudConfirmModal from '../../../shared/components/ui/BudConfirmModal';
+import ConfirmModal from '../../../shared/components/ui/ConfirmModal';
 
 interface ReplaceConnectionDialogProps {
   open: boolean;
@@ -17,7 +17,7 @@ const ReplaceConnectionDialog = ({
   onCancel,
   onConfirm,
 }: ReplaceConnectionDialogProps) => (
-  <BudConfirmModal
+  <ConfirmModal
     open={open}
     title="Replace your current connection?"
     message={

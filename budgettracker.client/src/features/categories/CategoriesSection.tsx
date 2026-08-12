@@ -5,14 +5,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  BudBadge,
-  BudButton,
-  BudCard,
-  BudConfirmModal,
-  BudInput,
-  BudModal,
-  BudModalActions,
-  BudSelect,
+  Badge,
+  Button,
+  Card,
+  ConfirmModal,
+  Input,
+  Modal,
+  ModalActions,
+  Select,
 } from '../../shared/components/ui';
 import type { Category } from '../../shared/types/api';
 import { categorySchema, type CategoryFormValues } from '../../shared/validation/categorySchema';
@@ -169,12 +169,12 @@ const CategoriesSection = ({
   const isSaving = createCategory.isPending || updateCategory.isPending || deleteCategory.isPending;
 
   return (
-    <BudCard
+    <Card
       title="Categories"
       actions={
-        <BudButton size="sm" onClick={openAddDialog}>
+        <Button size="sm" onClick={openAddDialog}>
           Add Category
-        </BudButton>
+        </Button>
       }
     >
       <>
@@ -200,7 +200,7 @@ const CategoriesSection = ({
                       return (
                         <Tooltip key={cat.id} title={tooltipLabel} arrow>
                           <span>
-                            <BudBadge
+                            <Badge
                               label={`${cat.name} (${usage.total})`}
                               color={group.color}
                               variant="outline"
@@ -219,14 +219,14 @@ const CategoriesSection = ({
         )}
       </>
 
-      <BudModal
+      <Modal
         open={dialogOpen}
         onClose={closeDialog}
         title={dialogMode === 'add' ? 'Add Category' : 'Edit Category'}
         maxWidth="xs"
         disableBackdropClose={isSaving}
         actions={
-          <BudModalActions
+          <ModalActions
             onCancel={closeDialog}
             onConfirm={onSave}
             confirmLabel={dialogMode === 'add' ? 'Create' : 'Save'}
@@ -234,16 +234,16 @@ const CategoriesSection = ({
           />
         }
       >
-        <BudInput control={control} name="name" label="Name" autoFocus />
-        <BudSelect
+        <Input control={control} name="name" label="Name" autoFocus />
+        <Select
           control={control}
           name="categoryType"
           label="Type"
           options={CATEGORY_TYPE_OPTIONS}
         />
-      </BudModal>
+      </Modal>
 
-      <BudConfirmModal
+      <ConfirmModal
         open={deleteTarget !== null}
         title="Delete Category"
         message={
@@ -263,7 +263,7 @@ const CategoriesSection = ({
         onCancel={() => setDeleteTarget(null)}
         onConfirm={onConfirmDelete}
       />
-    </BudCard>
+    </Card>
   );
 };
 

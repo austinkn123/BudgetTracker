@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
-import { BudButton, BudCard } from '../../../shared/components/ui';
+import { Button, Card } from '../../../shared/components/ui';
 import { getHeroSurface, getSemanticColors } from '../utils/chartTheme';
 
 /**
@@ -16,7 +16,7 @@ const PlanStoryHeroEmpty = () => {
   const semantic = getSemanticColors(theme);
 
   return (
-    <BudCard
+    <Card
       padding="none"
       sx={{
         background: surface.background,
@@ -60,16 +60,16 @@ const PlanStoryHeroEmpty = () => {
             </Typography>
           </Box>
         </Box>
-        <BudButton
+        <Button
           component={RouterLink}
           to="/budget-plans"
           size="lg"
           sx={{ flexShrink: 0 }}
         >
           Create a plan
-        </BudButton>
+        </Button>
       </>
-    </BudCard>
+    </Card>
   );
 };
 

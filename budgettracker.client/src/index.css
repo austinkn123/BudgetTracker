@@ -26,19 +26,6 @@
       print-color-adjust: exact;
     }
   }
-
-  /* react-day-picker theme hooks — composed with the classNames API in
-     Calendar.tsx; these vars cover what classNames can't reach. */
-  .rdp-root {
-    --rdp-accent-color: rgb(var(--bud-primary));
-    --rdp-accent-background-color: rgb(var(--bud-primary-subtle));
-    --rdp-day-height: 2.5rem;
-    --rdp-day-width: 2.5rem;
-    --rdp-day_button-height: 2.25rem;
-    --rdp-day_button-width: 2.25rem;
-    --rdp-day_button-border-radius: theme(borderRadius.DEFAULT);
-    font-family: theme(fontFamily.sans);
-  }
 }
 
 @layer components {
@@ -49,35 +36,43 @@
   }
 
   /* Transactions calendar day tinting (BUD-20). Classes rather than inline
-     utilities because they must compose with react-day-picker's .rdp-selected
-     modifier on the same element. */
+     utilities because they must compose with react-day-picker's
+     data-selected state on the same day cell. */
   .day-pos {
-    @apply border border-success/[0.32] bg-success/[0.14] font-semibold text-success-dark;
+    @apply border border-success/[0.32] bg-success/[0.14];
   }
-  .day-pos:hover,
-  .day-pos:focus-visible {
+  .day-pos button {
+    @apply font-semibold text-success-dark;
+  }
+  .day-pos:hover {
     @apply bg-success/[0.22];
   }
-  .day-pos.rdp-selected,
   .day-pos[data-selected='true'] {
-    @apply bg-success text-white;
+    @apply border-success bg-success;
   }
-  .day-pos.rdp-selected:hover {
+  .day-pos[data-selected='true'] button {
+    @apply text-white;
+  }
+  .day-pos[data-selected='true']:hover {
     @apply bg-success-dark;
   }
 
   .day-neg {
-    @apply border border-error/[0.32] bg-error/[0.14] font-semibold text-error-dark;
+    @apply border border-error/[0.32] bg-error/[0.14];
   }
-  .day-neg:hover,
-  .day-neg:focus-visible {
+  .day-neg button {
+    @apply font-semibold text-error-dark;
+  }
+  .day-neg:hover {
     @apply bg-error/[0.22];
   }
-  .day-neg.rdp-selected,
   .day-neg[data-selected='true'] {
-    @apply bg-error text-white;
+    @apply border-error bg-error;
   }
-  .day-neg.rdp-selected:hover {
+  .day-neg[data-selected='true'] button {
+    @apply text-white;
+  }
+  .day-neg[data-selected='true']:hover {
     @apply bg-error-dark;
   }
 }

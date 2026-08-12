@@ -1,7 +1,7 @@
 import Typography from '@mui/material/Typography';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { useTheme } from '@mui/material/styles';
-import BudCard from '../../../shared/components/ui/BudCard';
+import Card from '../../../shared/components/ui/Card';
 import { useMemo } from 'react';
 import type { WaterfallBar } from '../utils/selectors';
 import { getSemanticColors } from '../utils/chartTheme';
@@ -77,7 +77,7 @@ const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
 
   if (!chartData) {
     return (
-      <BudCard
+      <Card
         title="Cashflow Waterfall"
         fullHeight
         contentSx={{
@@ -90,14 +90,14 @@ const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
         <Typography variant="body2" color="text.secondary">
           No transactions yet this plan month
         </Typography>
-      </BudCard>
+      </Card>
     );
   }
 
   const labels = items.map((i) => i.label);
 
   return (
-    <BudCard title="Cashflow Waterfall" fullHeight>
+    <Card title="Cashflow Waterfall" fullHeight>
       <BarChart
           height={320}
           xAxis={[{ data: labels, scaleType: 'band' }]}
@@ -145,7 +145,7 @@ const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
             },
           }}
         />
-    </BudCard>
+    </Card>
   );
 };
 

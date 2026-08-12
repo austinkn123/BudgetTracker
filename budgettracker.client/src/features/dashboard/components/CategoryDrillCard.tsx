@@ -1,5 +1,5 @@
 import CardActionArea from '@mui/material/CardActionArea';
-import BudCard from '../../../shared/components/ui/BudCard';
+import Card from '../../../shared/components/ui/Card';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
@@ -44,7 +44,7 @@ const CategoryDrillCard = ({ data, expanded, onToggle }: CategoryDrillCardProps)
   const hasSpark = sparkData.some((v) => v > 0);
 
   return (
-    <BudCard
+    <Card
       padding="none"
       fullHeight
       sx={{ display: 'flex', flexDirection: 'column' }}
@@ -140,7 +140,7 @@ const CategoryDrillCard = ({ data, expanded, onToggle }: CategoryDrillCardProps)
           )}
         </Box>
       </Collapse>
-    </BudCard>
+    </Card>
   );
 };
 
