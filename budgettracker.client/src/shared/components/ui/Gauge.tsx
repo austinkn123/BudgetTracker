@@ -26,13 +26,13 @@ const polar = (center: number, radius: number, angle: number): [number, number] 
  * Static SVG gauge (BUD-20). Replaces @mui/x-charts Gauge — two stroked arcs
  * with round caps plus centered text; no interactivity by design.
  */
-const Gauge = ({ value, size = 220, valueColor, trackColor, textColor }: GaugeProps) => {
+const Gauge = ({ value, size = 200, valueColor, trackColor, textColor }: GaugeProps) => {
   const clamped = Math.min(100, Math.max(0, value));
   const center = size / 2;
-  // innerRadius 78% / outerRadius 100% of the old 110px ring → stroke centered
-  // at 89% of half-size, stroke width 22% of half-size.
-  const radius = center * 0.89;
-  const strokeWidth = center * 0.22;
+  // Slim ring: a thinner arc reads as precision instrumentation rather than
+  // a chunky progress donut.
+  const radius = center * 0.86;
+  const strokeWidth = center * 0.1;
 
   const [startX, startY] = polar(center, radius, START_ANGLE);
   const [endX, endY] = polar(center, radius, END_ANGLE);
@@ -70,13 +70,34 @@ const Gauge = ({ value, size = 220, valueColor, trackColor, textColor }: GaugePr
       )}
       <text
         x={center}
-        y={center - 6}
+        y={center - 4}
         textAnchor="middle"
         dominantBaseline="central"
         fill={textColor}
-        style={{ fontSize: 32, fontWeight: 600 }}
+        style={{
+          fontSize: size * 0.24,
+          fontWeight: 600,
+          letterSpacing: '-0.03em',
+          fontVariantNumeric: 'tabular-nums',
+        }}
       >
         {Math.round(clamped)}%
+      </text>
+      <text
+        x={center}
+        y={center + size * 0.16}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={textColor}
+        opacity={0.5}
+        style={{
+          fontSize: size * 0.055,
+          fontWeight: 600,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+        }}
+      >
+        of plan
       </text>
     </svg>
   );

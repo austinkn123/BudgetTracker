@@ -88,8 +88,8 @@ const Select = <TFieldValues extends FieldValues, TValue extends string | number
               onBlur={field.onBlur}
               aria-invalid={fieldState.error ? true : undefined}
               className={cn(
-                'focus-ring flex h-9 w-full items-center justify-between gap-2 rounded border border-border bg-surface px-3 text-body text-ink shadow-xs transition-colors duration-120 hover:border-border-strong disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-muted',
-                'data-[placeholder]:text-ink-muted/70',
+                'focus-ring flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 text-[14px] text-ink shadow-xs transition-colors duration-120 hover:border-border-strong disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-muted',
+                'data-[placeholder]:text-ink-muted/60',
                 fieldState.error && 'border-error focus-visible:border-error focus-visible:ring-error/25',
               )}
             >

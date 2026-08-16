@@ -29,10 +29,13 @@ const FieldShell = ({
   children,
 }: FieldShellProps) => (
   <div className={cn('flex flex-col gap-1.5', fullWidth && 'w-full', className)}>
-    <label htmlFor={htmlFor} className="text-[13px] font-semibold text-ink">
+    <label
+      htmlFor={htmlFor}
+      className="text-[12px] font-semibold uppercase tracking-[0.05em] text-ink-muted"
+    >
       {label}
       {required && (
-        <span aria-hidden className="ml-0.5 text-error">
+        <span aria-hidden className="ml-1 font-normal normal-case tracking-normal text-error">
           *
         </span>
       )}

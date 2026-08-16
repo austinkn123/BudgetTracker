@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Wallet } from 'lucide-react';
 import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import { loginSchema, type LoginFormData } from '../shared/validation/auth';
@@ -36,11 +37,20 @@ const LoginPage = () => {
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card padding="lg" className="w-full max-w-[400px]">
+    <div className="flex min-h-screen items-center justify-center bg-grey-900 p-4">
+      <div className="w-full max-w-[400px]">
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          <span className="flex text-primary-light">
+            <Wallet size={24} />
+          </span>
+          <span className="text-[17px] font-semibold tracking-[-0.01em] text-white">
+            BudgetTracker
+          </span>
+        </div>
+        <Card padding="lg">
         <div className="flex flex-col gap-6">
           <div>
-            <h1 className="mb-2 text-2xl font-semibold tracking-tight text-ink">Sign In</h1>
+            <h1 className="mb-1.5 text-[22px] font-semibold tracking-[-0.02em] text-ink">Sign In</h1>
             <p className="text-sm text-ink-muted">Welcome back to BudgetTracker</p>
           </div>
 
@@ -86,7 +96,8 @@ const LoginPage = () => {
             </p>
           </div>
         </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };

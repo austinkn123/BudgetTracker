@@ -17,13 +17,16 @@ type BudgetPlanCardProps = {
   onDeletePlan: (plan: BudgetPlan) => void;
 };
 
-const TILE_CLASSES = {
-  success: 'border-success/20 bg-success/10 [&>span]:text-success [&>p]:text-success-dark',
-  error: 'border-error/20 bg-error/10 [&>span]:text-error [&>p]:text-error-dark',
-  primary: 'border-primary/20 bg-primary/10 [&>span]:text-primary',
+const TILE_ACCENT = {
+  success: 'bg-success',
+  error: 'bg-ink/25',
+  primary: 'bg-primary',
 } as const;
 
-/** Summary tile for the income/expenses/net row. */
+/**
+ * Summary tile for the income/expenses/net row. A thin accent rail plus a
+ * large tabular figure reads cleaner than a fully tinted box.
+ */
 const SummaryTile = ({
   label,
   value,
@@ -33,20 +36,24 @@ const SummaryTile = ({
 }: {
   label: string;
   value: number;
-  tone: keyof typeof TILE_CLASSES;
+  tone: keyof typeof TILE_ACCENT;
   signed?: boolean;
 }) => (
-  <div className={cn('rounded-md border px-3 py-2.5', TILE_CLASSES[tone])}>
-    <span className="text-xs">{label}</span>
-    <p
-      className={cn(
-        'text-body font-semibold',
-        signed && (value >= 0 ? 'text-success-dark' : 'text-error-dark'),
-        !signed && tone === 'primary' && 'text-primary-dark',
-      )}
-    >
-      ${value.toFixed(2)}
-    </p>
+  <div className="flex items-stretch gap-3 rounded-lg bg-background px-4 py-3 ring-1 ring-ink/[0.05]">
+    <span className={cn('w-0.5 shrink-0 rounded-full', TILE_ACCENT[tone])} aria-hidden />
+    <div>
+      <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-ink-muted">
+        {label}
+      </span>
+      <p
+        className={cn(
+          'mt-0.5 text-lg font-semibold tabular-nums tracking-[-0.02em]',
+          signed ? (value >= 0 ? 'text-success-dark' : 'text-error') : 'text-ink',
+        )}
+      >
+        ${value.toFixed(2)}
+      </p>
+    </div>
   </div>
 );
 

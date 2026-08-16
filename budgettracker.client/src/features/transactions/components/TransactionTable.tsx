@@ -57,32 +57,58 @@ const TransactionTable = ({
 
   return (
     <div className="flex flex-col items-stretch lg:flex-row">
-      <div className="order-1 min-w-0 flex-1 border-b border-border-subtle bg-background/50 p-5 pb-4 lg:order-2 lg:border-b-0 lg:border-l">
-        <div className="flex flex-col gap-4">
+      <div className="order-1 min-w-0 flex-1 border-b border-border-subtle bg-background/40 px-5 py-5 lg:order-2 lg:border-b-0 lg:border-l">
+        <div className="flex flex-col gap-5">
           <div>
-            <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
+            <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-ink-muted">
               Selected Day
             </span>
-            <h3 className="text-base font-semibold text-ink">{format(selectedDate, 'PPPP')}</h3>
-            <p className="text-sm text-ink-muted">
+            <h3 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink">
+              {format(selectedDate, 'PPPP')}
+            </h3>
+            <p className="mt-0.5 text-sm text-ink-muted">
               {selectedTransactions.length > 0
                 ? `Review ${selectedTransactions.length} ${selectedTransactions.length === 1 ? 'transaction' : 'transactions'} for this day.`
                 : 'No transactions are recorded for this day yet.'}
             </p>
           </div>
 
-          <div className="flex flex-row flex-wrap gap-2">
-            <Badge label={`${selectedTransactions.length} item${selectedTransactions.length === 1 ? '' : 's'}`} />
-            <Badge variant="outline" color="success" label={`Income $${selectedIncomeTotal.toFixed(2)}`} />
-            <Badge variant="outline" color="error" label={`Outflow $${selectedOutflowTotal.toFixed(2)}`} />
-            <Badge
-              color={selectedNetTotal >= 0 ? 'success' : 'error'}
-              label={`Net ${selectedNetTotal >= 0 ? '+' : '-'}$${Math.abs(selectedNetTotal).toFixed(2)}`}
-            />
+          {/* Day totals as a stat strip rather than loose pills */}
+          <div className="grid grid-cols-3 divide-x divide-border-subtle overflow-hidden rounded-lg bg-surface ring-1 ring-ink/[0.06]">
+            <div className="px-3 py-2.5">
+              <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                Income
+              </span>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-success-dark">
+                ${selectedIncomeTotal.toFixed(2)}
+              </p>
+            </div>
+            <div className="px-3 py-2.5">
+              <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                Outflow
+              </span>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-ink">
+                ${selectedOutflowTotal.toFixed(2)}
+              </p>
+            </div>
+            <div className="px-3 py-2.5">
+              <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                Net
+              </span>
+              <p
+                className={
+                  selectedNetTotal >= 0
+                    ? 'mt-0.5 text-sm font-semibold tabular-nums text-success-dark'
+                    : 'mt-0.5 text-sm font-semibold tabular-nums text-error'
+                }
+              >
+                {selectedNetTotal >= 0 ? '+' : '−'}${Math.abs(selectedNetTotal).toFixed(2)}
+              </p>
+            </div>
           </div>
 
           {selectedTransactions.length > 0 ? (
-            <ul className="overflow-hidden rounded-md border border-border">
+            <ul className="overflow-hidden rounded-lg bg-surface ring-1 ring-ink/[0.06]">
               {selectedTransactions.map((transaction, index) => {
                 // An Adjustment is a user-driven balance correction. Its sign carries
                 // semantic meaning: negative = balance was overstated (outflow correction,
@@ -131,8 +157,8 @@ const TransactionTable = ({
                       <span
                         className={
                           isInflow
-                            ? 'whitespace-nowrap text-sm font-semibold text-success-dark'
-                            : 'whitespace-nowrap text-sm font-semibold text-error'
+                            ? 'whitespace-nowrap text-sm font-semibold tabular-nums text-success-dark'
+                            : 'whitespace-nowrap text-sm font-semibold tabular-nums text-ink'
                         }
                       >
                         {sign}${Math.abs(transaction.amount).toFixed(2)}

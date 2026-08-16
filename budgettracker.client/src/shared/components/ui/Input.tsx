@@ -47,7 +47,7 @@ export interface InputProps<TFieldValues extends FieldValues> {
 }
 
 const CONTROL_CLASSES =
-  'focus-ring w-full rounded border border-border bg-surface text-body text-ink shadow-xs transition-colors duration-120 placeholder:text-ink-muted/70 hover:border-border-strong disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-muted';
+  'focus-ring w-full rounded-lg border border-border bg-surface text-[14px] text-ink shadow-xs transition-colors duration-120 placeholder:text-ink-muted/60 hover:border-border-strong disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-muted';
 
 const ERROR_CLASSES = 'border-error focus-visible:border-error focus-visible:ring-error/25';
 
@@ -144,7 +144,7 @@ const Input = <TFieldValues extends FieldValues>({
                   onChange={(event) => handleChange(event.target.value)}
                   className={cn(
                     CONTROL_CLASSES,
-                    'h-9 px-3',
+                    'h-10 px-3',
                     startAdornment && 'pl-9',
                     endAdornment && 'pr-9',
                     fieldState.error && ERROR_CLASSES,
