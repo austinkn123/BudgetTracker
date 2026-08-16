@@ -4,22 +4,22 @@ import { Sheet } from '../ui';
 import { useScrollDirection } from '../../hooks/useScrollDirection';
 import MobileNavPanel from './MobileNavPanel';
 import TopNav from './TopNav';
-import { MOBILE_NAV_WIDTH, NAV_HEIGHT, NAV_TOP_OFFSET } from './constants';
+import { MOBILE_NAV_WIDTH, NAV_HEIGHT_FULL, NAV_TOP_OFFSET } from './constants';
 
 /**
  * App shell for authenticated routes (BUD-14, BUD-20).
  *
- * A floating top nav overlays the content and slides away while you scroll
- * down, returning on the way up — a horizontal bar is the one thing that
- * genuinely reclaims vertical space by hiding.
+ * A floating top nav overlays the content and contracts to a compact icon
+ * pill while you scroll down, expanding again on the way up. It never leaves
+ * the screen, so navigation stays one click away at any scroll depth.
  */
 const AppShell = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { direction, atTop } = useScrollDirection();
 
-  // Never hide while the mobile sheet is open — the trigger must stay put.
-  const navHidden = direction === 'down' && !atTop && !mobileOpen;
+  // Stay expanded while the mobile sheet is open — the trigger must not move.
+  const navCompact = direction === 'down' && !atTop && !mobileOpen;
 
   // Close the mobile sheet whenever the route changes.
   useEffect(() => {
@@ -28,7 +28,7 @@ const AppShell = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <TopNav hidden={navHidden} onOpenMobileNav={() => setMobileOpen(true)} />
+      <TopNav compact={navCompact} onOpenMobileNav={() => setMobileOpen(true)} />
 
       <Sheet
         open={mobileOpen}
@@ -47,7 +47,8 @@ const AppShell = () => {
       <main className="min-w-0">
         <div
           className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8"
-          style={{ paddingTop: NAV_HEIGHT + NAV_TOP_OFFSET * 2 + 16 }}
+          // Clear the bar at its tallest so content never jumps as it morphs.
+          style={{ paddingTop: NAV_HEIGHT_FULL + NAV_TOP_OFFSET * 2 + 16 }}
         >
           <Outlet />
         </div>
