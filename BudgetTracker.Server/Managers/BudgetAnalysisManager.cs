@@ -22,10 +22,8 @@ public class BudgetAnalysisManager(
         var now = DateTime.UtcNow;
 
         // The window is an API concern, not a business one, so it is applied here.
-        // `to` is inclusive of its whole day.
-        var toExclusive = to.Date.AddDays(1);
         var windowTransactions = transactions
-            .Where(t => t.OccurredAt >= from.Date && t.OccurredAt < toExclusive)
+            .Where(t => t.OccurredAt >= from.Date && t.OccurredAt.Date <= to.Date)
             .ToList();
 
         var analysis = new BudgetAnalysis(
