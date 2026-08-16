@@ -23,7 +23,7 @@ const Sheet = ({ open, onClose, title, width = 240, className, children }: Sheet
       <RadixDialog.Overlay className="fixed inset-0 z-40 bg-ink/40 animate-fade-in" />
       <RadixDialog.Content
         className={cn(
-          'fixed inset-y-0 left-0 z-50 border-r border-border bg-surface shadow-lg data-[state=closed]:animate-slide-out-left data-[state=open]:animate-slide-in-left',
+          'fixed inset-y-0 left-0 z-50 shadow-lg data-[state=closed]:animate-slide-out-left data-[state=open]:animate-slide-in-left',
           className,
         )}
         style={{ width }}

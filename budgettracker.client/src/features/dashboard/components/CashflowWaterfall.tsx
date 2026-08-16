@@ -147,12 +147,20 @@ const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
       <ResponsiveContainer width="100%" height={320}>
         <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={withAlpha(semanticColors.ink, 0.08)} />
+          {/* Category names are long and collide at this width — truncate and
+              angle rather than dropping ticks, so every bar stays labelled. */}
           <XAxis
             dataKey="label"
             axisLine={false}
             tickLine={false}
             interval={0}
-            tick={{ fontSize: 11, fill: semanticColors.expense }}
+            height={64}
+            angle={-35}
+            textAnchor="end"
+            tickFormatter={(value: string) =>
+              value.length > 14 ? `${value.slice(0, 13)}…` : value
+            }
+            tick={{ fontSize: 10, fill: semanticColors.expense }}
           />
           <YAxis
             axisLine={false}

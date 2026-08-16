@@ -73,6 +73,16 @@ export default {
           DEFAULT: varRef('ink', colorTokens.neutral.textPrimary),
           muted: varRef('ink-muted', colorTokens.neutral.textSecondary),
         },
+        /**
+         * Neutral ramp. Structural surfaces only (the dark nav rail, chart
+         * gridlines) — for text and borders prefer the semantic tokens above.
+         */
+        grey: Object.fromEntries(
+          Object.entries(colorTokens.grey).map(([step, hex]) => [
+            step,
+            varRef(`grey-${step}`, hex),
+          ]),
+        ),
       },
       fontFamily: {
         sans: ['Inter', ...defaultTheme.fontFamily.sans],

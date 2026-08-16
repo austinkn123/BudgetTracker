@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { PageHeader } from '../../../shared/components/ui';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { useUser } from '../../user/hooks/useUser';
@@ -116,18 +117,19 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header row: title + range selector */}
-      <div className="flex flex-col gap-4 rounded-md border border-border bg-surface px-5 py-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Dashboard</h1>
-          {hero && (
-            <p className="mt-1 text-sm text-ink-muted">
+      <PageHeader
+        title="Dashboard"
+        description={
+          hero ? (
+            <>
               Tracking against <span className="font-semibold text-ink">{hero.plan.name}</span>
-            </p>
-          )}
-        </div>
-        <RangeSelector value={range} onChange={setRange} />
-      </div>
+            </>
+          ) : (
+            'Your financial position at a glance'
+          )
+        }
+        actions={<RangeSelector value={range} onChange={setRange} />}
+      />
 
       {/* Hero */}
       {hero ? (

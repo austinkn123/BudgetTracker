@@ -22,11 +22,9 @@ const AppShell = () => {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop: permanent sidebar */}
-      <aside
-        className="hidden shrink-0 border-r border-border lg:block"
-        style={{ width: SIDEBAR_WIDTH }}
-      >
+      {/* Desktop: permanent sidebar. bg on the <aside> too, so the rail still
+          reads as one column when the page scrolls past one viewport. */}
+      <aside className="hidden shrink-0 bg-grey-900 lg:block" style={{ width: SIDEBAR_WIDTH }}>
         <div className="sticky top-0 h-screen">
           <Sidebar />
         </div>

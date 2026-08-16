@@ -5,20 +5,20 @@ export type CardPadding = 'none' | 'sm' | 'md' | 'lg';
 export type CardVariant = 'outlined' | 'elevated' | 'plain';
 
 /**
- * Padding is a named token: MUI's spacing was 8px-based and Tailwind's is
- * 4px-based, so a numeric prop would be ambiguous at the API edge.
+ * Padding is a named token: a numeric prop would be ambiguous between
+ * Tailwind's 4px scale and the 8px design grid.
  */
-const PADDING_CLASSES: Record<CardPadding, { header: string; content: string; footer: string }> = {
-  none: { header: '', content: '', footer: '' },
-  sm: { header: 'px-4 pt-4', content: 'p-4', footer: 'px-4 pb-4' },
-  md: { header: 'px-6 pt-6', content: 'p-6', footer: 'px-6 pb-6' },
-  lg: { header: 'px-8 pt-8', content: 'p-8', footer: 'px-8 pb-8' },
+const PADDING: Record<CardPadding, { x: string; y: string }> = {
+  none: { x: '', y: '' },
+  sm: { x: 'px-4', y: 'py-4' },
+  md: { x: 'px-6', y: 'py-5' },
+  lg: { x: 'px-8', y: 'py-7' },
 };
 
 export interface CardProps {
   title?: ReactNode;
   subtitle?: ReactNode;
-  /** Header top-right slot, typically actions or a badge. */
+  /** Header trailing slot — actions, badges, legends. */
   actions?: ReactNode;
   footer?: ReactNode;
   padding?: CardPadding;
@@ -32,7 +32,13 @@ export interface CardProps {
   children: ReactNode;
 }
 
-/** Surface primitive (BUD-20): 1px border + micro-shadow, 8px radius. */
+/**
+ * Surface primitive (BUD-20).
+ *
+ * Hairline ring rather than a 1px border, a soft wide shadow for lift, and a
+ * separated header rule — the header reads as a distinct band instead of text
+ * floating above content.
+ */
 const Card = ({
   title,
   subtitle,
@@ -47,42 +53,54 @@ const Card = ({
   contentClassName,
   children,
 }: CardProps) => {
-  const pad = PADDING_CLASSES[padding];
+  const pad = PADDING[padding];
   const hasHeader = Boolean(title || subtitle || actions);
 
   const body = (
     <>
       {hasHeader && (
-        <div className={cn('flex items-start justify-between gap-4', pad.header, headerClassName)}>
+        <div
+          className={cn(
+            'flex items-center justify-between gap-4 border-b border-border-subtle',
+            pad.x,
+            padding === 'none' ? '' : 'py-4',
+            headerClassName,
+          )}
+        >
           <div className="min-w-0">
-            {title && <h2 className="text-base font-semibold text-ink">{title}</h2>}
-            {subtitle && <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>}
+            {title && (
+              <h2 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink">
+                {title}
+              </h2>
+            )}
+            {subtitle && <p className="mt-0.5 truncate text-[13px] text-ink-muted">{subtitle}</p>}
           </div>
-          {actions && <div className="shrink-0">{actions}</div>}
+          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
       )}
 
-      <div className={cn(pad.content, hasHeader && padding !== 'none' && 'pt-4', contentClassName)}>
-        {children}
-      </div>
+      <div className={cn(pad.x, pad.y, contentClassName)}>{children}</div>
 
-      {footer && <div className={cn(pad.footer)}>{footer}</div>}
+      {footer && (
+        <div className={cn('border-t border-border-subtle', pad.x, 'py-4')}>{footer}</div>
+      )}
     </>
   );
 
   return (
     <div
       className={cn(
-        'rounded-md',
-        variant === 'outlined' && 'border border-border bg-surface shadow-sm',
-        variant === 'elevated' && 'border border-border bg-surface shadow-md',
+        'rounded-xl',
+        variant === 'outlined' && 'bg-surface shadow-sm ring-1 ring-ink/[0.06]',
+        variant === 'elevated' && 'bg-surface shadow-md ring-1 ring-ink/[0.04]',
         variant === 'plain' && 'bg-transparent',
         fullHeight && 'h-full',
+        onClick && 'transition-shadow duration-160 ease-out-soft hover:shadow-md',
         className,
       )}
     >
       {onClick ? (
-        <button type="button" onClick={onClick} className="focus-ring block w-full rounded-md text-left">
+        <button type="button" onClick={onClick} className="focus-ring block w-full rounded-xl text-left">
           {body}
         </button>
       ) : (

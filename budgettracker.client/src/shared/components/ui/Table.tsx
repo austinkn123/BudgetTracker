@@ -52,21 +52,21 @@ const Table = <TRow,>({
   ariaLabel,
   className,
 }: TableProps<TRow>) => {
-  const cellPadding = size === 'small' ? 'px-3 py-2' : 'px-4 py-3';
+  const cellPadding = size === 'small' ? 'px-4 py-3' : 'px-4 py-4';
 
   return (
-    <div className={cn('overflow-x-auto', className)}>
-      <table aria-label={ariaLabel} className="w-full border-collapse text-sm">
+    <div className={cn('-mx-6 overflow-x-auto', className)}>
+      <table aria-label={ariaLabel} className="w-full border-collapse text-sm tabular-nums">
         <thead>
-          <tr className="border-b border-border">
+          <tr className="bg-background/60">
             {columns.map((column) => (
               <th
                 key={column.key}
                 scope="col"
                 style={{ width: column.width }}
                 className={cn(
-                  cellPadding,
-                  'whitespace-nowrap text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted',
+                  'px-4 py-2.5',
+                  'whitespace-nowrap border-y border-border-subtle text-2xs font-semibold uppercase tracking-[0.07em] text-ink-muted',
                   ALIGN_CLASSES[column.align ?? 'left'],
                 )}
               >
@@ -100,8 +100,7 @@ const Table = <TRow,>({
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn(
                   'border-b border-border-subtle last:border-b-0',
-                  onRowClick &&
-                    'cursor-pointer transition-colors duration-120 hover:bg-background',
+                  onRowClick && 'cursor-pointer transition-colors duration-120 hover:bg-primary/[0.03]',
                 )}
               >
                 {columns.map((column) => (

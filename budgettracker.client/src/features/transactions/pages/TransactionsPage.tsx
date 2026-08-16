@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PageHeader } from '../../../shared/components/ui';
 import { useTransactions } from '../hooks/useTransactions';
 import StatusBanner from '../../../shared/components/StatusBanner';
 import TransactionsSection from '../TransactionsSection';
@@ -10,12 +11,10 @@ const TransactionsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Transactions</h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          Browse your ledger by calendar day, then drill into that date to add or edit transactions
-        </p>
-      </div>
+      <PageHeader
+        title="Transactions"
+        description="Browse your ledger by calendar day, then drill into that date to add or edit transactions"
+      />
 
       <StatusBanner statusMessage={statusMessage} statusError={statusError} />
 

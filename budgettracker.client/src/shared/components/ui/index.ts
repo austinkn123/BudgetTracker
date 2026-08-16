@@ -39,6 +39,9 @@ export type { GaugeProps } from './Gauge';
 export { default as Input } from './Input';
 export type { InputProps, InputType, InputValueAs } from './Input';
 
+export { default as PageHeader } from './PageHeader';
+export type { PageHeaderProps } from './PageHeader';
+
 export { default as Modal } from './Modal';
 export type { ModalMaxWidth, ModalProps } from './Modal';
 
