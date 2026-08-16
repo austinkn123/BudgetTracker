@@ -1,5 +1,5 @@
 /**
- * Display helpers for the sidebar account footer (BUD-14).
+ * Display helpers for the nav account cluster (BUD-14).
  *
  * The app has no display name and no avatar URL — Cognito collects
  * given_name/family_name at sign-up but never reads them back — so the footer

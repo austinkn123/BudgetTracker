@@ -129,7 +129,8 @@ const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
     <Card
       title="Cashflow Waterfall"
       actions={
-        <div className="flex flex-wrap items-center gap-3">
+        // Hidden on narrow screens: the legend would crowd the title out.
+        <div className="hidden flex-wrap items-center gap-3 sm:flex">
           {LEGEND.map((entry) => (
             <span key={entry.label} className="flex items-center gap-1.5 text-xs text-ink-muted">
               <span
