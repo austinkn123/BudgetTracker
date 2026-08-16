@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfDay, startOfMonth } from 'date-fns';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import { Plus } from 'lucide-react';
 import { Badge, Button, Card } from '../../shared/components/ui';
 import { useTransactions } from './hooks/useTransactions';
@@ -84,20 +82,20 @@ const TransactionsSection = ({
 
   return (
     <>
-      <Stack spacing={2.5}>
+      <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <Typography variant="body2" color="text.secondary">
+            <p className="text-sm text-ink-muted">
               {visibleMonthSummary.label} has {visibleMonthSummary.transactionCount}{' '}
               {visibleMonthSummary.transactionCount === 1 ? 'transaction' : 'transactions'} across{' '}
               {visibleMonthSummary.activeDayCount} active{' '}
               {visibleMonthSummary.activeDayCount === 1 ? 'day' : 'days'}.
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
+            </p>
+            <span className="text-xs text-ink-muted">
               Select a day on the calendar to inspect that ledger slice or start a new entry.
-            </Typography>
+            </span>
           </div>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
+          <div className="flex flex-col gap-2.5 sm:flex-row">
             <Button variant="secondary" onClick={handleToday}>
               Today
             </Button>
@@ -107,11 +105,11 @@ const TransactionsSection = ({
             >
               Add Transaction
             </Button>
-          </Stack>
+          </div>
         </div>
 
         <Card padding="sm">
-          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.25} useFlexGap flexWrap="wrap">
+          <div className="flex flex-col flex-wrap gap-2.5 lg:flex-row">
             <Badge label={`Selected ${format(selectedDate, 'PP')}`} color="primary" variant="outline" />
             <Badge label={`Income $${visibleMonthSummary.incomeTotal.toFixed(2)}`} color="success" variant="outline" />
             <Badge label={`Outflow $${visibleMonthSummary.outflowTotal.toFixed(2)}`} color="error" variant="outline" />
@@ -119,7 +117,7 @@ const TransactionsSection = ({
               label={`Net ${visibleMonthSummary.netTotal >= 0 ? '+' : '-'}$${Math.abs(visibleMonthSummary.netTotal).toFixed(2)}`}
               color={visibleMonthSummary.netTotal >= 0 ? 'success' : 'error'}
             />
-          </Stack>
+          </div>
         </Card>
 
         <Card padding="none">
@@ -135,7 +133,7 @@ const TransactionsSection = ({
             onRowClick={form.openForEdit}
           />
         </Card>
-      </Stack>
+      </div>
 
       <TransactionDialog
         open={form.dialogOpen}

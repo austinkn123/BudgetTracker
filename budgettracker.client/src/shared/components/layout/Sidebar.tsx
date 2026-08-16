@@ -1,25 +1,15 @@
 import { NavLink } from 'react-router-dom';
-import Avatar from '@mui/material/Avatar';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Skeleton from '@mui/material/Skeleton';
-import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
 import { LogOut, User, Wallet } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../../features/user/hooks/useUser';
 import { useSignOut } from '../../hooks/useSignOut';
+import { Avatar, Button, Separator, Skeleton, Tooltip } from '../ui';
+import { cn } from '../../utils/cn';
 import { NAV_ITEMS } from './navItems';
 import { getAccountLabel, getInitials } from './userIdentity';
 
 export interface SidebarProps {
-  /** Called after a nav link is followed, so AppShell can close the mobile drawer. */
+  /** Called after a nav link is followed, so AppShell can close the mobile sheet. */
   onNavigate?: () => void;
 }
 
@@ -35,112 +25,75 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
   const initials = getInitials(email);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: 'background.paper' }}>
+    <div className="flex h-full flex-col bg-surface">
       {/* Brand */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, py: 2.5 }}>
-        <Box sx={{ display: 'flex', color: 'primary.main' }}>
+      <div className="flex items-center gap-3 px-5 py-5">
+        <span className="flex text-primary">
           <Wallet size={24} />
-        </Box>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
-          BudgetTracker
-        </Typography>
-      </Box>
+        </span>
+        <span className="text-base font-semibold tracking-tight text-ink">BudgetTracker</span>
+      </div>
 
-      <Divider />
+      <Separator />
 
       {/* Primary navigation */}
-      <List component="nav" aria-label="Main navigation" sx={{ flexGrow: 1, px: 1.5, py: 2 }}>
-        {NAV_ITEMS.map((item) => (
-          <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
-            <ListItemButton
-              component={NavLink}
-              to={item.path}
-              end={item.end}
-              onClick={onNavigate}
-              sx={{
-                borderRadius: 2,
-                px: 1.5,
-                py: 1,
-                color: 'text.secondary',
-                '&:hover': { bgcolor: 'grey.100' },
-                // NavLink adds `.active` itself, and sets aria-current="page".
-                '&.active': {
-                  bgcolor: 'primary.subtle',
-                  color: 'primary.main',
-                  '&:hover': { bgcolor: 'primary.subtle' },
-                  '& .MuiListItemIcon-root': { color: 'primary.main' },
-                  '& .MuiListItemText-primary': { fontWeight: 600 },
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
-                <item.icon size={20} />
-              </ListItemIcon>
-              <ListItemText primary={item.label} slotProps={{ primary: { fontSize: '0.9375rem' } }} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
+      <nav aria-label="Main navigation" className="flex-1 px-3 py-4">
+        <ul className="flex flex-col gap-1">
+          {NAV_ITEMS.map((item) => (
+            <li key={item.path}>
+              <NavLink
+                to={item.path}
+                end={item.end}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    'focus-ring flex items-center gap-3 rounded px-3 py-2 text-sm font-medium text-ink-muted transition-colors duration-120',
+                    'hover:bg-border-subtle hover:text-ink',
+                    isActive && 'bg-primary-subtle font-semibold text-primary hover:bg-primary-subtle hover:text-primary',
+                  )
+                }
+              >
+                <item.icon size={18} className="shrink-0" />
+                {item.label}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-      <Divider />
+      <Separator />
 
       {/* Account footer */}
-      <Box sx={{ px: 2, py: 2 }}>
+      <div className="flex flex-col gap-3 px-4 py-4">
         {loadingUser ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+          <div className="flex items-center gap-3">
             <Skeleton variant="circular" width={36} height={36} />
-            <Skeleton variant="text" width={130} height={20} />
-          </Box>
+            <Skeleton width={130} height={16} />
+          </div>
         ) : (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, minWidth: 0 }}>
-            <Avatar
-              sx={{
-                width: 36,
-                height: 36,
-                fontSize: '0.8125rem',
-                fontWeight: 600,
-                bgcolor: 'primary.subtle',
-                color: 'primary.main',
-              }}
-            >
-              {initials || <User size={18} />}
-            </Avatar>
-            <Tooltip title={accountLabel} placement="top">
-              <Typography
-                variant="body2"
-                sx={{
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  color: 'text.secondary',
-                }}
-              >
-                {accountLabel}
-              </Typography>
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar>{initials || <User size={18} />}</Avatar>
+            <Tooltip title={accountLabel}>
+              <span className="min-w-0 truncate text-sm text-ink-muted">{accountLabel}</span>
             </Tooltip>
-          </Box>
+          </div>
         )}
 
-        {error && (
-          <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'error.main' }}>
-            {error}
-          </Typography>
-        )}
+        {error && <span className="block text-xs text-error">{error}</span>}
 
         <Button
+          variant="destructive-ghost"
+          size="sm"
           fullWidth
-          variant="outlined"
-          color="error"
-          size="small"
           startIcon={<LogOut size={16} />}
           onClick={signOut}
-          disabled={isSigningOut}
+          loading={isSigningOut}
+          className="border-error/30"
         >
           {isSigningOut ? 'Signing out…' : 'Sign out'}
         </Button>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 };
 

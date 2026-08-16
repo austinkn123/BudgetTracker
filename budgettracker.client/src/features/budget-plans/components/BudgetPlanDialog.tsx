@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
-import Box from '@mui/material/Box';
-import Checkbox from '@mui/material/Checkbox';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  Checkbox,
   ConfirmModal,
   Input,
   Modal,
@@ -77,15 +75,13 @@ const BudgetPlanDialog = ({
           />
         }
       >
-        <Box
-          sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}
-        >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
             control={control}
             name="name"
             label="Plan Name"
             required
-            sx={{ gridColumn: { sm: '1 / -1' } }}
+            className="sm:col-span-2"
           />
           <Input control={control} name="planMonth" label="Plan Month" type="month" required />
           <Input
@@ -98,23 +94,9 @@ const BudgetPlanDialog = ({
             step="0.01"
             required
           />
-        </Box>
+        </div>
 
-        <Controller
-          name="isActive"
-          control={control}
-          render={({ field }) => (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={field.value}
-                  onChange={(event) => field.onChange(event.target.checked)}
-                />
-              }
-              label="Set as active budget plan"
-            />
-          )}
-        />
+        <Checkbox control={control} name="isActive" label="Set as active budget plan" />
       </Modal>
 
       <ConfirmModal

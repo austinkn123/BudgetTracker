@@ -49,14 +49,14 @@ describe('colorTokens', () => {
 
 describe('color helpers', () => {
   it('converts hex to space-separated rgb channels', () => {
-    expect(hexToChannels('#1E6FD9')).toBe('30 111 217');
+    expect(hexToChannels('#635BFF')).toBe('99 91 255');
     expect(hexToChannels('#FFFFFF')).toBe('255 255 255');
     expect(hexToChannels('#fff')).toBe('255 255 255');
   });
 
   it('produces hash-free alpha colors (hex-audit safe)', () => {
     const result = withAlpha(colorTokens.primary.main, 0.14);
-    expect(result).toBe('rgb(30 111 217 / 0.14)');
+    expect(result).toBe(`rgb(${hexToChannels(colorTokens.primary.main)} / 0.14)`);
     expect(result).not.toContain('#');
   });
 });

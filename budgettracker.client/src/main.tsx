@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { BrowserRouter } from 'react-router-dom'
-import { ThemeProvider } from '@mui/material/styles'
 import { Provider as TooltipProvider } from '@radix-ui/react-tooltip'
 // Self-hosted Inter (BUD-13) — no external font request, works offline.
 import '@fontsource/inter/400.css'
@@ -15,7 +14,6 @@ import '@fontsource/inter/700.css'
 import './index.css'
 import './auth/amplifyConfig'
 import { AuthProvider } from './auth/AuthContext'
-import { budgetTrackerTheme } from './shared/theme/theme'
 import App from './App.tsx'
 
 const queryClient = new QueryClient({
@@ -32,12 +30,9 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
-          {/* ThemeProvider remains until MUI teardown (BUD-20 Phase 6). */}
-          <ThemeProvider theme={budgetTrackerTheme}>
-            <TooltipProvider delayDuration={200}>
-              <App />
-            </TooltipProvider>
-          </ThemeProvider>
+          <TooltipProvider delayDuration={200}>
+            <App />
+          </TooltipProvider>
           {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
         </QueryClientProvider>
       </AuthProvider>

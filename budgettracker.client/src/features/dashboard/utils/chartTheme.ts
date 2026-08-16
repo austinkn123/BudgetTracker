@@ -1,11 +1,12 @@
-import { alpha, type Theme } from '@mui/material/styles';
+import { colorTokens, withAlpha } from '../../../shared/theme/tokens';
 
 /**
- * Semantic colors derived from the BudgetTracker MUI theme (BUD-13 tokens).
+ * Semantic colors for charts (BUD-13 tokens, de-themed in BUD-20).
  * Use these to color charts by meaning rather than by sequence.
  *
- * Every value resolves through `theme.palette`, which is built from
- * src/shared/theme/tokens.ts — so editing tokens.ts propagates here.
+ * Module-level consts reading tokens.ts directly — no theme context needed,
+ * and referential stability comes free (the old getter-per-render pattern
+ * broke useMemo deps downstream).
  */
 export interface SemanticColors {
   /** Positive money in (income, net surplus). Success green. */
@@ -22,47 +23,34 @@ export interface SemanticColors {
   ink: string;
 }
 
-/**
- * Build the semantic-color map from the active theme.
- * Returns stable hex/rgba strings so they can be handed directly to chart components.
- */
-export const getSemanticColors = (theme: Theme): SemanticColors => ({
-  income: theme.palette.success.main,
-  expense: theme.palette.text.secondary,
-  overspend: theme.palette.warning.main,
-  neutral: theme.palette.secondary.main,
-  surface: theme.palette.background.default,
-  ink: theme.palette.text.primary,
-});
-
-/**
- * An ordered set of category colors for charts that render multiple series.
- * Derived from the theme palette (brand blue, warning amber, accent teal,
- * structural slate) plus 65% tints of each so the sequence stays harmonious
- * with the rest of the UI. Ordered so adjacent series differ in hue and
- * lightness. Success green is deliberately excluded — it is reserved for the
- * `income` semantic and would mislead in a categorical sequence.
- */
-export const getChartPalette = (theme: Theme): string[] => {
-  const brand = theme.palette.primary.main;
-  const amber = theme.palette.warning.main;
-  const teal = theme.palette.secondary.main;
-  const slate = theme.palette.grey[600];
-
-  return [
-    brand,
-    amber,
-    teal,
-    slate,
-    alpha(brand, 0.65),
-    alpha(amber, 0.65),
-    alpha(teal, 0.65),
-    alpha(slate, 0.65),
-  ];
+export const semanticColors: SemanticColors = {
+  income: colorTokens.success.main,
+  expense: colorTokens.neutral.textSecondary,
+  overspend: colorTokens.warning.main,
+  neutral: colorTokens.secondary.main,
+  surface: colorTokens.neutral.background,
+  ink: colorTokens.neutral.textPrimary,
 };
 
 /**
- * Build a linear-gradient CSS string between two theme colors.
+ * An ordered set of category colors for charts that render multiple series.
+ * Brand blue, warning amber, accent teal, structural slate, plus 65% tints of
+ * each so the sequence stays harmonious. Success green is deliberately
+ * excluded — it is reserved for the `income` semantic.
+ */
+export const chartPalette: readonly string[] = [
+  colorTokens.primary.main,
+  colorTokens.warning.main,
+  colorTokens.secondary.main,
+  colorTokens.grey[600],
+  withAlpha(colorTokens.primary.main, 0.65),
+  withAlpha(colorTokens.warning.main, 0.65),
+  withAlpha(colorTokens.secondary.main, 0.65),
+  withAlpha(colorTokens.grey[600], 0.65),
+];
+
+/**
+ * Build a linear-gradient CSS string between two token colors.
  * Useful for hero card backgrounds.
  */
 export const buildGradient = (
@@ -72,18 +60,14 @@ export const buildGradient = (
   toAlpha: number = 0.5,
   angle: number = 160,
 ): string =>
-  `linear-gradient(${angle}deg, ${alpha(fromColor, fromAlpha)} 0%, ${alpha(toColor, toAlpha)} 100%)`;
+  `linear-gradient(${angle}deg, ${withAlpha(fromColor, fromAlpha)} 0%, ${withAlpha(toColor, toAlpha)} 100%)`;
 
 /**
- * Convenience wrapper that returns gradient + border tones in one call
- * for hero/featured card styling.
+ * Hero surface (BUD-20): deep navy with a barely-there indigo wash. The old
+ * mint-green gradient was the least on-brand element in the app — a dark hero
+ * against light cards is what gives the dashboard a focal point.
  */
-export const getHeroSurface = (theme: Theme): { background: string; border: string } => ({
-  background: buildGradient(
-    theme.palette.background.default,
-    theme.palette.secondary.main,
-    0.9,
-    0.5,
-  ),
-  border: alpha(theme.palette.primary.main, 0.45),
-});
+export const heroSurface: { background: string; border: string } = {
+  background: `linear-gradient(135deg, ${colorTokens.grey[900]} 0%, ${colorTokens.grey[800]} 55%, ${withAlpha(colorTokens.primary.dark, 0.85)} 100%)`,
+  border: 'transparent',
+};

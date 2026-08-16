@@ -1,10 +1,8 @@
-import Box from '@mui/material/Box';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo } from 'react';
 import {
+  Checkbox,
   Input,
   Modal,
   ModalActions,
@@ -90,7 +88,7 @@ const PlanLineDialog = ({
         />
       }
     >
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select
           control={control}
           name="categoryId"
@@ -111,25 +109,11 @@ const PlanLineDialog = ({
         />
         <Select control={control} name="bucket" label="Bucket" options={BUCKET_OPTIONS} />
         <Select control={control} name="cadence" label="Cadence" options={CADENCE_OPTIONS} />
-      </Box>
+      </div>
 
       <Input control={control} name="notes" label="Notes" multiline rows={2} />
 
-      <Controller
-        name="isStressFactor"
-        control={control}
-        render={({ field }) => (
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={field.value}
-                onChange={(event) => field.onChange(event.target.checked)}
-              />
-            }
-            label="Stress Factor"
-          />
-        )}
-      />
+      <Checkbox control={control} name="isStressFactor" label="Stress Factor" />
     </Modal>
   );
 };

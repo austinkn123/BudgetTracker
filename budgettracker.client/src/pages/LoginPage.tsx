@@ -2,9 +2,6 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
 import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import { loginSchema, type LoginFormData } from '../shared/validation/auth';
@@ -39,29 +36,18 @@ const LoginPage = () => {
   });
 
   return (
-    <Box
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      minHeight="100vh"
-      bgcolor="background.default"
-      p={2}
-    >
-      <Card padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
-        <Stack spacing={3}>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card padding="lg" className="w-full max-w-[400px]">
+        <div className="flex flex-col gap-6">
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
-              Sign In
-            </Typography>
-            <Typography variant="body2" className="text-ink-muted">
-              Welcome back to BudgetTracker
-            </Typography>
+            <h1 className="mb-2 text-2xl font-semibold tracking-tight text-ink">Sign In</h1>
+            <p className="text-sm text-ink-muted">Welcome back to BudgetTracker</p>
           </div>
 
           {error && <Alert severity="error" message={error} />}
 
           <form onSubmit={onSubmit}>
-            <Stack spacing={3}>
+            <div className="flex flex-col gap-5">
               <Input
                 control={control}
                 name="email"
@@ -83,25 +69,25 @@ const LoginPage = () => {
               <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                 {isSubmitting ? 'Signing In...' : 'Sign In'}
               </Button>
-            </Stack>
+            </div>
           </form>
 
-          <Stack spacing={2}>
-            <Typography variant="body2" className="text-center text-ink-muted">
+          <div className="flex flex-col gap-3">
+            <p className="text-center text-sm text-ink-muted">
               Don't have an account?{' '}
               <Link to="/signup" className="font-semibold text-primary hover:text-primary-dark">
                 Sign up
               </Link>
-            </Typography>
-            <Typography variant="body2" className="text-center text-ink-muted">
+            </p>
+            <p className="text-center text-sm text-ink-muted">
               <Link to="/forgot" className="font-semibold text-primary hover:text-primary-dark">
                 Forgot password?
               </Link>
-            </Typography>
-          </Stack>
-        </Stack>
+            </p>
+          </div>
+        </div>
       </Card>
-    </Box>
+    </div>
   );
 };
 

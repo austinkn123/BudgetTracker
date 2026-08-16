@@ -1,6 +1,4 @@
 import { useMemo } from 'react';
-import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +11,7 @@ import {
   Modal,
   ModalActions,
   Select,
+  Tooltip,
 } from '../../shared/components/ui';
 import type { Category } from '../../shared/types/api';
 import { categorySchema, type CategoryFormValues } from '../../shared/validation/categorySchema';
@@ -179,9 +178,7 @@ const CategoriesSection = ({
     >
       <>
         {categories.length === 0 ? (
-          <Typography color="text.secondary" fontStyle="italic">
-            No categories found
-          </Typography>
+          <p className="text-body italic text-ink-muted">No categories found</p>
         ) : (
           <div className="space-y-3">
             {GROUPS.map((group) => {
@@ -189,17 +186,17 @@ const CategoriesSection = ({
               if (!items || items.length === 0) return null;
               return (
                 <div key={group.type}>
-                  <Typography variant="caption" color="text.secondary" className="mb-1 block">
+                  <span className="mb-1.5 block text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
                     {group.label}
-                  </Typography>
+                  </span>
                   <div className="flex flex-wrap gap-1">
                     {items.map((cat) => {
                       const usage = getUsage(cat.id);
                       const tooltipLabel = `Used in ${usage.transactions} transaction${usage.transactions === 1 ? '' : 's'} and ${usage.planEntries} budget plan entr${usage.planEntries === 1 ? 'y' : 'ies'}`;
 
                       return (
-                        <Tooltip key={cat.id} title={tooltipLabel} arrow>
-                          <span>
+                        <Tooltip key={cat.id} title={tooltipLabel}>
+                          <span className="inline-flex">
                             <Badge
                               label={`${cat.name} (${usage.total})`}
                               color={group.color}

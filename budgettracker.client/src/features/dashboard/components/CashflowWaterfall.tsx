@@ -1,10 +1,20 @@
-import Typography from '@mui/material/Typography';
-import { BarChart } from '@mui/x-charts/BarChart';
-import { useTheme } from '@mui/material/styles';
-import Card from '../../../shared/components/ui/Card';
 import { useMemo } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import type { TooltipContentProps } from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import Card from '../../../shared/components/ui/Card';
+import { withAlpha } from '../../../shared/theme/tokens';
 import type { WaterfallBar } from '../utils/selectors';
-import { getSemanticColors } from '../utils/chartTheme';
+import { semanticColors } from '../utils/chartTheme';
 
 interface CashflowWaterfallProps {
   /** Ordered bars: income → top expense categories → Other → net. */
@@ -18,133 +28,133 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
+interface WaterfallRow {
+  label: string;
+  base: number;
+  income: number | null;
+  expense: number | null;
+  netPositive: number | null;
+  netNegative: number | null;
+}
+
+/** Signed tooltip line per visible series. */
+const SERIES_SIGNS: Record<string, string> = {
+  Income: '+',
+  Expense: '-',
+  'Net surplus': '+',
+  'Net deficit': '-',
+};
+
+const WaterfallTooltip = ({ active, payload, label }: TooltipContentProps<ValueType, NameType>) => {
+  if (!active || !payload?.length) return null;
+  // Hide the transparent float series.
+  const visible = payload.filter((entry) => entry.name !== 'base' && entry.value != null);
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="rounded border border-border bg-surface px-3 py-2 text-sm shadow-md">
+      <p className="mb-1 font-semibold text-ink">{label}</p>
+      {visible.map((entry) => (
+        <p key={String(entry.name)} className="text-ink-muted">
+          {entry.name}: {SERIES_SIGNS[String(entry.name)] ?? ''}
+          {currency.format(Math.abs(Number(entry.value ?? 0)))}
+        </p>
+      ))}
+    </div>
+  );
+};
+
 /**
- * Pseudo-waterfall built on `BarChart`. We split the value column into three
- * stacked series (income, expense, net) so each gets a single color via
- * `series.color`, then push a transparent "base" series to float the bars
- * to their proper running-total position.
+ * Pseudo-waterfall on Recharts (BUD-20). The value column is split into
+ * stacked series so each gets one color, with a transparent "base" series
+ * floating bars to their running-total position.
  */
 const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
-  const theme = useTheme();
-  const semantic = getSemanticColors(theme);
-
-  const chartData = useMemo(() => {
+  const rows = useMemo<WaterfallRow[] | null>(() => {
     if (items.length === 0) {
       return null;
     }
-    const bases: number[] = [];
-    const incomeData: (number | null)[] = [];
-    const expenseData: (number | null)[] = [];
-    const netPositive: (number | null)[] = [];
-    const netNegative: (number | null)[] = [];
 
     let running = 0;
-    for (const item of items) {
+    return items.map((item) => {
       if (item.kind === 'net') {
-        bases.push(item.signed >= 0 ? 0 : item.signed);
-        incomeData.push(null);
-        expenseData.push(null);
-        if (item.signed >= 0) {
-          netPositive.push(item.value);
-          netNegative.push(null);
-        } else {
-          netPositive.push(null);
-          netNegative.push(item.value);
-        }
-        continue;
+        return {
+          label: item.label,
+          base: item.signed >= 0 ? 0 : item.signed,
+          income: null,
+          expense: null,
+          netPositive: item.signed >= 0 ? item.value : null,
+          netNegative: item.signed >= 0 ? null : item.value,
+        };
       }
 
       if (item.kind === 'income') {
-        bases.push(running);
-        incomeData.push(item.value);
-        expenseData.push(null);
-        netPositive.push(null);
-        netNegative.push(null);
+        const row: WaterfallRow = {
+          label: item.label,
+          base: running,
+          income: item.value,
+          expense: null,
+          netPositive: null,
+          netNegative: null,
+        };
         running += item.value;
-      } else {
-        const newRunning = running - item.value;
-        bases.push(newRunning);
-        incomeData.push(null);
-        expenseData.push(item.value);
-        netPositive.push(null);
-        netNegative.push(null);
-        running = newRunning;
+        return row;
       }
-    }
 
-    return { bases, incomeData, expenseData, netPositive, netNegative };
+      running -= item.value;
+      return {
+        label: item.label,
+        base: running,
+        income: null,
+        expense: item.value,
+        netPositive: null,
+        netNegative: null,
+      };
+    });
   }, [items]);
 
-  if (!chartData) {
+  if (!rows) {
     return (
       <Card
         title="Cashflow Waterfall"
         fullHeight
-        contentSx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: 320,
-        }}
+        contentClassName="flex min-h-[320px] items-center justify-center"
       >
-        <Typography variant="body2" color="text.secondary">
-          No transactions yet this plan month
-        </Typography>
+        <p className="text-sm text-ink-muted">No transactions yet this plan month</p>
       </Card>
     );
   }
 
-  const labels = items.map((i) => i.label);
-
   return (
     <Card title="Cashflow Waterfall" fullHeight>
-      <BarChart
-          height={320}
-          xAxis={[{ data: labels, scaleType: 'band' }]}
-          series={[
-            {
-              data: chartData.bases,
-              stack: 'waterfall',
-              color: 'transparent',
-              label: 'base',
-              valueFormatter: () => null,
-            },
-            {
-              data: chartData.incomeData,
-              stack: 'waterfall',
-              color: semantic.income,
-              label: 'Income',
-              valueFormatter: (v) => (v == null ? '' : `+${currency.format(v)}`),
-            },
-            {
-              data: chartData.expenseData,
-              stack: 'waterfall',
-              color: semantic.expense,
-              label: 'Expense',
-              valueFormatter: (v) => (v == null ? '' : `-${currency.format(v)}`),
-            },
-            {
-              data: chartData.netPositive,
-              stack: 'waterfall',
-              color: semantic.income,
-              label: 'Net surplus',
-              valueFormatter: (v) => (v == null ? '' : `+${currency.format(v)}`),
-            },
-            {
-              data: chartData.netNegative,
-              stack: 'waterfall',
-              color: semantic.overspend,
-              label: 'Net deficit',
-              valueFormatter: (v) => (v == null ? '' : `-${currency.format(v)}`),
-            },
-          ]}
-          slotProps={{
-            legend: {
-              direction: 'horizontal',
-              position: { vertical: 'top', horizontal: 'center' },
-            },
-          }}
-        />
+      <ResponsiveContainer width="100%" height={320}>
+        <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke={withAlpha(semanticColors.ink, 0.08)} />
+          <XAxis
+            dataKey="label"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 12, fill: semanticColors.expense }}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 12, fill: semanticColors.expense }}
+            tickFormatter={(value: number) => currency.format(value)}
+            width={72}
+          />
+          <Tooltip
+            content={WaterfallTooltip}
+            cursor={{ fill: withAlpha(semanticColors.ink, 0.04) }}
+          />
+          <Legend verticalAlign="top" align="center" iconType="circle" iconSize={8} />
+          <Bar dataKey="base" stackId="w" fill="transparent" legendType="none" isAnimationActive={false} />
+          <Bar dataKey="income" stackId="w" fill={semanticColors.income} name="Income" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="expense" stackId="w" fill={semanticColors.expense} name="Expense" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="netPositive" stackId="w" fill={semanticColors.income} name="Net surplus" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="netNegative" stackId="w" fill={semanticColors.overspend} name="Net deficit" radius={[3, 3, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
     </Card>
   );
 };

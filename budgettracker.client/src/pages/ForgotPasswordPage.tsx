@@ -2,9 +2,6 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
 import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import {
@@ -82,25 +79,16 @@ const ForgotPasswordPage = () => {
   });
 
   return (
-    <Box
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      minHeight="100vh"
-      bgcolor="background.default"
-      p={2}
-    >
-      <Card padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
-        <Stack spacing={3}>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card padding="lg" className="w-full max-w-[400px]">
+        <div className="flex flex-col gap-6">
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
-              Reset Password
-            </Typography>
-            <Typography variant="body2" className="text-ink-muted">
+            <h1 className="mb-2 text-2xl font-semibold tracking-tight text-ink">Reset Password</h1>
+            <p className="text-sm text-ink-muted">
               {step === 'request'
                 ? 'Enter your email to receive a reset code'
                 : `Confirm the code sent to ${email}`}
-            </Typography>
+            </p>
           </div>
 
           {error && <Alert severity="error" message={error} />}
@@ -108,7 +96,7 @@ const ForgotPasswordPage = () => {
 
           {step === 'request' ? (
             <form onSubmit={handleRequestCode}>
-              <Stack spacing={3}>
+              <div className="flex flex-col gap-5">
                 <Input
                   control={requestForm.control}
                   name="email"
@@ -121,11 +109,11 @@ const ForgotPasswordPage = () => {
                 <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                   {isSubmitting ? 'Sending Code...' : 'Send Reset Code'}
                 </Button>
-              </Stack>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleResetPassword}>
-              <Stack spacing={3}>
+              <div className="flex flex-col gap-5">
                 <Input
                   control={resetForm.control}
                   name="code"
@@ -158,18 +146,18 @@ const ForgotPasswordPage = () => {
                 <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                   {isSubmitting ? 'Resetting Password...' : 'Reset Password'}
                 </Button>
-              </Stack>
+              </div>
             </form>
           )}
 
-          <Typography variant="body2" className="text-center text-ink-muted">
+          <p className="text-center text-sm text-ink-muted">
             <Link to="/login" className="font-semibold text-primary hover:text-primary-dark">
               Back to Sign In
             </Link>
-          </Typography>
-        </Stack>
+          </p>
+        </div>
       </Card>
-    </Box>
+    </div>
   );
 };
 

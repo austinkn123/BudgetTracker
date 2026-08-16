@@ -1,9 +1,7 @@
-import Typography from '@mui/material/Typography';
-import Box from '@mui/material/Box';
-import { alpha, useTheme } from '@mui/material/styles';
 import Card from '../../../shared/components/ui/Card';
+import { withAlpha } from '../../../shared/theme/tokens';
 import type { SpendSlice } from '../utils/selectors';
-import { getChartPalette, getSemanticColors } from '../utils/chartTheme';
+import { chartPalette, semanticColors } from '../utils/chartTheme';
 
 interface WhereItWentProps {
   /** Window-scoped expense totals, already ranked with a trailing "Other". */
@@ -18,64 +16,40 @@ const currency = new Intl.NumberFormat('en-US', {
 });
 
 const WhereItWent = ({ rows }: WhereItWentProps) => {
-  const theme = useTheme();
-  const palette = getChartPalette(theme);
-  const semantic = getSemanticColors(theme);
-
   const max = rows.reduce((m, r) => Math.max(m, r.value), 0);
 
   return (
     <Card title="Where It Went" fullHeight>
-      <>
-        {rows.length === 0 ? (
-          <Box className="flex items-center justify-center" sx={{ minHeight: 240 }}>
-            <Typography variant="body2" color="text.secondary">
-              No expenses in this range
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {rows.map((row, idx) => {
-              const pct = max > 0 ? (row.value / max) * 100 : 0;
-              const color = row.key === 'other' ? semantic.neutral : palette[idx % palette.length];
-              return (
-                <Box key={row.key}>
-                  <Box className="flex items-baseline justify-between">
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: 600, color: semantic.ink }}
-                    >
-                      {row.label}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: semantic.expense }}>
-                      {currency.format(row.value)}
-                    </Typography>
-                  </Box>
-                  <Box
-                    sx={{
-                      mt: 0.5,
-                      height: 10,
-                      borderRadius: 5,
-                      backgroundColor: alpha(semantic.neutral, 0.3),
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: `${pct}%`,
-                        height: '100%',
-                        backgroundColor: color,
-                        borderRadius: 5,
-                        transition: 'width 240ms ease',
-                      }}
-                    />
-                  </Box>
-                </Box>
-              );
-            })}
-          </Box>
-        )}
-      </>
+      {rows.length === 0 ? (
+        <div className="flex min-h-[240px] items-center justify-center">
+          <p className="text-sm text-ink-muted">No expenses in this range</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {rows.map((row, idx) => {
+            const pct = max > 0 ? (row.value / max) * 100 : 0;
+            const color =
+              row.key === 'other' ? semanticColors.neutral : chartPalette[idx % chartPalette.length];
+            return (
+              <div key={row.key}>
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-semibold text-ink">{row.label}</p>
+                  <span className="text-xs text-ink-muted">{currency.format(row.value)}</span>
+                </div>
+                <div
+                  className="mt-1 h-2.5 overflow-hidden rounded-full"
+                  style={{ backgroundColor: withAlpha(semanticColors.neutral, 0.3) }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-240 ease-out-soft"
+                    style={{ width: `${pct}%`, backgroundColor: color }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 };

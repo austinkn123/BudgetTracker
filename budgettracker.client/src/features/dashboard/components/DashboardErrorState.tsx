@@ -1,4 +1,3 @@
-import Typography from '@mui/material/Typography';
 import Alert from '../../../shared/components/ui/Alert';
 
 type DashboardErrorStateProps = {
@@ -29,9 +28,9 @@ const DashboardErrorState = ({
         message="We couldn't reach the API. Check that the server and database are running."
       >
         {failures.map(({ label, error }) => (
-          <Typography key={label} variant="caption" sx={{ display: 'block', mt: 1 }}>
+          <span key={label} className="mt-2 block text-xs">
             {label}: {String(error)}
-          </Typography>
+          </span>
         ))}
       </Alert>
     </div>

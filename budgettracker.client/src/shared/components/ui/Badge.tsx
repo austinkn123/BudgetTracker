@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -48,6 +48,8 @@ export interface BadgeProps {
   onDelete?: () => void;
   title?: string;
   className?: string;
+  /** For token-derived runtime colors (e.g. per-category chart tints). */
+  style?: CSSProperties;
 }
 
 /**
@@ -64,6 +66,7 @@ const Badge = ({
   onDelete,
   title,
   className,
+  style,
 }: BadgeProps) => {
   const Root = onClick ? 'button' : 'span';
 
@@ -72,6 +75,7 @@ const Badge = ({
       type={onClick ? 'button' : undefined}
       onClick={onClick}
       title={title}
+      style={style}
       className={cn(
         'inline-flex max-w-full items-center gap-1 truncate rounded-full border font-semibold',
         size === 'sm' ? 'h-6 px-2.5 text-xs' : 'h-7 px-3 text-sm',

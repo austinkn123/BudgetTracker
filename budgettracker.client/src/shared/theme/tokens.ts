@@ -16,79 +16,82 @@
  *   contrastText — accessible text color on top of `main`
  */
 export const colorTokens = {
-  /** Brand blue. Working default #1E6FD9 — exact shade TBC with stakeholder (BUD-13). */
+  /** Brand indigo — the single saturated accent (BUD-20). */
   primary: {
-    main: '#1E6FD9',
-    light: '#6EA3E8',
-    dark: '#1656A8',
-    subtle: '#E9F1FB',
+    main: '#635BFF',
+    light: '#8F8AFF',
+    dark: '#4B44D4',
+    subtle: '#EFEEFF',
     contrastText: '#FFFFFF',
   },
-  /** Accent for highlights. Working default teal — TBC with stakeholder (BUD-13). */
+  /** Supporting cyan for secondary data series. Used sparingly. */
   secondary: {
-    main: '#14B8A6',
-    light: '#5ED4C6',
-    dark: '#0E8579',
-    subtle: '#E7F8F6',
+    main: '#0BA5EC',
+    light: '#5CC8F5',
+    dark: '#0876AB',
+    subtle: '#E6F6FE',
     contrastText: '#FFFFFF',
   },
   success: {
-    main: '#2E7D32',
-    light: '#6FBF73',
-    dark: '#1B5E20',
-    subtle: '#EAF5EB',
+    main: '#0E9F6E',
+    light: '#4FC79E',
+    dark: '#05704B',
+    subtle: '#E6F6F0',
     contrastText: '#FFFFFF',
   },
   warning: {
-    main: '#F59E0B',
-    light: '#F8BA4B',
-    dark: '#B45309',
-    subtle: '#FEF3C7',
-    contrastText: '#422006',
+    main: '#C77700',
+    light: '#E5A23D',
+    dark: '#8A5300',
+    subtle: '#FDF3E2',
+    contrastText: '#FFFFFF',
   },
   error: {
-    main: '#D32F2F',
-    light: '#E57373',
-    dark: '#B71C1C',
-    subtle: '#FDECEA',
+    main: '#DF1B41',
+    light: '#EE6C86',
+    dark: '#A81231',
+    subtle: '#FDEBEF',
     contrastText: '#FFFFFF',
   },
   info: {
-    main: '#0288D1',
-    light: '#4FC3F7',
-    dark: '#01579B',
-    subtle: '#E5F4FB',
+    main: '#3F6AD8',
+    light: '#7C9AE8',
+    dark: '#2C4CA0',
+    subtle: '#ECF1FC',
     contrastText: '#FFFFFF',
   },
-  /** Neutrals (slate scale — harmonizes with the brand blue). */
+  /**
+   * Neutrals — a cool navy-slate ramp. Deep, slightly blue ink over a
+   * near-white page reads sharper than pure grey-on-grey.
+   */
   neutral: {
     /** Page background. */
-    background: '#F8FAFC',
+    background: '#F6F9FC',
     /** Card / elevated surface background. */
     surface: '#FFFFFF',
     /** Internal dividers, table row rules. */
-    borderSubtle: '#F1F5F9',
+    borderSubtle: '#F0F4F8',
     /** Default border + divider color — always visible, 1px (BUD-20). */
-    border: '#E2E8F0',
+    border: '#E3E8EE',
     /** Control hover, active input borders. */
-    borderStrong: '#CBD5E1',
-    /** Primary body text. */
-    textPrimary: '#0F172A',
+    borderStrong: '#C9D2DD',
+    /** Primary body text — deep navy, not black. */
+    textPrimary: '#0A2540',
     /** Secondary / muted text. */
-    textSecondary: '#64748B',
+    textSecondary: '#5B6B7F',
   },
-  /** Full grey ramp (slate). */
+  /** Full neutral ramp (navy-slate). */
   grey: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475569',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A',
+    50: '#F6F9FC',
+    100: '#F0F4F8',
+    200: '#E3E8EE',
+    300: '#C9D2DD',
+    400: '#9AA8B8',
+    500: '#5B6B7F',
+    600: '#425466',
+    700: '#2E4155',
+    800: '#1B3049',
+    900: '#0A2540',
   },
 } as const;
 
@@ -137,12 +140,16 @@ export const radiusTokens = {
   full: '9999px',
 } as const;
 
-/** Layered micro-shadows; `--bud-shadow` is the ink channel triplet. */
+/**
+ * Layered shadows; `--bud-shadow` is the ink channel triplet. Two layers each —
+ * a tight contact shadow plus a wide soft one — which is what gives surfaces
+ * real lift instead of looking like flat outlined boxes.
+ */
 export const shadowTokens = {
-  xs: '0 1px 2px 0 rgb(var(--bud-shadow) / 0.06)',
-  sm: '0 1px 2px 0 rgb(var(--bud-shadow) / 0.06), 0 4px 12px -2px rgb(var(--bud-shadow) / 0.04)',
-  md: '0 1px 2px 0 rgb(var(--bud-shadow) / 0.06), 0 8px 24px -4px rgb(var(--bud-shadow) / 0.08)',
-  lg: '0 2px 4px 0 rgb(var(--bud-shadow) / 0.06), 0 16px 40px -8px rgb(var(--bud-shadow) / 0.12)',
+  xs: '0 1px 1px 0 rgb(var(--bud-shadow) / 0.04), 0 2px 4px -1px rgb(var(--bud-shadow) / 0.06)',
+  sm: '0 1px 2px 0 rgb(var(--bud-shadow) / 0.05), 0 6px 16px -4px rgb(var(--bud-shadow) / 0.10)',
+  md: '0 2px 4px -1px rgb(var(--bud-shadow) / 0.06), 0 12px 28px -6px rgb(var(--bud-shadow) / 0.14)',
+  lg: '0 4px 8px -2px rgb(var(--bud-shadow) / 0.08), 0 24px 48px -12px rgb(var(--bud-shadow) / 0.20)',
   none: 'none',
 } as const;
 

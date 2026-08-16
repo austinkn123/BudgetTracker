@@ -1,4 +1,3 @@
-import Typography from '@mui/material/Typography';
 import { useUser } from '../../user/hooks/useUser';
 import UserSection from '../../user/UserSection';
 import LinkedAccountCard from '../../linked-accounts/components/LinkedAccountCard';
@@ -9,12 +8,8 @@ const SettingsPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <Typography variant="h4" className="font-bold text-ink">
-          Settings
-        </Typography>
-        <Typography variant="body2" className="text-ink-muted mt-1">
-          Your account information
-        </Typography>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">Settings</h1>
+        <p className="mt-1 text-sm text-ink-muted">Your account information</p>
       </div>
 
       <UserSection isLoading={loadingUser} />

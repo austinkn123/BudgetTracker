@@ -51,11 +51,11 @@ describe('tailwind config token parity', () => {
     expect(sans[0]).toBe('Inter');
   });
 
-  it('channel conversion round-trips the primary token', () => {
+  it('channel conversion round-trips the brand tokens', () => {
     // The :root emitter derives channels via hexToChannels; spot-check the math
     // so a broken converter can't silently shift every color.
-    expect(hexToChannels(colorTokens.primary.main)).toBe('30 111 217');
-    expect(hexToChannels(colorTokens.neutral.textPrimary)).toBe('15 23 42');
+    expect(hexToChannels(colorTokens.primary.main)).toBe('99 91 255');
+    expect(hexToChannels(colorTokens.neutral.textPrimary)).toBe('10 37 64');
   });
 });
 

@@ -1,12 +1,9 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
-import { alpha } from '@mui/material/styles';
-import Typography from '@mui/material/Typography';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { Badge, Button, Card, Table } from '../../../shared/components/ui';
 import type { TableColumn } from '../../../shared/components/ui';
+import { cn } from '../../../shared/utils/cn';
 import type { BudgetPlan, BudgetPlanEntry } from '../../../shared/types/api';
 
 type BudgetPlanCardProps = {
@@ -20,6 +17,12 @@ type BudgetPlanCardProps = {
   onDeletePlan: (plan: BudgetPlan) => void;
 };
 
+const TILE_CLASSES = {
+  success: 'border-success/20 bg-success/10 [&>span]:text-success [&>p]:text-success-dark',
+  error: 'border-error/20 bg-error/10 [&>span]:text-error [&>p]:text-error-dark',
+  primary: 'border-primary/20 bg-primary/10 [&>span]:text-primary',
+} as const;
+
 /** Summary tile for the income/expenses/net row. */
 const SummaryTile = ({
   label,
@@ -30,29 +33,21 @@ const SummaryTile = ({
 }: {
   label: string;
   value: number;
-  tone: 'success' | 'error' | 'primary';
+  tone: keyof typeof TILE_CLASSES;
   signed?: boolean;
 }) => (
-  <Box
-    sx={{
-      borderRadius: 3,
-      px: 1.5,
-      py: 1.25,
-      border: (theme) => `1px solid ${alpha(theme.palette[tone].main, 0.2)}`,
-      backgroundColor: (theme) => alpha(theme.palette[tone].main, 0.1),
-    }}
-  >
-    <Typography variant="caption" color={`${tone}.main`}>
-      {label}
-    </Typography>
-    <Typography
-      variant="subtitle1"
-      fontWeight={600}
-      color={signed ? (value >= 0 ? 'success.dark' : 'error.dark') : `${tone}.dark`}
+  <div className={cn('rounded-md border px-3 py-2.5', TILE_CLASSES[tone])}>
+    <span className="text-xs">{label}</span>
+    <p
+      className={cn(
+        'text-body font-semibold',
+        signed && (value >= 0 ? 'text-success-dark' : 'text-error-dark'),
+        !signed && tone === 'primary' && 'text-primary-dark',
+      )}
     >
       ${value.toFixed(2)}
-    </Typography>
-  </Box>
+    </p>
+  </div>
 );
 
 const BudgetPlanCard = ({
@@ -110,9 +105,7 @@ const BudgetPlanCard = ({
         header: 'Amount',
         align: 'right',
         render: (entry) => (
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            ${entry.amount.toFixed(2)}
-          </Typography>
+          <span className="text-sm font-semibold text-ink">${entry.amount.toFixed(2)}</span>
         ),
       },
       {
@@ -128,17 +121,17 @@ const BudgetPlanCard = ({
   return (
     <Card
       title={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <span className="flex items-center gap-2">
           {plan.name}
           <Badge
             label={plan.isActive ? 'Active' : 'Inactive'}
             color={plan.isActive ? 'success' : 'neutral'}
           />
-        </Box>
+        </span>
       }
       subtitle={planMonthLabel}
       actions={
-        <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
+        <div className="flex flex-row flex-wrap justify-end gap-2">
           {!plan.isActive && (
             <Button
               size="sm"
@@ -163,21 +156,14 @@ const BudgetPlanCard = ({
           >
             Delete
           </Button>
-        </Stack>
+        </div>
       }
     >
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
-          gap: 1.5,
-          mb: 3,
-        }}
-      >
+      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
         <SummaryTile label="Monthly Income" value={monthlyIncome} tone="success" />
         <SummaryTile label="Monthly Expenses" value={monthlyExpenses} tone="error" />
         <SummaryTile label="Monthly Net" value={monthlyNet} tone="primary" signed />
-      </Box>
+      </div>
 
       <Table
         columns={columns}

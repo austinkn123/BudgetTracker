@@ -1,4 +1,3 @@
-import Box from '@mui/material/Box';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo } from 'react';
@@ -90,13 +89,7 @@ const TransactionDialog = ({
       )}
 
       {/* Single column on phones so the pair never overflows a 375px viewport. */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-          gap: 2,
-        }}
-      >
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
           control={control}
           name="amount"
@@ -125,7 +118,7 @@ const TransactionDialog = ({
           required
         />
         <Input control={control} name="payee" label="Payee" disabled={locked} />
-      </Box>
+      </div>
 
       <Input control={control} name="notes" label="Notes" multiline rows={2} />
     </Modal>

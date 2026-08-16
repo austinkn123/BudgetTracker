@@ -1,5 +1,4 @@
 import { useCallback, useMemo } from 'react';
-import Typography from '@mui/material/Typography';
 import { Plus } from 'lucide-react';
 import { Badge, Button } from '../../shared/components/ui';
 import { useBudgetPlans } from './hooks/useBudgetPlans';
@@ -62,12 +61,10 @@ const BudgetPlansSection = ({
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Typography variant="h6" className="font-semibold text-ink">
-            Budget Plans
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <h2 className="text-base font-semibold text-ink">Budget Plans</h2>
+          <p className="text-sm text-ink-muted">
             Create, edit, switch, and maintain multiple monthly plans.
-          </Typography>
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -98,9 +95,7 @@ const BudgetPlansSection = ({
             />
           ))
         ) : (
-          <Typography color="text.secondary" fontStyle="italic">
-            No budget plans found
-          </Typography>
+          <p className="text-body italic text-ink-muted">No budget plans found</p>
         )}
       </div>
 
