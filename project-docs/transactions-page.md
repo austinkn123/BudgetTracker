@@ -1,158 +1,101 @@
 # Transactions Page
 
-A user-facing guide to the **Transactions** experience in BudgetTracker: how to read the ledger, add and edit entries, and how the signed-amount (inflow vs. outflow) convention works.
+A guide to the **Transactions** experience: how to review what your bank imported, categorise it,
+and read it against your budget plan.
 
 ## Overview
 
-The Transactions page is where you review and manage individual money movements — purchases, income, transfers, and balance corrections. It is rendered by the `TransactionsSection` component (`budgettracker.client/src/features/transactions/`) and is composed of three parts:
+Transactions come from Plaid. There is no manual entry — the page exists to *review* an imported
+ledger, not to type one in. The two things you can change on a transaction are its **category** and
+its **note**; everything else is what the bank reported.
 
-- A **month summary** strip (transaction count, active days, and Income / Outflow / Net totals).
-- A **calendar** that highlights every day with activity and lets you jump to a specific day.
-- A **selected-day ledger** listing each transaction for the chosen date, with running Income, Outflow, and Net totals for that day.
+The page works one month at a time. A month switcher in the header drives every view, and the
+plan-vs-actual figures follow it — browsing to June shows June's performance, not today's.
 
-The page works one day at a time: pick a date on the calendar (or click **Today**) and the ledger updates to show just that day's transactions. New entries default to the currently selected day.
+Three views, behind the toggle at the top:
 
-Transactions come from two sources:
+| View | What it is for |
+|---|---|
+| **Plan** (default) | The month grouped the way the budget is structured: Core, then Buffer, then by category. |
+| **List** | A flat, searchable, filterable list. For "where did that charge go". |
+| **Calendar** | The day-by-day ledger. For "what happened on the 14th". |
 
-- **Manual** entries you add through the dialog.
-- **Imported** entries synced from your bank via Plaid. Imported rows are marked with an **Imported** chip, may show the account mask (e.g. `•••• 1234`), and can show a **Pending** chip while the bank is still settling them.
+## Month header
 
-## Viewing transactions
+Shows the month under review, the plan governing it, and how the month is tracking:
 
-### Calendar
+- **Planned** — the sum of the plan's expense lines, using each line's monthly equivalent.
+- **Actual** — what has been spent so far.
+- **Remaining** (or **Over plan**) — the difference.
+- A progress bar with a marker showing how far through the month you are. Bar left of the marker
+  means you are spending slower than the calendar.
 
-The calendar drives the whole page:
+The pace badge says what is happening in plain terms — "Spending faster than the month" — rather
+than the API's `Ahead`/`Behind`, which read backwards to most people.
 
-- Each day that has at least one transaction is **highlighted**. The highlight color reflects that day's **net** total — green when the day nets positive (more in than out) and red when it nets negative.
-- Click any day to load its ledger.
-- Changing the month moves the selection to the first of that month, so the month summary follows what you are looking at.
-- The **Today** button returns the selection to the current date.
+If no plan governs the month yet, the header says so and the spending below is still grouped by
+category.
 
-### Month summary
+## Plan view
 
-The strip above the calendar summarizes the **visible month** (the month of the selected date):
+The heart of the page. Categories are grouped into the two buckets the budget is built from:
 
-- A sentence such as *"June 2026 has 12 transactions across 5 active days."*
-- **Income** — total of all inflows for the month.
-- **Outflow** — total of all outflows for the month.
-- **Net** — Income minus Outflow, shown with a leading `+` or `-` and colored green or red.
+- **Core** — committed spending you have signed up for.
+- **Buffer** — flex spending. **Anything unplanned or uncategorised lands here too**, which is the
+  point: you commit to Core, and everything else eats your Buffer.
 
-### Selected-day ledger
+Each category row shows actual against planned with a progress bar that ramps through four steps —
+on pace, slightly over, well over, and over budget — plus an "over by" badge once actual exceeds
+planned. Categories are ordered worst-overspend-first, so the row that needs attention is at the
+top. Expanding a row lists that category's transactions.
 
-For the chosen day you see:
+**Uncategorised is pinned above both buckets.** Those transactions are missing from every figure on
+the page and on the dashboard until they are categorised, so they are surfaced rather than buried.
 
-- A header with the full date and a count of transactions.
-- Chips for **item count**, **Income**, **Outflow**, and **Net** for that day.
-- A list of transactions, each showing:
-  - **Payee** (falls back to the category name, then to *"Uncategorized transaction"*).
-  - A secondary line combining the **category** and either the **notes** or the **transaction type**.
-  - For imported rows: an **Imported** chip, the account mask if available, and a **Pending** chip when applicable.
-  - The **amount**, right-aligned, prefixed with `+` (inflow, green) or `-` (outflow, red).
+A category with a plan line but no spend still appears — an untouched budget is information.
 
-Transactions within a day are sorted newest first. If the day has no transactions, the ledger shows an empty state with an **Add Transaction for This Day** button.
+## Categorising
 
-> There is currently no free-text search or column filtering. Navigation is by date through the calendar.
+Three ways, in increasing order of speed:
 
-## Adding a transaction
+1. **Inline** — the category dropdown on any transaction row.
+2. **One-click suggestion** — imported rows carry Plaid's suggested category. When one of your
+   categories claims that Plaid value, a "Use *Category*" button appears. Plaid's raw suggestion is
+   kept even after you override it.
+3. **Bulk** — select rows with their checkboxes and set a category for all of them at once.
 
-Click **Add Transaction** (top right) or the button in an empty day's ledger to open the dialog. **New manual transactions are recorded as expenses (outflows).**
+Map a category to a Plaid taxonomy value in the **Categories** page ("Auto-categorise imports as").
+Once mapped, matching transactions are categorised automatically on the next sync, and a re-sync
+never overwrites a category you chose yourself.
 
-The dialog has these fields:
+## Notes
 
-| Field | Required | Notes |
-|-------|----------|-------|
-| **Amount** | Yes | Enter a positive number. The page applies the sign for you (see [Signed amounts](#signed-amounts-inflow-vs-outflow)). Step is `0.01`. |
-| **Category** | Yes | Choose from your expense categories. |
-| **Date** | Yes | Defaults to the day selected on the calendar. |
-| **Payee** | No | Who the money went to / came from. Up to 200 characters. |
-| **Notes** | No | Free text, up to 500 characters. |
+Click the note affordance on any row to add or edit a note inline. Enter saves, Escape cancels.
+Notes are capped at 1000 characters.
 
-Click **Add** to save (the button shows *Saving…* while in flight) or **Cancel** to discard. On success you'll see a confirmation message and the ledger refreshes; on failure an error message explains why and the dialog stays open.
+## Signed amounts
 
-### Validation rules
+Amounts are stored **signed**: negative for outflows, positive for inflows. Imported transactions
+are only ever `Expense` or `Income` — Plaid's sign convention is inverted on import.
 
-Validation runs on save (React Hook Form + Zod). You must fix any flagged field before the entry saves:
+In the UI a transaction counts as an **inflow** if it is `Income`, or an `Adjustment` with a
+positive amount. Inflows render green with a `+`; everything else renders with a `-`.
 
-- **Amount** must be **greater than 0**. Enter the magnitude only — never a negative number; the sign is applied automatically.
-- **Category** is **required**.
-- **Date** is **required**.
-- **Payee** must be **200 characters or fewer**.
-- **Notes** must be **500 characters or fewer**.
+Totals follow the same rule: income and outflow are shown as non-negative magnitudes, and the net
+figure carries the sign.
 
-## Editing and deleting a transaction
+## Gotchas
 
-Click any row in the ledger to open it in the dialog (titled **Edit Transaction**).
-
-### Manual transactions
-
-For a manual **expense**, every field is editable. Edit the values and click **Save**, or use the **Delete** button (bottom left) to remove the transaction. The amount field always shows the **positive magnitude**; the correct sign is re-applied when you save, based on the transaction's type.
-
-> **Current limitation:** editing manual **Income**, **Transfer**, and **Adjustment** transactions is not yet supported. Clicking such a row shows the message *"Editing Income, Transfer, and Adjustment transactions is not yet supported (see BUD-19)."* This guard prevents accidentally losing the transaction's sign while a dedicated type picker is still in development.
-
-### Imported (bank) transactions
-
-Imported rows are **locked**. The dialog shows an info banner — *"Imported from your bank — only category & notes can be edited."* — and:
-
-- **Amount**, **Date**, and **Payee** are read-only.
-- Only **Category** and **Notes** can be changed.
-- There is **no Delete button** for imported rows; the amount and other source fields are preserved exactly as the bank reported them.
-
-This lets you categorize and annotate bank activity without altering the underlying record.
-
-## Signed amounts (inflow vs. outflow)
-
-BudgetTracker stores every transaction amount as a **signed** value, but the dialog always asks you for a **positive** number. The page translates between the two so you never type a minus sign.
-
-### How the sign is decided
-
-The stored sign depends on the **transaction type**:
-
-| Transaction type | Stored sign | Direction |
-|------------------|-------------|-----------|
-| **Income** | Positive (`+`) | Inflow |
-| **Expense** | Negative (`-`) | Outflow |
-| **Transfer** | Negative (`-`) | Outflow |
-| **Adjustment** | User-chosen (`+` or `-`) | Either |
-
-When you save, the page takes the magnitude you entered and applies the rule above. When you re-open a transaction to edit it, the page strips the sign and shows the positive magnitude again.
-
-### How direction is displayed
-
-In the ledger and summaries, a transaction counts as an **inflow** if it is **Income**, or an **Adjustment with a positive amount**. Everything else (Expense, Transfer, and negative Adjustments) is an **outflow**.
-
-- Inflows render green with a `+` prefix.
-- Outflows render red with a `-` prefix.
-
-### Adjustments
-
-An **Adjustment** is a manual balance correction, and its sign is meaningful:
-
-- A **positive** Adjustment means the balance was understated — it is treated as an **inflow** (green, income side).
-- A **negative** Adjustment means the balance was overstated — it is treated as an **outflow** (red, expense side).
-
-Adjustments are the only type that keeps whatever sign was recorded, because the direction is intentionally the user's choice.
-
-### How summary totals are calculated
-
-For each day, and for the visible month, totals are computed as follows:
-
-- **Income total** — the sum of the **magnitudes** of all inflow transactions (always shown as a non-negative number).
-- **Outflow total** — the sum of the **magnitudes** of all outflow transactions (always shown as a non-negative number).
-- **Net total** — the sum of the **signed** amounts. Because inflows are positive and outflows are negative, Net naturally equals Income minus Outflow, and is shown with a `+` or `-` and colored accordingly.
-
-The month summary is simply the roll-up of every active day in the selected month.
-
-## Gotchas and edge cases
-
-- **Always enter a positive amount.** The minus sign is never typed — it is derived from the transaction type on save. A negative entry is rejected by validation.
-- **New manual entries are expenses.** The "Add Transaction" flow records an Expense (outflow). There is not yet a type picker for creating Income, Transfer, or Adjustment entries manually.
-- **Some manual edits are blocked.** Income, Transfer, and Adjustment manual transactions can't be edited yet (tracked under BUD-19).
-- **Imported rows are mostly read-only.** You can change only category and notes; amount, date, and payee stay as the bank reported them, and they can't be deleted from this dialog.
-- **Net color follows the day's net, not the count.** A day with many expenses but a large income deposit can still highlight green on the calendar.
-- **Income and Outflow totals are always non-negative.** The direction is conveyed by which bucket a transaction lands in and by the Net figure — not by a sign on those two totals.
-- **Day navigation only.** There is no keyword search or column-level filtering; use the calendar to move between dates and months.
+- **Only category and notes are editable.** Amount, date, payee and account are what the bank
+  reported. The server rejects any attempt to change them, not just the UI.
+- **Imported transactions cannot be deleted.** Disconnect the bank to remove them.
+- **Buffer absorbs the unplanned.** A category with no plan line shows as "unbudgeted" and its spend
+  counts toward Buffer, matching how budget analysis computes it.
+- **Annual plan lines are compared monthly.** A $2,004/yr maintenance line is $167/month; the page
+  compares against the monthly equivalent, never the annual amount.
+- **Uncategorised spend is invisible to the plan figures.** That is why it is pinned to the top.
 
 ## Related documentation
 
-- [Frontend Architecture](frontend-architecture.md) — feature-slice structure these components follow.
+- [Frontend Architecture](frontend-architecture.md) — the feature-slice structure these components follow.
 - [Database Schema (ERD)](database-schema-erd.md) — how transactions are persisted.

@@ -1,5 +1,15 @@
 # UI Modernization
 
+
+> **SUPERSEDED — historical.** This was the BUD-20 migration plan, written 2026-06-09. The work
+> shipped, but it shipped a *different* design system: MUI was deleted entirely and the
+> Copilot-Money / leaf-green direction was replaced with a Stripe-leaning indigo palette
+> (`primary #635BFF`). **None of the colour tokens named in §4.1 exist in the codebase**, and the
+> type, radius, shadow and motion values below all differ from what was built.
+>
+> **[`design.md`](design.md) governs.** Keep this for the Copilot research in §3/§6 and for the
+> phase log — not for direction.
+
 This document captures a frontend audit of `budgettracker.client` and a phased roadmap for moving the UI toward a Copilot Money-style design language: premium minimalism, restrained color, generous whitespace, and tabular currency typography. It is paired with a token spec so work can be staged behind primitives instead of rewritten page-by-page.
 
 ## 1. Executive summary
@@ -65,6 +75,11 @@ Copilot Money is the reference point. Distilled cues — informed by [copilot.mo
 What we are not copying: Copilot's exact palette, their iOS-only navigation, or their proprietary categorization UI. We keep `leaf #85CB33` as the BudgetTracker brand accent — inspiration, not impersonation.
 
 ## 4. Proposed design tokens
+
+> **Not built as specified.** Every token name below (`bg.*`, `fg.*`, `status.*`, `cat.1`–`cat.8`,
+> `accent.primary`) is aspirational — see `src/shared/theme/tokens.ts` for what actually exists.
+> The four-step `status.*` ramp and the 8-hue category palette were never implemented in any form.
+
 
 Tokens live in `budgettracker.client/src/shared/design/tokens.ts`, exported as a JS object (consumed by `main.tsx` to build the MUI theme) and as CSS custom properties on `:root` and `[data-theme="dark"]` (consumed by Tailwind via `tailwind.config.js`).
 
@@ -245,6 +260,11 @@ Seven phases. Each phase is intended as a single PR that ships a visible delta. 
 
 - No new features. The product surface is identical; only presentation changes.
 - No backend or API changes. No DTO renaming, no new endpoints, no contract churn.
+  - **Amended (Phase 5, transactions redesign):** one exception was taken deliberately.
+    `BudgetAnalysisManager` now derives its analysed month from the requested window instead of
+    `DateTime.UtcNow`, so the Transactions page can show plan-vs-actual for any month you browse to.
+    Without it the page could only ever report the current month. No contract changed — the same
+    endpoint, same shapes, different month.
 - No iOS port. Native mobile work is owned by `mobile-strategy.md`.
 - No Storybook. If silvio scopes it later it lands as Phase 8.
 - Not adopting Copilot's exact palette. `leaf #85CB33` remains the brand accent.
