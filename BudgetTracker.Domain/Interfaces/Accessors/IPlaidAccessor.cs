@@ -10,6 +10,12 @@ public interface IPlaidAccessor
     /// <summary>Create a Link token for the given Cognito-sub user identity.</summary>
     Task<PlaidLinkTokenResult> CreateLinkTokenAsync(string clientUserId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Create a public_token directly against Plaid's Sandbox using a <c>user_custom</c>
+    /// configuration, bypassing the Link UI. Sandbox-only; Plaid rejects this elsewhere.
+    /// </summary>
+    Task<string> CreateSandboxPublicTokenAsync(string customUserJson, CancellationToken cancellationToken = default);
+
     /// <summary>Exchange a Link public_token for a long-lived access_token.</summary>
     Task<PlaidExchangeResult> ExchangePublicTokenAsync(string publicToken, CancellationToken cancellationToken = default);
 

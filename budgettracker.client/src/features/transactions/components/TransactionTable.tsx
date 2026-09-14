@@ -1,11 +1,8 @@
 import { useMemo } from 'react';
 import { format, startOfDay, startOfMonth } from 'date-fns';
-import { Badge, Button, Calendar, Separator } from '../../../shared/components/ui';
+import { Badge, Calendar, Separator } from '../../../shared/components/ui';
 import type { Category, Transaction } from '../../../shared/types/api';
-import {
-  toDateKey,
-  type TransactionDaySummary,
-} from '../utils/transactionGroups';
+import type { TransactionDaySummary } from '../utils/transactionGroups';
 
 type TransactionTableProps = {
   categories: Category[];
@@ -15,7 +12,6 @@ type TransactionTableProps = {
   maskByPlaidAccountId: Map<string, string | null | undefined>;
   onDateChange: (date: Date) => void;
   onMonthChange: (month: Date) => void;
-  onAddTransaction: (occurredAt?: string) => void;
   onRowClick: (transaction: Transaction) => void;
 };
 
@@ -27,11 +23,9 @@ const TransactionTable = ({
   maskByPlaidAccountId,
   onDateChange,
   onMonthChange,
-  onAddTransaction,
   onRowClick,
 }: TransactionTableProps) => {
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
-  const selectedDateKey = toDateKey(selectedDate);
   const selectedTransactions = selectedDaySummary?.transactions ?? [];
   const selectedIncomeTotal = selectedDaySummary?.incomeTotal ?? 0;
   const selectedOutflowTotal = selectedDaySummary?.outflowTotal ?? 0;
@@ -124,8 +118,12 @@ const TransactionTable = ({
                 const mask = transaction.plaidAccountId
                   ? maskByPlaidAccountId.get(transaction.plaidAccountId)
                   : undefined;
+                const categoryName =
+                  transaction.categoryId == null
+                    ? 'Uncategorized'
+                    : (categoryMap.get(transaction.categoryId) ?? 'Uncategorized');
                 const secondaryText = [
-                  categoryMap.get(transaction.categoryId) ?? 'Uncategorized',
+                  categoryName,
                   transaction.notes || transaction.transactionType,
                 ]
                   .filter(Boolean)
@@ -141,9 +139,7 @@ const TransactionTable = ({
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-ink">
-                          {transaction.payee ||
-                            categoryMap.get(transaction.categoryId) ||
-                            'Uncategorized transaction'}
+                          {transaction.payee || categoryName}
                         </p>
                         <span className="text-sm text-ink-muted">{secondaryText}</span>
                         {transaction.isImported && (
@@ -173,12 +169,9 @@ const TransactionTable = ({
               <p className="text-sm font-semibold text-ink">
                 No transactions on {format(selectedDate, 'PP')}
               </p>
-              <p className="mb-4 mt-1.5 text-sm text-ink-muted">
-                Choose another date on the calendar or add a transaction for this day.
+              <p className="mt-1.5 text-sm text-ink-muted">
+                Transactions arrive automatically from your linked bank.
               </p>
-              <Button onClick={() => onAddTransaction(selectedDateKey)}>
-                Add Transaction for This Day
-              </Button>
             </div>
           )}
         </div>

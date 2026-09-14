@@ -13,12 +13,12 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'bg-primary text-white border border-primary shadow-xs hover:bg-primary-dark hover:border-primary-dark active:translate-y-px',
+    'bg-primary text-white border border-primary shadow-xs hover:bg-primary-hover hover:border-primary-hover active:translate-y-px',
   secondary:
     'bg-surface text-ink border border-border shadow-xs hover:border-border-strong hover:bg-background active:translate-y-px',
   ghost: 'bg-transparent text-ink-muted border border-transparent hover:bg-border-subtle hover:text-ink',
   destructive:
-    'bg-error text-white border border-error shadow-xs hover:bg-error-dark hover:border-error-dark active:translate-y-px',
+    'bg-error text-white border border-error shadow-xs hover:bg-error-hover hover:border-error-hover active:translate-y-px',
   'destructive-ghost': 'bg-transparent text-error border border-transparent hover:bg-error-subtle',
 };
 

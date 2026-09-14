@@ -7,6 +7,8 @@ import { heroSurface, semanticColors } from '../utils/chartTheme';
 
 interface PlanStoryHeroProps {
   plan: AnalyzedPlan;
+  /** The month being reported (ISO). The plan may have taken effect earlier. */
+  analyzedMonth: string;
   pacing: PeriodPacing;
   /** Copy is composed client-side from the pacing numbers. */
   headline: string;
@@ -32,7 +34,7 @@ const clampPct = (value: number): number => {
   return Math.max(0, Math.min(100, value));
 };
 
-const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps) => {
+const PlanStoryHero = ({ plan, analyzedMonth, pacing, headline, drifting }: PlanStoryHeroProps) => {
   const gaugeValue = clampPct(pacing.spentPct * 100);
   const onTrack = pacing.pacingDelta <= 0;
   const gaugeColor = onTrack ? semanticColors.income : semanticColors.overspend;
@@ -45,7 +47,8 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
     ? `${currency.format(pacing.remaining)} left`
     : `${currency.format(Math.abs(pacing.remaining))} over`;
 
-  const planMonthLabel = format(parseISO(plan.planMonth), 'MMMM yyyy');
+  // The month on show is the one analysed, not the month the plan took effect.
+  const monthLabel = format(parseISO(analyzedMonth), 'MMMM yyyy');
 
   return (
     <Card padding="none" className="overflow-hidden">
@@ -60,7 +63,7 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
               {headline}
             </h1>
             <p className="mt-1.5 text-sm text-white/60">
-              {plan.name} · {planMonthLabel}
+              {plan.name} · {monthLabel}
             </p>
           </div>
           <Badge
@@ -80,7 +83,7 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
               trackColor="rgb(255 255 255 / 0.12)"
               textColor="rgb(255 255 255)"
             />
-            <p className="-mt-1 text-sm font-semibold text-white/60">{remainingLabel}</p>
+            <p className="numeric -mt-1 text-sm font-semibold text-white/60">{remainingLabel}</p>
           </div>
 
           {/* Progress rows */}
@@ -102,7 +105,7 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
             <div>
               <div className="flex items-baseline justify-between">
                 <p className="text-sm font-semibold text-white">Projection</p>
-                <span className="text-xs text-white/60">
+                <span className="numeric text-xs text-white/60">
                   {`Projects to ${currency.format(pacing.projectedEnd)}`}
                 </span>
               </div>
@@ -120,12 +123,12 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
                   style={{ left: 'calc(100% - 1px)' }}
                 />
                 {overshoot && (
-                  <span className="mt-1.5 block text-xs font-semibold text-warning-light">
+                  <span className="numeric mt-1.5 block text-xs font-semibold text-warning-light">
                     {`Overshoot: +${currency.format(pacing.projectedEnd - pacing.plannedExpenses)}`}
                   </span>
                 )}
               </div>
-              <span className="mt-1.5 block text-xs text-white/50">
+              <span className="numeric mt-1.5 block text-xs text-white/50">
                 {pacing.perDiemToStay > 0
                   ? `Stay-on-plan rate: ${currencyPrecise.format(pacing.perDiemToStay)}/day`
                   : `No days remaining in this plan month`}
@@ -164,7 +167,7 @@ const ProgressRow = ({ label, detail, percent, color }: ProgressRowProps) => (
   <div>
     <div className="flex items-baseline justify-between">
       <p className="text-sm font-semibold text-white">{label}</p>
-      <span className="text-xs text-white/60">{detail}</span>
+      <span className="numeric text-xs text-white/60">{detail}</span>
     </div>
     <Progress
       value={clampPct(percent)}

@@ -1,12 +1,12 @@
-import { colorTokens, withAlpha } from '../../../shared/theme/tokens';
+import { colorTokens, cssVar, withAlpha } from '../../../shared/theme/tokens';
 
 /**
  * Semantic colors for charts (BUD-13 tokens, de-themed in BUD-20).
  * Use these to color charts by meaning rather than by sequence.
  *
- * Module-level consts reading tokens.ts directly — no theme context needed,
- * and referential stability comes free (the old getter-per-render pattern
- * broke useMemo deps downstream).
+ * Module-level consts holding CSS-var references — no theme context needed,
+ * they follow the active theme on their own, and referential stability comes
+ * free (the old getter-per-render pattern broke useMemo deps downstream).
  */
 export interface SemanticColors {
   /** Positive money in (income, net surplus). Success green. */
@@ -23,30 +23,39 @@ export interface SemanticColors {
   ink: string;
 }
 
+/**
+ * Token REFERENCES, not resolved hex (BUD-17). Charts render into SVG and inline
+ * styles where Tailwind's `dark:` variant cannot reach, so resolving a hex here
+ * would freeze the light palette — gridlines drawn from `ink` would vanish into
+ * a dark surface. `cssVar` defers the lookup to paint time instead.
+ */
 export const semanticColors: SemanticColors = {
-  income: colorTokens.success.main,
-  expense: colorTokens.neutral.textSecondary,
-  overspend: colorTokens.warning.main,
-  neutral: colorTokens.secondary.main,
-  surface: colorTokens.neutral.background,
-  ink: colorTokens.neutral.textPrimary,
+  income: cssVar('success'),
+  expense: cssVar('ink-muted'),
+  overspend: cssVar('warning'),
+  neutral: cssVar('secondary'),
+  surface: cssVar('background'),
+  ink: cssVar('ink'),
 };
 
 /**
  * An ordered set of category colors for charts that render multiple series.
- * Brand blue, warning amber, accent teal, structural slate, plus 65% tints of
- * each so the sequence stays harmonious. Success green is deliberately
- * excluded — it is reserved for the `income` semantic.
+ * Brand blue, warning amber, accent teal, muted ink, plus 65% tints of each so
+ * the sequence stays harmonious. Success green is deliberately excluded — it is
+ * reserved for the `income` semantic.
+ *
+ * The fourth slot is `ink-muted` rather than a fixed grey: the grey ramp does
+ * not invert between themes, so a structural grey would go dim on dark.
  */
 export const chartPalette: readonly string[] = [
-  colorTokens.primary.main,
-  colorTokens.warning.main,
-  colorTokens.secondary.main,
-  colorTokens.grey[600],
-  withAlpha(colorTokens.primary.main, 0.65),
-  withAlpha(colorTokens.warning.main, 0.65),
-  withAlpha(colorTokens.secondary.main, 0.65),
-  withAlpha(colorTokens.grey[600], 0.65),
+  cssVar('primary'),
+  cssVar('warning'),
+  cssVar('secondary'),
+  cssVar('ink-muted'),
+  cssVar('primary', 0.65),
+  cssVar('warning', 0.65),
+  cssVar('secondary', 0.65),
+  cssVar('ink-muted', 0.65),
 ];
 
 /**

@@ -7,7 +7,7 @@ export type BadgeVariant = 'solid' | 'soft' | 'outline';
 
 const SURFACE_CLASSES: Record<BadgeColor, Record<BadgeVariant, string>> = {
   neutral: {
-    solid: 'bg-ink text-white border-transparent',
+    solid: 'bg-ink text-background border-transparent',
     soft: 'bg-border-subtle text-ink-muted border-transparent',
     outline: 'bg-transparent text-ink-muted border-border',
   },

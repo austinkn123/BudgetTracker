@@ -7,15 +7,6 @@ namespace BudgetTracker.Domain.Accessors;
 
 public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionAccessor
 {
-    public async Task<Transaction?> GetByIdAsync(int id, int userId)
-    {
-        return await context.Transactions
-            .AsNoTracking()
-            .Where(t => t.Id == id)
-            .Where(t => t.Account.UserId == userId)
-            .FirstOrDefaultAsync();
-    }
-
     public async Task<IEnumerable<Transaction>> GetByUserIdAsync(int userId)
     {
         return await context.Transactions
@@ -25,58 +16,65 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
             .ToListAsync();
     }
 
-    public async Task<bool> AccountBelongsToUserAsync(int accountId, int userId)
+    public async Task<IEnumerable<Transaction>> GetFilteredAsync(int userId, TransactionFilter filter)
     {
-        return await context.Accounts
+        var query = context.Transactions
             .AsNoTracking()
-            .AnyAsync(a => a.Id == accountId && a.UserId == userId);
-    }
+            .Where(t => t.Account.UserId == userId);
 
-    public async Task<int> CreateAsync(Transaction transaction)
-    {
-        context.Transactions.Add(transaction);
-        await context.SaveChangesAsync();
-        return transaction.Id;
-    }
-
-    public async Task<bool> UpdateAsync(Transaction transaction, int userId)
-    {
-        var existing = await context.Transactions
-            .Where(t => t.Id == transaction.Id)
-            .Where(t => t.Account.UserId == userId)
-            .FirstOrDefaultAsync();
-
-        if (existing is null)
         {
-            return false;
+            if (filter.From is DateTime from)
+                query = query.Where(t => t.OccurredAt >= from);
+
+            if (filter.To is DateTime to)
+                query = query.Where(t => t.OccurredAt <= to);
+
+            if (filter.Uncategorized is bool uncategorized)
+                query = uncategorized
+                    ? query.Where(t => t.CategoryId == null)
+                    : query.Where(t => t.CategoryId != null);
+
+            if (filter.IsImported is bool imported)
+                query = query.Where(t => t.IsImported == imported);
+
+            if (filter.IsPending is bool pending)
+                query = query.Where(t => t.IsPending == pending);
+
+            if (!string.IsNullOrWhiteSpace(filter.Search))
+            {
+                var term = filter.Search.Trim();
+                // EF.Functions.Like keeps the match in SQL Server rather than pulling rows to compare.
+                query = query.Where(t =>
+                    (t.Payee != null && EF.Functions.Like(t.Payee, $"%{term}%")) ||
+                    (t.Notes != null && EF.Functions.Like(t.Notes, $"%{term}%")));
+            }
         }
 
-        existing.AccountId = transaction.AccountId;
-        existing.CategoryId = transaction.CategoryId;
-        existing.TransactionType = transaction.TransactionType;
-        existing.Amount = transaction.Amount;
-        existing.OccurredAt = transaction.OccurredAt;
-        existing.Payee = transaction.Payee;
-        existing.Notes = transaction.Notes;
-        existing.TransferAccountId = transaction.TransferAccountId;
-
-        return await context.SaveChangesAsync() > 0;
+        return await query
+            .OrderByDescending(t => t.OccurredAt)
+            .ToListAsync();
     }
 
-    public async Task<bool> DeleteAsync(int id, int userId)
+    public async Task<bool> SetNotesAsync(int id, string? notes, int userId)
     {
-        var transaction = await context.Transactions
-            .Where(t => t.Id == id)
-            .Where(t => t.Account.UserId == userId)
-            .FirstOrDefaultAsync();
+        var affected = await context.Transactions
+            .Where(t => t.Id == id && t.Account.UserId == userId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.Notes, notes));
 
-        if (transaction is null)
-        {
-            return false;
-        }
+        return affected > 0;
+    }
 
-        context.Transactions.Remove(transaction);
-        return await context.SaveChangesAsync() > 0;
+    public async Task<int> SetCategoryAsync(IEnumerable<int> ids, int? categoryId, int userId)
+    {
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0)
+            return 0;
+
+        // Scoped through Account.UserId so ids belonging to someone else are silently excluded
+        // rather than trusted — the same tenancy rule every other read here uses.
+        return await context.Transactions
+            .Where(t => idList.Contains(t.Id) && t.Account.UserId == userId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.CategoryId, categoryId));
     }
 
     /// <inheritdoc />
@@ -112,6 +110,14 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
                 current.TransactionType = incomingTxn.TransactionType;
                 current.IsPending = incomingTxn.IsPending;
                 current.PlaidAccountId = incomingTxn.PlaidAccountId;
+                current.PlaidCategoryPrimary = incomingTxn.PlaidCategoryPrimary;
+
+                // CategoryId is user-owned (BUD-9: "my choice sticks on future syncs"), so a re-sync
+                // never overwrites it. Only backfill when the row is still uncategorized — that lets a
+                // mapping added after the import take effect on the next sync.
+                if (current.CategoryId is null)
+                    current.CategoryId = incomingTxn.CategoryId;
+
                 updated++;
             }
             else

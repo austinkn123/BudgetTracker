@@ -8,13 +8,12 @@
  *   - body background/color (preflight leaves body transparent + UA text color)
  *   - font smoothing (without it text renders heavy on macOS)
  *   - base size / line-height
- *   - color-scheme (native scrollbars, date inputs, autofill)
+ *   - color-scheme is emitted per theme by the token plugin (BUD-17), not here
  *   - global tracking (Stripe-leaning -0.011em)
  */
 @layer base {
   html {
     letter-spacing: -0.011em;
-    color-scheme: light;
   }
 
   body {
@@ -29,6 +28,14 @@
 }
 
 @layer components {
+  /* Currency / figure treatment (BUD-17). Tabular lining figures so columns of
+     money align on the decimal, plus the optical tightening the larger display
+     sizes need. Apply to any element rendering an amount, count, or date. */
+  .numeric {
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.022em;
+  }
+
   /* The one focus treatment, applied to every interactive element. Uses
      native :focus-visible — keyboard only, no mouse-click rings. */
   .focus-ring {

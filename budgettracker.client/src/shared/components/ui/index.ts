@@ -36,6 +36,12 @@ export type { ConfirmModalProps } from './ConfirmModal';
 export { default as Gauge } from './Gauge';
 export type { GaugeProps } from './Gauge';
 
+export { default as InlineCheckbox } from './InlineCheckbox';
+export type { InlineCheckboxProps } from './InlineCheckbox';
+
+export { default as InlineSelect } from './InlineSelect';
+export type { InlineSelectProps } from './InlineSelect';
+
 export { default as Input } from './Input';
 export type { InputProps, InputType, InputValueAs } from './Input';
 

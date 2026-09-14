@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LogOut, Menu, User, Wallet } from 'lucide-react';
+import { LogOut, Menu, Moon, Sun, User, Wallet } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../../features/user/hooks/useUser';
 import { useSignOut } from '../../hooks/useSignOut';
+import { useTheme } from '../../theme/useTheme';
 import { Skeleton, Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
 import { NAV_ITEMS } from './navItems';
@@ -59,6 +60,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
   const { data: user, isLoading: loadingUser } = useUser();
   const { user: cognitoUser } = useAuth();
   const { signOut, isSigningOut } = useSignOut();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   // useUser() is the reliable source: the Cognito email is empty after a page
   // refresh because getCurrentUser() does not repopulate signInDetails.
@@ -162,6 +164,20 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
 
         {/* Account cluster */}
         <div className="flex shrink-0 items-center gap-1">
+          <Tooltip title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              className={cn(
+                'focus-ring inline-flex items-center justify-center rounded-full text-white/45 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white/90 motion-reduce:transition-none',
+                compact ? 'h-8 w-8' : 'h-9 w-9',
+              )}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </Tooltip>
+
           {loadingUser ? (
             <Skeleton variant="circular" width={28} height={28} className="bg-white/10" />
           ) : (

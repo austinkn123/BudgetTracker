@@ -14,6 +14,7 @@ import CategoryDrillGrid from '../components/CategoryDrillGrid';
 import BucketBreakdown from '../components/BucketBreakdown';
 import RecentActivityFeed from '../components/RecentActivityFeed';
 import StatStrip from '../components/StatStrip';
+import UncategorizedNudge from '../components/UncategorizedNudge';
 import type { Stat } from '../components/StatStrip';
 import { useDateRange } from '../hooks/useDateRange';
 import { useBudgetAnalysis } from '../hooks/useBudgetAnalysis';
@@ -69,11 +70,12 @@ const DashboardPage = () => {
     if (!planMonth) return null;
     return {
       plan: planMonth.plan,
+      analyzedMonth: planMonth.analyzedMonth,
       pacing: planMonth.pacing,
       headline: getStatusHeadline(
         planMonth.pacing.pacingDelta,
         planMonth.pacing.daysPct,
-        planMonth.plan.planMonth,
+        planMonth.analyzedMonth,
       ),
       drifting: selectDrifting(planMonth.byCategory, categoryNames, DRIFTING_CATEGORIES),
     };
@@ -138,6 +140,13 @@ const DashboardPage = () => {
     ];
   }, [planMonth]);
 
+  // Counted across the whole ledger, not the selected range: a row outside the current window
+  // is still missing from the plan-vs-actual maths.
+  const uncategorizedCount = useMemo(
+    () => transactions.filter((t) => t.categoryId == null).length,
+    [transactions],
+  );
+
   const isLoading = loadingUser || loadingCategories || loadingTransactions || loadingAnalysis;
   const hasErrors = userError || categoriesError || transactionsError || analysisError;
 
@@ -172,10 +181,13 @@ const DashboardPage = () => {
 
       {stats.length > 0 && <StatStrip stats={stats} />}
 
+      <UncategorizedNudge count={uncategorizedCount} />
+
       {/* Hero */}
       {hero ? (
         <PlanStoryHero
           plan={hero.plan}
+          analyzedMonth={hero.analyzedMonth}
           pacing={hero.pacing}
           headline={hero.headline}
           drifting={hero.drifting}

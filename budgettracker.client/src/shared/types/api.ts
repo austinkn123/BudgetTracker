@@ -9,13 +9,16 @@ export interface Category {
   userId: number;
   name: string;
   categoryType: string;
+  /** Plaid taxonomy value (personal_finance_category.primary) this category claims, if any. */
+  plaidCategoryPrimary?: string | null;
 }
 
 export interface Transaction {
   id: number;
   accountId: number;
   transactionType: string;
-  categoryId: number;
+  /** Null for uncategorised rows — every imported transaction starts this way. */
+  categoryId: number | null;
   amount: number;
   occurredAt: string;
   payee?: string;
@@ -24,6 +27,8 @@ export interface Transaction {
   createdAt: string;
   plaidTransactionId?: string | null;
   plaidAccountId?: string | null;
+  /** Plaid's suggested category. Retained even after the user overrides categoryId. */
+  plaidCategoryPrimary?: string | null;
   isImported?: boolean;
   isPending?: boolean;
 }
@@ -125,6 +130,11 @@ export interface BucketPerformance {
 
 export interface PlanPerformance {
   plan: AnalyzedPlan;
+  /**
+   * The month these figures describe. Differs from `plan.planMonth` (the month the plan took
+   * effect) whenever a plan has rolled forward past its own month.
+   */
+  analyzedMonth: string;
   pacing: PeriodPacing;
   byCategory: CategoryPerformance[];
   byBucket: BucketPerformance[];

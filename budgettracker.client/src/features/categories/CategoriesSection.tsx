@@ -14,6 +14,7 @@ import {
   Tooltip,
 } from '../../shared/components/ui';
 import type { Category } from '../../shared/types/api';
+import { PLAID_CATEGORY_OPTIONS } from '../../shared/constants/plaidCategories';
 import { categorySchema, type CategoryFormValues } from '../../shared/validation/categorySchema';
 import { useTransactions } from '../transactions/hooks/useTransactions';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
@@ -81,6 +82,10 @@ const CategoriesSection = ({
     }
 
     for (const transaction of transactions) {
+      // Uncategorised rows belong to no category, so they cannot count toward any category's
+      // usage. Before categoryId was typed nullable these accumulated under a null key.
+      if (transaction.categoryId == null) continue;
+
       const usage = map.get(transaction.categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
       usage.transactions += 1;
       usage.total += 1;
@@ -104,7 +109,7 @@ const CategoriesSection = ({
 
   const openAddDialog = () => {
     setEditingCategoryId(null);
-    reset({ name: '', categoryType: 'Expense' });
+    reset({ name: '', categoryType: 'Expense', plaidCategoryPrimary: '' });
     setDialogMode('add');
     setDialogOpen(true);
   };
@@ -119,6 +124,7 @@ const CategoriesSection = ({
     reset({
       name: category.name,
       categoryType,
+      plaidCategoryPrimary: category.plaidCategoryPrimary ?? '',
     });
     setDialogMode('edit');
     setDialogOpen(true);
@@ -136,6 +142,7 @@ const CategoriesSection = ({
           userId: 0,
           name: values.name,
           categoryType: values.categoryType,
+          plaidCategoryPrimary: values.plaidCategoryPrimary ?? '',
         });
         closeDialog();
         return;
@@ -148,6 +155,9 @@ const CategoriesSection = ({
         userId: 0,
         name: values.name,
         categoryType: values.categoryType,
+        // Always sent — omitting it makes the server treat the mapping as "not supplied",
+        // which used to wipe auto-categorisation on a simple rename.
+        plaidCategoryPrimary: values.plaidCategoryPrimary ?? '',
       });
       closeDialog();
     } catch {
@@ -237,6 +247,14 @@ const CategoriesSection = ({
           name="categoryType"
           label="Type"
           options={CATEGORY_TYPE_OPTIONS}
+        />
+        <Select
+          control={control}
+          name="plaidCategoryPrimary"
+          label="Auto-categorise imports as"
+          options={PLAID_CATEGORY_OPTIONS}
+          emptyOptionLabel="No automatic mapping"
+          helperText="Imported transactions Plaid tags with this category are assigned here automatically."
         />
       </Modal>
 

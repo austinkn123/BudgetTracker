@@ -1,19 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, startOfDay, startOfMonth } from 'date-fns';
-import { Plus } from 'lucide-react';
-import { Badge, Button, Card } from '../../shared/components/ui';
+import { endOfMonth, isSameMonth, startOfDay, startOfMonth } from 'date-fns';
+import { Button, Card, InlineSelect, ToggleGroup } from '../../shared/components/ui';
 import { useTransactions } from './hooks/useTransactions';
-import { useTransactionForm } from './hooks/useTransactionForm';
+import { useTransactionReview } from './hooks/useTransactionReview';
 import { useCategories } from '../categories/hooks/useCategories';
+import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
+import { useBudgetAnalysis } from '../dashboard/hooks/useBudgetAnalysis';
 import { plaidService } from '../../shared/services/plaid.service';
-import TransactionDialog from './components/TransactionDialog';
+import type { TransactionQuery } from '../../shared/services/transaction.service';
+import MonthHeader from './components/MonthHeader';
+import PlanGroupedView from './components/PlanGroupedView';
+import TransactionRows from './components/TransactionRows';
 import TransactionTable from './components/TransactionTable';
+import TransactionFilters from './components/TransactionFilters';
+import { buildListQuery, type TransactionStatusFilter } from './utils/transactionFilters';
+import { groupByPlan } from './utils/planGrouping';
 import {
   buildTransactionDaySummaries,
   getTransactionDaySummary,
-  getTransactionMonthSummary,
-  toDateKey,
 } from './utils/transactionGroups';
 
 type TransactionsSectionProps = {
@@ -22,17 +27,45 @@ type TransactionsSectionProps = {
   setStatusError: (msg: string | null) => void;
 };
 
+type ViewMode = 'plan' | 'list' | 'calendar';
+
+const VIEW_OPTIONS = [
+  { value: 'plan' as const, label: 'Plan' },
+  { value: 'list' as const, label: 'List' },
+  { value: 'calendar' as const, label: 'Calendar' },
+];
+
 const TransactionsSection = ({
   isLoading,
   setStatusMessage,
   setStatusError,
 }: TransactionsSectionProps) => {
-  const { data: transactions = [] } = useTransactions();
-  const { data: categories = [] } = useCategories();
+  const [view, setView] = useState<ViewMode>('plan');
+  const [status, setStatus] = useState<TransactionStatusFilter>('all');
+  const [search, setSearch] = useState('');
+  const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
 
-  // Read-only share of the Settings page connection cache (same query key) so we
-  // can resolve a Plaid account mask for each imported row. Never mutates.
+  const monthStart = useMemo(() => startOfMonth(month), [month]);
+  const monthEnd = useMemo(() => endOfMonth(month), [month]);
+
+  // The calendar tints every day of its visible month, so it needs the unfiltered ledger.
+  const { data: allTransactions = [] } = useTransactions();
+
+  const monthQuery = useMemo<TransactionQuery>(
+    () => buildListQuery(status, search, monthStart, monthEnd),
+    [status, search, monthStart, monthEnd],
+  );
+
+  const { data: monthTransactions = [] } = useTransactions(monthQuery);
+  const { data: categories = [] } = useCategories();
+  const { data: budgetPlans = [] } = useBudgetPlans();
+
+  // Analysis now follows the requested window, so this is the plan-vs-actual for the month on screen.
+  const { data: analysis } = useBudgetAnalysis(monthStart, monthEnd, 3);
+
+  // Read-only share of the Settings page connection cache (same query key) so we can resolve a
+  // Plaid account mask for each imported row. Never mutates.
   const { data: connection } = useQuery({
     queryKey: ['plaid', 'connection'],
     queryFn: plaidService.getConnection,
@@ -43,83 +76,161 @@ const TransactionsSection = ({
     [connection],
   );
 
-  const expenseCategories = useMemo(
-    () => categories.filter((c) => c.categoryType === 'Expense' || c.categoryType === 'Both'),
+  const review = useTransactionReview(monthTransactions, setStatusMessage, setStatusError);
+
+  const categoryNames = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.name])),
     [categories],
   );
 
-  const incomeCategories = useMemo(
-    () => categories.filter((c) => c.categoryType === 'Income' || c.categoryType === 'Both'),
+  const categoryOptions = useMemo(
+    () => categories.map((c) => ({ value: c.id, label: c.name })),
     [categories],
   );
 
-  const form = useTransactionForm(transactions, expenseCategories, setStatusMessage, setStatusError);
+  // The plan governing the month on screen: plans roll forward, so it is the newest active plan
+  // dated on or before it — the same rule BudgetAnalysisManager applies server-side.
+  const governingPlan = useMemo(() => {
+    const candidates = budgetPlans
+      .filter((p) => p.isActive && new Date(p.planMonth) <= monthStart)
+      .sort((a, b) => new Date(b.planMonth).getTime() - new Date(a.planMonth).getTime());
+    return candidates[0] ?? null;
+  }, [budgetPlans, monthStart]);
 
-  // For a locked (imported) edit, offer categories matching the row's type so the
-  // dropdown isn't empty for Income rows, falling back to ALL categories.
-  const dialogCategories = useMemo(() => {
-    const editing = form.editingTransaction;
-    if (!editing || !form.locked) return expenseCategories;
-    const typed = editing.transactionType === 'Income' ? incomeCategories : expenseCategories;
-    return typed.length > 0 ? typed : categories;
-  }, [form.editingTransaction, form.locked, expenseCategories, incomeCategories, categories]);
+  const grouping = useMemo(
+    () =>
+      groupByPlan(
+        monthTransactions,
+        governingPlan,
+        categoryNames,
+        analysis?.planMonth?.byCategory,
+      ),
+    [monthTransactions, governingPlan, categoryNames, analysis],
+  );
 
-  const daySummaries = useMemo(() => buildTransactionDaySummaries(transactions), [transactions]);
+  // Counted across the whole ledger rather than the month on screen, so the number does not shift
+  // as you browse — it is the size of the backlog, not of this page.
+  const uncategorizedCount = useMemo(
+    () => allTransactions.filter((t) => t.categoryId == null).length,
+    [allTransactions],
+  );
+
+  const daySummaries = useMemo(
+    () => buildTransactionDaySummaries(allTransactions),
+    [allTransactions],
+  );
   const selectedDaySummary = useMemo(
     () => getTransactionDaySummary(daySummaries, selectedDate),
     [daySummaries, selectedDate],
   );
-  const visibleMonthSummary = useMemo(
-    () => getTransactionMonthSummary(daySummaries, selectedDate),
-    [daySummaries, selectedDate],
-  );
 
-  const handleToday = () => {
-    setSelectedDate(startOfDay(new Date()));
+  const handleMonthChange = (next: Date) => {
+    setMonth(next);
+    // Keep the calendar's selection inside the month being reviewed.
+    setSelectedDate(isSameMonth(next, new Date()) ? startOfDay(new Date()) : next);
+  };
+
+  const rowProps = {
+    categories,
+    maskByPlaidAccountId,
+    selectedIds: review.selectedIds,
+    onToggleSelected: review.toggleSelected,
+    onCategoryChange: review.setCategoryFor,
+    onNotesChange: review.setNotesFor,
+    isBusy: review.isBusy,
   };
 
   if (isLoading) return null;
 
   return (
-    <>
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm text-ink-muted">
-              {visibleMonthSummary.label} has {visibleMonthSummary.transactionCount}{' '}
-              {visibleMonthSummary.transactionCount === 1 ? 'transaction' : 'transactions'} across{' '}
-              {visibleMonthSummary.activeDayCount} active{' '}
-              {visibleMonthSummary.activeDayCount === 1 ? 'day' : 'days'}.
-            </p>
-            <span className="text-xs text-ink-muted">
-              Select a day on the calendar to inspect that ledger slice or start a new entry.
-            </span>
-          </div>
-          <div className="flex flex-col gap-2.5 sm:flex-row">
-            <Button variant="secondary" onClick={handleToday}>
-              Today
-            </Button>
-            <Button
-              startIcon={<Plus size={16} />}
-              onClick={() => form.openForAdd(toDateKey(selectedDate))}
-            >
-              Add Transaction
-            </Button>
-          </div>
-        </div>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ToggleGroup
+          value={view}
+          onChange={setView}
+          options={VIEW_OPTIONS}
+          ariaLabel="Transactions view"
+        />
+        {uncategorizedCount > 0 && (
+          <Button
+            variant={status === 'uncategorized' ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => {
+              setStatus(status === 'uncategorized' ? 'all' : 'uncategorized');
+              setView('list');
+            }}
+          >
+            {uncategorizedCount} need a category
+          </Button>
+        )}
+      </div>
 
+      <MonthHeader
+        month={monthStart}
+        onMonthChange={handleMonthChange}
+        performance={analysis?.planMonth ?? null}
+      />
+
+      {review.selectedIds.size > 0 && (
         <Card padding="sm">
-          <div className="flex flex-col flex-wrap gap-2.5 lg:flex-row">
-            <Badge label={`Selected ${format(selectedDate, 'PP')}`} color="primary" variant="outline" />
-            <Badge label={`Income $${visibleMonthSummary.incomeTotal.toFixed(2)}`} color="success" variant="outline" />
-            <Badge label={`Outflow $${visibleMonthSummary.outflowTotal.toFixed(2)}`} color="error" variant="outline" />
-            <Badge
-              label={`Net ${visibleMonthSummary.netTotal >= 0 ? '+' : '-'}$${Math.abs(visibleMonthSummary.netTotal).toFixed(2)}`}
-              color={visibleMonthSummary.netTotal >= 0 ? 'success' : 'error'}
-            />
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-ink">
+              {review.selectedIds.size} selected
+            </span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-56">
+                <InlineSelect
+                  value={null}
+                  onChange={(categoryId) => review.setCategoryForSelected(categoryId)}
+                  options={categoryOptions}
+                  emptyOptionLabel="Uncategorized"
+                  placeholder="Set category…"
+                  ariaLabel="Set category for selected transactions"
+                  valueAs="number"
+                  disabled={review.isBusy}
+                />
+              </div>
+              <Button variant="ghost" size="sm" onClick={review.clearSelection}>
+                Clear
+              </Button>
+            </div>
           </div>
         </Card>
+      )}
 
+      {view === 'plan' && <PlanGroupedView grouping={grouping} {...rowProps} />}
+
+      {view === 'list' && (
+        <div className="flex flex-col gap-4">
+          <TransactionFilters
+            status={status}
+            onStatusChange={setStatus}
+            search={search}
+            onSearchChange={setSearch}
+            uncategorizedCount={uncategorizedCount}
+          />
+          <Card padding="none">
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                {monthTransactions.length}{' '}
+                {monthTransactions.length === 1 ? 'transaction' : 'transactions'}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => review.toggleAll(review.selectedIds.size !== monthTransactions.length)}
+              >
+                {review.selectedIds.size === monthTransactions.length && monthTransactions.length > 0
+                  ? 'Deselect all'
+                  : 'Select all'}
+              </Button>
+            </div>
+            <TransactionRows transactions={monthTransactions} {...rowProps} />
+          </Card>
+        </div>
+      )}
+
+      {view === 'calendar' && (
         <Card padding="none">
           <TransactionTable
             categories={categories}
@@ -128,25 +239,12 @@ const TransactionsSection = ({
             selectedDaySummary={selectedDaySummary}
             maskByPlaidAccountId={maskByPlaidAccountId}
             onDateChange={setSelectedDate}
-            onMonthChange={(month) => setSelectedDate(startOfMonth(month))}
-            onAddTransaction={form.openForAdd}
-            onRowClick={form.openForEdit}
+            onMonthChange={(next) => handleMonthChange(startOfMonth(next))}
+            onRowClick={() => undefined}
           />
         </Card>
-      </div>
-
-      <TransactionDialog
-        open={form.dialogOpen}
-        mode={form.dialogMode}
-        initialValues={form.initialValues}
-        categories={dialogCategories}
-        isSaving={form.isSaving}
-        locked={form.locked}
-        onClose={form.closeDialog}
-        onSave={form.save}
-        onDelete={form.deleteTransaction}
-      />
-    </>
+      )}
+    </div>
   );
 };
 

@@ -1,93 +1,58 @@
 using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Interfaces.Accessors;
-using BudgetTracker.Domain.Interfaces.Engines;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Models;
 
 namespace BudgetTracker.Server.Managers;
 
-public class TransactionManager(ITransactionEngine engine, ITransactionAccessor accessor) : ITransactionManager
+/// <summary>
+/// Read and review orchestration for the ledger. Plaid sync creates every transaction (via
+/// <see cref="ITransactionAccessor.UpsertImportedAsync"/>), so this manager owns no create or
+/// delete path — only the two annotations a person makes: category and notes.
+/// </summary>
+public class TransactionManager(ITransactionAccessor accessor, ICategoryAccessor categoryAccessor) : ITransactionManager
 {
-    public async Task<Result<Transaction>> GetByIdAsync(int id, int userId)
-    {
-        var transaction = await accessor.GetByIdAsync(id, userId);
-        return transaction is not null
-            ? Result<Transaction>.Success(transaction)
-            : Result<Transaction>.Failure("Transaction not found");
-    }
-
     public async Task<Result<IEnumerable<Transaction>>> GetByUserIdAsync(int userId)
     {
         var transactions = await accessor.GetByUserIdAsync(userId);
         return Result<IEnumerable<Transaction>>.Success(transactions);
     }
 
-    public async Task<Result<int>> CreateAsync(Transaction transaction, int userId)
+    public async Task<Result<IEnumerable<Transaction>>> GetFilteredAsync(int userId, TransactionFilter filter)
     {
-        var error = engine.ValidateTransaction(transaction);
-        if (error is not null)
-            return Result<int>.Failure(error);
-
-        var ownsAccount = await accessor.AccountBelongsToUserAsync(transaction.AccountId, userId);
-        if (!ownsAccount)
-            return Result<int>.Failure("Account not found for current user");
-
-        if (transaction.TransferAccountId is not null)
-        {
-            var ownsTransferAccount = await accessor.AccountBelongsToUserAsync(transaction.TransferAccountId.Value, userId);
-            if (!ownsTransferAccount)
-                return Result<int>.Failure("Transfer account not found for current user");
-        }
-
-        var id = await accessor.CreateAsync(transaction);
-        return Result<int>.Success(id);
+        var transactions = await accessor.GetFilteredAsync(userId, filter);
+        return Result<IEnumerable<Transaction>>.Success(transactions);
     }
 
-    public async Task<Result<bool>> UpdateAsync(Transaction transaction, int userId)
+    public async Task<Result<int>> SetCategoryAsync(IEnumerable<int> ids, int? categoryId, int userId)
     {
-        // Fetch the current state first so we can detect tampering with read-only fields on imported rows.
-        var existing = await accessor.GetByIdAsync(transaction.Id, userId);
-        if (existing is null)
-            return Result<bool>.Failure("Transaction not found");
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0)
+            return Result<int>.Failure("No transactions selected");
 
-        if (existing.IsImported)
+        // Verify the target category is the user's own before writing it across a batch; the accessor
+        // scopes the rows by owner, but the category id arrives straight from the request body.
+        if (categoryId is int id)
         {
-            // For Plaid-sourced rows only Category and Notes are editable; merchant/amount/date/account come from upstream.
-            if (existing.Amount != transaction.Amount
-                || existing.OccurredAt != transaction.OccurredAt
-                || existing.AccountId != transaction.AccountId
-                || existing.TransactionType != transaction.TransactionType
-                || !string.Equals(existing.Payee, transaction.Payee, StringComparison.Ordinal))
-            {
-                return Result<bool>.Failure("Imported transactions are read-only except for Category and Notes");
-            }
+            var category = await categoryAccessor.GetByIdForUserAsync(id, userId);
+            if (category is null)
+                return Result<int>.Failure("Category not found");
         }
 
-        var error = engine.ValidateTransaction(transaction);
-        if (error is not null)
-            return Result<bool>.Failure(error);
+        var changed = await accessor.SetCategoryAsync(idList, categoryId, userId);
+        return Result<int>.Success(changed);
+    }
 
-        var ownsAccount = await accessor.AccountBelongsToUserAsync(transaction.AccountId, userId);
-        if (!ownsAccount)
-            return Result<bool>.Failure("Account not found for current user");
+    public async Task<Result<bool>> SetNotesAsync(int id, string? notes, int userId)
+    {
+        // Matches the column width; the ledger is not a place for essays.
+        if (notes is { Length: > 1000 })
+            return Result<bool>.Failure("Notes must be 1000 characters or fewer");
 
-        if (transaction.TransferAccountId is not null)
-        {
-            var ownsTransferAccount = await accessor.AccountBelongsToUserAsync(transaction.TransferAccountId.Value, userId);
-            if (!ownsTransferAccount)
-                return Result<bool>.Failure("Transfer account not found for current user");
-        }
+        var normalised = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
 
-        var updated = await accessor.UpdateAsync(transaction, userId);
+        var updated = await accessor.SetNotesAsync(id, normalised, userId);
         return updated
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("Transaction not found");
-    }
-
-    public async Task<Result<bool>> DeleteAsync(int id, int userId)
-    {
-        var deleted = await accessor.DeleteAsync(id, userId);
-        return deleted
             ? Result<bool>.Success(true)
             : Result<bool>.Failure("Transaction not found");
     }

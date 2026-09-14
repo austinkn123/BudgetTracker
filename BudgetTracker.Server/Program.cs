@@ -52,7 +52,7 @@ builder.Services.Scan(scan => scan
 
 // Engines (business logic)
 builder.Services.Scan(scan => scan
-    .FromAssemblies(typeof(TransactionEngine).Assembly)
+    .FromAssemblies(typeof(BudgetAnalysisEngine).Assembly)
         .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Engine")))
         .AsImplementedInterfaces()
         .WithScopedLifetime());

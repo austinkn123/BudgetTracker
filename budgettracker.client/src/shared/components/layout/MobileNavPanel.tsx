@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { LogOut, User, Wallet } from 'lucide-react';
+import { LogOut, Moon, Sun, User, Wallet } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../../features/user/hooks/useUser';
 import { useSignOut } from '../../hooks/useSignOut';
+import { useTheme } from '../../theme/useTheme';
 import { Skeleton } from '../ui';
 import { cn } from '../../utils/cn';
 import { NAV_ITEMS } from './navItems';
@@ -17,6 +18,7 @@ const MobileNavPanel = ({ onNavigate }: MobileNavPanelProps) => {
   const { data: user, isLoading: loadingUser } = useUser();
   const { user: cognitoUser } = useAuth();
   const { signOut, isSigningOut, error } = useSignOut();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const email = user?.email || cognitoUser?.email || '';
   const accountLabel = getAccountLabel(email, cognitoUser?.username);
@@ -82,6 +84,19 @@ const MobileNavPanel = ({ onNavigate }: MobileNavPanelProps) => {
         )}
 
         {error && <p className="px-2 pb-1 text-xs text-error-light">{error}</p>}
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] font-medium text-white/55 outline-none transition-colors duration-120 hover:bg-white/[0.05] hover:text-white/90 focus-visible:ring-2 focus-visible:ring-primary-light/60"
+        >
+          {theme === 'dark' ? (
+            <Sun size={18} className="shrink-0 text-white/45" />
+          ) : (
+            <Moon size={18} className="shrink-0 text-white/45" />
+          )}
+          {theme === 'dark' ? 'Light theme' : 'Dark theme'}
+        </button>
 
         <button
           type="button"

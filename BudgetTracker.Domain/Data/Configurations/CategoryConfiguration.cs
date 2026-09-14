@@ -24,9 +24,18 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasDefaultValue("Expense")
             .IsRequired();
 
+        builder.Property(c => c.PlaidCategoryPrimary)
+            .HasMaxLength(100);
+
         builder.HasIndex(c => new { c.UserId, c.Name })
             .IsUnique()
             .HasDatabaseName("UQ_Categories_User_Name");
+
+        // One category per Plaid taxonomy value per user, so a suggestion resolves deterministically.
+        builder.HasIndex(c => new { c.UserId, c.PlaidCategoryPrimary })
+            .IsUnique()
+            .HasFilter("[PlaidCategoryPrimary] IS NOT NULL")
+            .HasDatabaseName("UQ_Categories_User_PlaidCategory");
 
         builder.HasMany(c => c.Transactions)
             .WithOne(t => t.Category)

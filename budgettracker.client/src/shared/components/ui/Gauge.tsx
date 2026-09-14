@@ -1,4 +1,4 @@
-import { colorTokens, withAlpha } from '../../theme/tokens';
+import { cssVar } from '../../theme/tokens';
 
 export interface GaugeProps {
   /** 0–100. */
@@ -51,7 +51,7 @@ const Gauge = ({ value, size = 200, valueColor, trackColor, textColor }: GaugePr
       <path
         d={arcPath}
         fill="none"
-        stroke={trackColor ?? withAlpha(colorTokens.neutral.textPrimary, 0.08)}
+        stroke={trackColor ?? cssVar('ink', 0.08)}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         pathLength={100}

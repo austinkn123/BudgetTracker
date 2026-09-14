@@ -12,7 +12,7 @@ namespace BudgetTracker.Domain.Engines;
 public class PlaidEngine : IPlaidEngine
 {
     /// <inheritdoc />
-    public Transaction MapToBudgetTrackerTransaction(PlaidTransactionDto dto, int accountId)
+    public Transaction MapToBudgetTrackerTransaction(PlaidTransactionDto dto, int accountId, int? categoryId = null)
     {
         // Plaid convention: positive = money out, negative = money in.
         // BudgetTracker convention (BUD-18): negative = outflow Expense, positive = inflow Income.
@@ -28,9 +28,24 @@ public class PlaidEngine : IPlaidEngine
             Payee = !string.IsNullOrWhiteSpace(dto.MerchantName) ? dto.MerchantName : dto.Name,
             PlaidTransactionId = dto.TransactionId,
             PlaidAccountId = dto.AccountId,
+            PlaidCategoryPrimary = dto.PersonalFinanceCategoryPrimary,
+            CategoryId = categoryId,
             IsImported = true,
             IsPending = dto.Pending
         };
+    }
+
+    /// <inheritdoc />
+    public int? ResolveCategoryId(PlaidTransactionDto dto, IEnumerable<Category> userCategories)
+    {
+        if (string.IsNullOrWhiteSpace(dto.PersonalFinanceCategoryPrimary))
+            return null;
+
+        var match = userCategories.FirstOrDefault(c =>
+            !string.IsNullOrWhiteSpace(c.PlaidCategoryPrimary) &&
+            string.Equals(c.PlaidCategoryPrimary, dto.PersonalFinanceCategoryPrimary, StringComparison.OrdinalIgnoreCase));
+
+        return match?.Id;
     }
 
     /// <inheritdoc />

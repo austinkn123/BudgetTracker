@@ -95,6 +95,88 @@ export const colorTokens = {
   },
 } as const;
 
+/**
+ * Dark theme values (BUD-17). Same shape as `colorTokens` — `tailwind.config.ts`
+ * emits both sets as `--bud-*` channel triplets, light on `:root` and dark on
+ * `.dark`, so every semantic utility switches theme without a component rewrite.
+ *
+ * Two deliberate departures from a naive inversion:
+ *
+ * 1. `dark` shade flips role. In the light theme `*-dark` is the deep variant
+ *    used as text on a `*-subtle` background (33 usages) and as a button hover
+ *    fill (2 usages). Text-on-subtle is the dominant case, and on a dark ground
+ *    that text has to be LIGHT — so here `dark` is a light tint. The two button
+ *    hovers carry an explicit `dark:` override instead.
+ *
+ * 2. The `grey` ramp is NOT inverted and is therefore absent from this map.
+ *    It exists for structural surfaces that are dark in both themes — the
+ *    floating nav pill (`bg-grey-900/85`), chart gridlines. Flipping it would
+ *    turn the nav white.
+ */
+export const darkColorTokens = {
+  primary: {
+    main: '#635BFF',
+    light: '#8F8AFF',
+    dark: '#A9A5FF',
+    subtle: '#1E1F4D',
+    contrastText: '#FFFFFF',
+    /** Button fill hover. Dark UIs lift on hover; light UIs deepen. */
+    hover: '#7D76FF',
+  },
+  secondary: {
+    main: '#0BA5EC',
+    light: '#5CC8F5',
+    dark: '#7FD6F8',
+    subtle: '#0C3247',
+    contrastText: '#FFFFFF',
+  },
+  success: {
+    main: '#0E9F6E',
+    light: '#4FC79E',
+    dark: '#6FD8B4',
+    subtle: '#0D3A2E',
+    contrastText: '#FFFFFF',
+  },
+  warning: {
+    main: '#C77700',
+    light: '#E5A23D',
+    dark: '#F0BC6E',
+    subtle: '#3A2D14',
+    contrastText: '#FFFFFF',
+  },
+  error: {
+    main: '#DF1B41',
+    light: '#EE6C86',
+    dark: '#F492A6',
+    subtle: '#3D1622',
+    contrastText: '#FFFFFF',
+    /** Button fill hover. Dark UIs lift on hover; light UIs deepen. */
+    hover: '#E8506D',
+  },
+  info: {
+    main: '#3F6AD8',
+    light: '#7C9AE8',
+    dark: '#A3B8F0',
+    subtle: '#16294F',
+    contrastText: '#FFFFFF',
+  },
+  /**
+   * Deep navy, not grey. The page sits BELOW the card surface so cards lift by
+   * a tone step plus a border — a shadow does no work on a dark ground.
+   */
+  neutral: {
+    background: '#06121E',
+    surface: '#0D2033',
+    borderSubtle: '#16304A',
+    border: '#1E3D5A',
+    borderStrong: '#2A5075',
+    textPrimary: '#E9F0F7',
+    textSecondary: '#8FA5BC',
+    /** Shadow ink. Near-black on dark; the light theme uses its own text ink. */
+    shadow: '#000000',
+  },
+} as const;
+
 /* ------------------------------------------------------------------ */
 /* Color helpers (BUD-20)                                              */
 /* ------------------------------------------------------------------ */
@@ -117,12 +199,29 @@ export const hexToChannels = (hex: string): string => {
 };
 
 /**
+ * A live token reference — `rgb(var(--bud-primary) / 1)`.
+ *
+ * Unlike reading a hex off `colorTokens`, this follows the theme at paint time.
+ * That is what lets SVG and inline-style consumers (charts, gauges, sparklines)
+ * switch with the rest of the UI instead of freezing the light palette at module
+ * load, since they cannot use Tailwind's `dark:` variant. (BUD-17)
+ */
+export const cssVar = (name: string, alpha: number = 1): string =>
+  `rgb(var(--bud-${name}) / ${alpha})`;
+
+/**
  * JS-side alpha compositing for consumers that can't use Tailwind classes
  * (chart fills, SVG attributes). Returns `rgb(r g b / a)` — deliberately no
  * `#`, so output strings pass the hex-literal audit.
+ *
+ * Accepts a hex OR an existing `cssVar()` reference: tinting a theme-aware
+ * color must not collapse it back to a fixed one.
  */
-export const withAlpha = (hex: string, alpha: number): string =>
-  `rgb(${hexToChannels(hex)} / ${alpha})`;
+export const withAlpha = (color: string, alpha: number): string => {
+  const tokenRef = color.match(/^rgb\(var\((--bud-[a-z0-9-]+)\)/i);
+  if (tokenRef) return `rgb(var(${tokenRef[1]}) / ${alpha})`;
+  return `rgb(${hexToChannels(color)} / ${alpha})`;
+};
 
 /* ------------------------------------------------------------------ */
 /* Non-color scales (BUD-20, Stripe-leaning)                           */

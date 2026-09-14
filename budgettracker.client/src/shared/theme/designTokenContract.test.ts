@@ -92,4 +92,32 @@ describe('hardcoded hex audit (src outside shared/theme)', () => {
 
     expect(offenders).toEqual([]);
   });
+
+  /**
+   * The hex audit above catches a literal color. It does NOT catch a plausible-looking
+   * reference to a CSS variable that was never defined — `var(--color-success)` instead of
+   * `var(--bud-success)`. That failure is silent: an unresolvable var() invalidates the whole
+   * declaration, so the element falls back to its class default and every state renders
+   * identically. Shipped exactly that way in PlanGroupedView's four-step spend ramp.
+   *
+   * Only `--bud-*` (emitted by the Tailwind plugin) and `--radix-*` (supplied by Radix at
+   * runtime) exist. Prefer `cssVar()` from tokens.ts over hand-writing either.
+   */
+  const CSS_VAR_PATTERN = /var\(\s*(--[a-zA-Z0-9-]+)/g;
+  const ALLOWED_VAR_PREFIXES = ['--bud-', '--radix-'];
+
+  it('references only CSS variables that are actually defined', () => {
+    const offenders = collectSourceFiles(SRC_ROOT).flatMap((file) => {
+      const contents = readFileSync(file, 'utf8');
+      const unknown = [...contents.matchAll(CSS_VAR_PATTERN)]
+        .map((match) => match[1])
+        .filter((name) => !ALLOWED_VAR_PREFIXES.some((prefix) => name.startsWith(prefix)));
+
+      return unknown.length > 0
+        ? [`${relative(SRC_ROOT, file)}: ${[...new Set(unknown)].join(', ')}`]
+        : [];
+    });
+
+    expect(offenders).toEqual([]);
+  });
 });

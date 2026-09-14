@@ -80,7 +80,7 @@ const ForgotPasswordPage = () => {
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-grey-900 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-grey-900 p-4 dark:bg-background">
       <div className="w-full max-w-[400px]">
         <div className="mb-6 flex items-center justify-center gap-2.5">
           <span className="flex text-primary-light">

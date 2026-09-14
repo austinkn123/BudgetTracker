@@ -3,6 +3,7 @@ import defaultTheme from 'tailwindcss/defaultTheme';
 import plugin from 'tailwindcss/plugin';
 import {
   colorTokens,
+  darkColorTokens,
   fontSizeTokens,
   hexToChannels,
   motionTokens,
@@ -28,9 +29,13 @@ import {
 const semanticScales = ['primary', 'secondary', 'success', 'warning', 'error', 'info'] as const;
 const shades = ['light', 'dark', 'subtle'] as const;
 
-const cssVars: Record<string, string> = {};
-const varRef = (name: string, hex: string): string => {
-  cssVars[`--bud-${name}`] = hexToChannels(hex);
+const lightVars: Record<string, string> = {};
+const darkVars: Record<string, string> = {};
+
+/** Register a token in BOTH themes and return the utility's var reference. */
+const varRef = (name: string, lightHex: string, darkHex: string): string => {
+  lightVars[`--bud-${name}`] = hexToChannels(lightHex);
+  darkVars[`--bud-${name}`] = hexToChannels(darkHex);
   return `rgb(var(--bud-${name}) / <alpha-value>)`;
 };
 
@@ -38,19 +43,36 @@ const semanticColors = Object.fromEntries(
   semanticScales.map((scale) => [
     scale,
     {
-      DEFAULT: varRef(scale, colorTokens[scale].main),
+      DEFAULT: varRef(scale, colorTokens[scale].main, darkColorTokens[scale].main),
       ...Object.fromEntries(
-        shades.map((shade) => [shade, varRef(`${scale}-${shade}`, colorTokens[scale][shade])]),
+        shades.map((shade) => [
+          shade,
+          varRef(`${scale}-${shade}`, colorTokens[scale][shade], darkColorTokens[scale][shade]),
+        ]),
       ),
     },
   ]),
 );
 
-// Shadow color channel (ink) — consumed by shadowTokens.
-cssVars['--bud-shadow'] = hexToChannels(colorTokens.neutral.textPrimary);
+/**
+ * Button fill hover. The `*-dark` shade cannot serve here: in the dark theme it
+ * flips to a light text tint (see darkColorTokens). Light deepens, dark lifts.
+ */
+const hoverColors = {
+  'primary-hover': varRef('primary-hover', colorTokens.primary.dark, darkColorTokens.primary.hover),
+  'error-hover': varRef('error-hover', colorTokens.error.dark, darkColorTokens.error.hover),
+};
+
+// Shadow color channel — consumed by shadowTokens. Near-black on dark, where
+// a navy-tinted shadow would read as a smudge rather than depth.
+lightVars['--bud-shadow'] = hexToChannels(colorTokens.neutral.textPrimary);
+darkVars['--bud-shadow'] = hexToChannels(darkColorTokens.neutral.shadow);
 
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  // Class strategy, not media: the Appearance control has an explicit
+  // light/dark/system choice, and "system" is resolved in JS (see theme.ts).
+  darkMode: 'class',
   theme: {
     // Full overrides (not extend) — deliberately clamped scales (BUD-20).
     borderRadius: radiusTokens,
@@ -58,20 +80,21 @@ export default {
     extend: {
       colors: {
         ...semanticColors,
+        ...hoverColors,
         /** Page background — matches tokens.neutral.background. */
-        background: varRef('background', colorTokens.neutral.background),
+        background: varRef('background', colorTokens.neutral.background, darkColorTokens.neutral.background),
         /** Card / surface background. */
-        surface: varRef('surface', colorTokens.neutral.surface),
+        surface: varRef('surface', colorTokens.neutral.surface, darkColorTokens.neutral.surface),
         /** Border scale: subtle (internal rules) / DEFAULT / strong (hover). */
         border: {
-          subtle: varRef('border-subtle', colorTokens.neutral.borderSubtle),
-          DEFAULT: varRef('border', colorTokens.neutral.border),
-          strong: varRef('border-strong', colorTokens.neutral.borderStrong),
+          subtle: varRef('border-subtle', colorTokens.neutral.borderSubtle, darkColorTokens.neutral.borderSubtle),
+          DEFAULT: varRef('border', colorTokens.neutral.border, darkColorTokens.neutral.border),
+          strong: varRef('border-strong', colorTokens.neutral.borderStrong, darkColorTokens.neutral.borderStrong),
         },
         /** Text colors. */
         ink: {
-          DEFAULT: varRef('ink', colorTokens.neutral.textPrimary),
-          muted: varRef('ink-muted', colorTokens.neutral.textSecondary),
+          DEFAULT: varRef('ink', colorTokens.neutral.textPrimary, darkColorTokens.neutral.textPrimary),
+          muted: varRef('ink-muted', colorTokens.neutral.textSecondary, darkColorTokens.neutral.textSecondary),
         },
         /**
          * Neutral ramp. Structural surfaces only (the dark nav rail, chart
@@ -80,7 +103,7 @@ export default {
         grey: Object.fromEntries(
           Object.entries(colorTokens.grey).map(([step, hex]) => [
             step,
-            varRef(`grey-${step}`, hex),
+            varRef(`grey-${step}`, hex, hex),
           ]),
         ),
       },
@@ -129,7 +152,10 @@ export default {
     // Emit the token-derived CSS custom properties. tokens.ts stays the single
     // source of truth; this plugin is the only place the vars are defined.
     plugin(({ addBase }) => {
-      addBase({ ':root': cssVars });
+      addBase({
+        ':root': { ...lightVars, 'color-scheme': 'light' },
+        '.dark': { ...darkVars, 'color-scheme': 'dark' },
+      });
     }),
   ],
 } satisfies Config;

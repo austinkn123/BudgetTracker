@@ -16,7 +16,7 @@ const Tooltip = ({ title, children }: TooltipProps) => (
     <RadixTooltip.Portal>
       <RadixTooltip.Content
         sideOffset={6}
-        className="z-50 max-w-xs rounded border border-border bg-ink px-2.5 py-1.5 text-xs font-medium text-white shadow-md animate-fade-in"
+        className="z-50 max-w-xs rounded border border-border bg-ink px-2.5 py-1.5 text-xs font-medium text-background shadow-md animate-fade-in"
       >
         {title}
         <RadixTooltip.Arrow className="fill-ink" />

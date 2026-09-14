@@ -14,6 +14,7 @@ import '@fontsource/inter/700.css'
 import './index.css'
 import './auth/amplifyConfig'
 import { AuthProvider } from './auth/AuthContext'
+import { ThemeProvider } from './shared/theme/ThemeProvider'
 import App from './App.tsx'
 
 const queryClient = new QueryClient({
@@ -28,14 +29,16 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider delayDuration={200}>
-            <App />
-          </TooltipProvider>
-          {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-        </QueryClientProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider delayDuration={200}>
+              <App />
+            </TooltipProvider>
+            {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+          </QueryClientProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,
 )
