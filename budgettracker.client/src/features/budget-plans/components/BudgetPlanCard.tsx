@@ -1,20 +1,9 @@
+import { useMemo } from 'react';
 import { format } from 'date-fns';
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import CardHeader from '@mui/material/CardHeader';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import Stack from '@mui/material/Stack';
-import { alpha } from '@mui/material/styles';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import Typography from '@mui/material/Typography';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Badge, Button, Card, Table } from '../../../shared/components/ui';
+import type { TableColumn } from '../../../shared/components/ui';
+import { cn } from '../../../shared/utils/cn';
 import type { BudgetPlan, BudgetPlanEntry } from '../../../shared/types/api';
 
 type BudgetPlanCardProps = {
@@ -28,6 +17,46 @@ type BudgetPlanCardProps = {
   onDeletePlan: (plan: BudgetPlan) => void;
 };
 
+const TILE_ACCENT = {
+  success: 'bg-success',
+  error: 'bg-ink/25',
+  primary: 'bg-primary',
+} as const;
+
+/**
+ * Summary tile for the income/expenses/net row. A thin accent rail plus a
+ * large tabular figure reads cleaner than a fully tinted box.
+ */
+const SummaryTile = ({
+  label,
+  value,
+  tone,
+  /** Net swings with its sign; income and expenses keep a fixed tone. */
+  signed = false,
+}: {
+  label: string;
+  value: number;
+  tone: keyof typeof TILE_ACCENT;
+  signed?: boolean;
+}) => (
+  <div className="flex items-stretch gap-3 rounded-lg bg-background px-4 py-3 ring-1 ring-ink/[0.05]">
+    <span className={cn('w-0.5 shrink-0 rounded-full', TILE_ACCENT[tone])} aria-hidden />
+    <div>
+      <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-ink-muted">
+        {label}
+      </span>
+      <p
+        className={cn(
+          'mt-0.5 text-lg font-semibold tabular-nums tracking-[-0.02em]',
+          signed ? (value >= 0 ? 'text-success-dark' : 'text-error') : 'text-ink',
+        )}
+      >
+        ${value.toFixed(2)}
+      </p>
+    </div>
+  </div>
+);
+
 const BudgetPlanCard = ({
   plan,
   categoryNameById,
@@ -39,9 +68,10 @@ const BudgetPlanCard = ({
   onDeletePlan,
 }: BudgetPlanCardProps) => {
   const [planYear, planMonth] = plan.planMonth.slice(0, 7).split('-').map(Number);
-  const planMonthLabel = Number.isFinite(planYear) && Number.isFinite(planMonth)
-    ? format(new Date(planYear, planMonth - 1, 1), 'MMMM yyyy')
-    : plan.planMonth;
+  const planMonthLabel =
+    Number.isFinite(planYear) && Number.isFinite(planMonth)
+      ? format(new Date(planYear, planMonth - 1, 1), 'MMMM yyyy')
+      : plan.planMonth;
 
   const monthlyIncome = plan.netIncomeMonthly;
 
@@ -51,169 +81,105 @@ const BudgetPlanCard = ({
 
   const monthlyNet = monthlyIncome - monthlyExpenses;
 
-  return (
-    <Card variant="outlined">
-      <CardHeader
-        title={
-          <div className="flex items-center gap-2">
-            <Typography variant="h6">{plan.name}</Typography>
-            <Chip
-              label={plan.isActive ? 'Active' : 'Inactive'}
-              color={plan.isActive ? 'success' : 'default'}
-              size="small"
-            />
-          </div>
-        }
-        subheader={planMonthLabel}
-        action={
-          <Stack direction="row" spacing={1} className="items-center justify-end flex-wrap">
-            {!plan.isActive && (
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => onSwitchActive(plan.id)}
-                disabled={isSwitchingPlan}
-              >
-                Set Active
-              </Button>
-            )}
-            <Button
-              size="small"
-              startIcon={<Plus className="w-4 h-4" />}
-              onClick={() => onAddLine(plan.id)}
-            >
-              Add Entry
-            </Button>
-            <Button
-              size="small"
-              color="inherit"
-              startIcon={<Pencil className="w-4 h-4" />}
-              onClick={() => onEditPlan(plan)}
-            >
-              Edit
-            </Button>
-            <Button
-              size="small"
-              color="error"
-              startIcon={<Trash2 className="w-4 h-4" />}
-              onClick={() => onDeletePlan(plan)}
-            >
-              Delete
-            </Button>
-          </Stack>
-        }
-      />
-      <CardContent className="pt-0">
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
-            gap: 1.5,
-            mb: 3,
-          }}
-        >
-          <Box
-            sx={{
-              borderRadius: 3,
-              px: 1.5,
-              py: 1.25,
-              border: (theme) => `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-              backgroundColor: (theme) => alpha(theme.palette.success.main, 0.12),
-            }}
-          >
-            <Typography variant="caption" color="success.main">Monthly Income</Typography>
-            <Typography variant="subtitle1" fontWeight={600} color="success.dark">
-              ${monthlyIncome.toFixed(2)}
-            </Typography>
-          </Box>
-          <Box
-            sx={{
-              borderRadius: 3,
-              px: 1.5,
-              py: 1.25,
-              border: (theme) => `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-              backgroundColor: (theme) => alpha(theme.palette.error.main, 0.08),
-            }}
-          >
-            <Typography variant="caption" color="error.main">Monthly Expenses</Typography>
-            <Typography variant="subtitle1" fontWeight={600} color="error.dark">
-              ${monthlyExpenses.toFixed(2)}
-            </Typography>
-          </Box>
-          <Box
-            sx={{
-              borderRadius: 3,
-              px: 1.5,
-              py: 1.25,
-              border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-              backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.12),
-            }}
-          >
-            <Typography variant="caption" color="primary.main">Monthly Net</Typography>
-            <Typography variant="subtitle1" fontWeight={600} color={monthlyNet >= 0 ? 'success.dark' : 'error.dark'}>
-              ${monthlyNet.toFixed(2)}
-            </Typography>
-          </Box>
-        </Box>
+  const sortedEntries = useMemo(
+    () => plan.entries.slice().sort((a, b) => a.sortOrder - b.sortOrder),
+    [plan.entries],
+  );
 
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Category</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Bucket</TableCell>
-                <TableCell>Cadence</TableCell>
-                <TableCell align="right">Amount</TableCell>
-                <TableCell align="right">Monthly Eq.</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {plan.entries.length > 0 ? (
-                plan.entries
-                  .slice()
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map((entry) => (
-                    <TableRow
-                      key={entry.id}
-                      hover
-                      onClick={() => onEditLine(plan.id, entry)}
-                      className="cursor-pointer"
-                    >
-                      <TableCell>
-                        {entry.categoryId
-                          ? (categoryNameById.get(entry.categoryId) ?? `Unknown`)
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={entry.lineType}
-                          size="small"
-                          color={entry.lineType === 'Income' ? 'success' : 'error'}
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>{entry.bucket}</TableCell>
-                      <TableCell>{entry.cadence}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        ${entry.amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell align="right">${entry.monthlyEquivalent.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    <Typography color="text.secondary" fontStyle="italic">
-                      No plan entries — click "Add Entry" to get started
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </CardContent>
+  const columns: TableColumn<BudgetPlanEntry>[] = useMemo(
+    () => [
+      {
+        key: 'categoryId',
+        header: 'Category',
+        render: (entry) =>
+          entry.categoryId ? (categoryNameById.get(entry.categoryId) ?? 'Unknown') : '-',
+      },
+      {
+        key: 'lineType',
+        header: 'Type',
+        render: (entry) => (
+          <Badge
+            label={entry.lineType}
+            color={entry.lineType === 'Income' ? 'success' : 'error'}
+            variant="outline"
+          />
+        ),
+      },
+      { key: 'bucket', header: 'Bucket' },
+      { key: 'cadence', header: 'Cadence' },
+      {
+        key: 'amount',
+        header: 'Amount',
+        align: 'right',
+        render: (entry) => (
+          <span className="text-sm font-semibold text-ink">${entry.amount.toFixed(2)}</span>
+        ),
+      },
+      {
+        key: 'monthlyEquivalent',
+        header: 'Monthly Eq.',
+        align: 'right',
+        render: (entry) => `$${entry.monthlyEquivalent.toFixed(2)}`,
+      },
+    ],
+    [categoryNameById],
+  );
+
+  return (
+    <Card
+      title={
+        <span className="flex items-center gap-2">
+          {plan.name}
+          <Badge
+            label={plan.isActive ? 'Active' : 'Inactive'}
+            color={plan.isActive ? 'success' : 'neutral'}
+          />
+        </span>
+      }
+      subtitle={planMonthLabel}
+      actions={
+        <div className="flex flex-row flex-wrap justify-end gap-2">
+          {!plan.isActive && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => onSwitchActive(plan.id)}
+              disabled={isSwitchingPlan}
+            >
+              Set Active
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" startIcon={<Plus size={16} />} onClick={() => onAddLine(plan.id)}>
+            Add Entry
+          </Button>
+          <Button size="sm" variant="ghost" startIcon={<Pencil size={16} />} onClick={() => onEditPlan(plan)}>
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive-ghost"
+            startIcon={<Trash2 size={16} />}
+            onClick={() => onDeletePlan(plan)}
+          >
+            Delete
+          </Button>
+        </div>
+      }
+    >
+      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <SummaryTile label="Monthly Income" value={monthlyIncome} tone="success" />
+        <SummaryTile label="Monthly Expenses" value={monthlyExpenses} tone="error" />
+        <SummaryTile label="Monthly Net" value={monthlyNet} tone="primary" signed />
+      </div>
+
+      <Table
+        columns={columns}
+        rows={sortedEntries}
+        rowKey={(entry) => entry.id}
+        onRowClick={(entry) => onEditLine(plan.id, entry)}
+        emptyMessage='No plan entries — click "Add Entry" to get started'
+        ariaLabel={`${plan.name} plan entries`}
+      />
     </Card>
   );
 };

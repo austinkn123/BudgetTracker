@@ -6,9 +6,4 @@ export const userService = {
     const response = await api.get<User>('/users/me');
     return response.data;
   },
-
-  updateCurrentUser: async (user: User): Promise<User> => {
-    const response = await api.put<User>('/users/me', user);
-    return response.data;
-  },
 };

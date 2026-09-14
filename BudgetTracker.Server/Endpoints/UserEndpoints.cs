@@ -1,7 +1,5 @@
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
-using BudgetTracker.Domain.Models;
-using Microsoft.AspNetCore.Mvc;
 
 namespace BudgetTracker.Server.Endpoints;
 
@@ -12,14 +10,11 @@ public static class UserEndpoints
         userGroup.MapGet("/me", async (ICurrentUserProvider currentUser, IUserManager manager) =>
         {
             var result = await manager.GetByIdAsync(currentUser.UserId);
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound();
-        });
+            if (!result.IsSuccess)
+                return Results.NotFound();
 
-        userGroup.MapPut("/me", async ([FromBody] User user, IUserManager manager, ICurrentUserProvider currentUser) =>
-        {
-            user.Id = currentUser.UserId;
-            var result = await manager.UpdateAsync(user);
-            return result.IsSuccess ? Results.Ok(user) : Results.NotFound();
+            var user = result.Value!;
+            return Results.Ok(new UserProfile(user.Id, currentUser.Email, user.CreatedAt));
         });
 
         return userGroup;

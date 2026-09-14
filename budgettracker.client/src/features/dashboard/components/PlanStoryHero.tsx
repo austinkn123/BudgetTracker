@@ -1,19 +1,14 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
-import Chip from '@mui/material/Chip';
-import Box from '@mui/material/Box';
-import { Gauge, gaugeClasses } from '@mui/x-charts/Gauge';
-import { alpha, useTheme } from '@mui/material/styles';
 import { AlertTriangle, TrendingUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { Badge, Card, Gauge, Progress } from '../../../shared/components/ui';
 import type { AnalyzedPlan, PeriodPacing } from '../../../shared/types/api';
 import type { DriftingCategory } from '../utils/selectors';
-import { getHeroSurface, getSemanticColors } from '../utils/chartTheme';
+import { heroSurface, semanticColors } from '../utils/chartTheme';
 
 interface PlanStoryHeroProps {
   plan: AnalyzedPlan;
+  /** The month being reported (ISO). The plan may have taken effect earlier. */
+  analyzedMonth: string;
   pacing: PeriodPacing;
   /** Copy is composed client-side from the pacing numbers. */
   headline: string;
@@ -39,14 +34,10 @@ const clampPct = (value: number): number => {
   return Math.max(0, Math.min(100, value));
 };
 
-const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps) => {
-  const theme = useTheme();
-  const semantic = getSemanticColors(theme);
-  const surface = getHeroSurface(theme);
-
+const PlanStoryHero = ({ plan, analyzedMonth, pacing, headline, drifting }: PlanStoryHeroProps) => {
   const gaugeValue = clampPct(pacing.spentPct * 100);
   const onTrack = pacing.pacingDelta <= 0;
-  const gaugeColor = onTrack ? semantic.income : semantic.overspend;
+  const gaugeColor = onTrack ? semanticColors.income : semanticColors.overspend;
   const projectionPct = pacing.plannedExpenses > 0
     ? clampPct((pacing.projectedEnd / pacing.plannedExpenses) * 100)
     : 0;
@@ -56,89 +47,52 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
     ? `${currency.format(pacing.remaining)} left`
     : `${currency.format(Math.abs(pacing.remaining))} over`;
 
-  const planMonthLabel = format(parseISO(plan.planMonth), 'MMMM yyyy');
+  // The month on show is the one analysed, not the month the plan took effect.
+  const monthLabel = format(parseISO(analyzedMonth), 'MMMM yyyy');
 
   return (
-    <Card
-      sx={{
-        background: surface.background,
-        border: `1px solid ${surface.border}`,
-        overflow: 'hidden',
-      }}
-    >
-      <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-        <Box className="flex items-start justify-between flex-wrap gap-2 mb-4">
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: semantic.ink }}>
+    <Card padding="none" className="overflow-hidden">
+      {/* Gradient + border are computed token strings, so they ride inline. */}
+      <div
+        className="p-6 md:p-8"
+        style={{ background: heroSurface.background }}
+      >
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-white">
               {headline}
-            </Typography>
-            <Typography variant="body2" sx={{ color: semantic.expense, mt: 0.5 }}>
-              {plan.name} · {planMonthLabel}
-            </Typography>
-          </Box>
-          <Chip
+            </h1>
+            <p className="mt-1.5 text-sm text-white/60">
+              {plan.name} · {monthLabel}
+            </p>
+          </div>
+          <Badge
             icon={onTrack ? <TrendingUp size={14} /> : <AlertTriangle size={14} />}
             label={onTrack ? 'On pace' : 'Watch your pace'}
-            size="small"
-            sx={{
-              backgroundColor: alpha(gaugeColor, 0.18),
-              color: semantic.ink,
-              fontWeight: 600,
-              borderRadius: 999,
-            }}
+            color={onTrack ? 'success' : 'warning'}
+            variant="solid"
           />
-        </Box>
+        </div>
 
-        <Box
-          className="grid gap-6"
-          sx={{
-            gridTemplateColumns: { xs: '1fr', lg: '260px 1fr' },
-            alignItems: 'center',
-          }}
-        >
+        <div className="grid items-center gap-8 lg:grid-cols-[260px_1fr]">
           {/* Gauge */}
-          <Box className="flex flex-col items-center">
+          <div className="flex flex-col items-center">
             <Gauge
-              width={220}
-              height={220}
               value={gaugeValue}
-              valueMin={0}
-              valueMax={100}
-              startAngle={-110}
-              endAngle={110}
-              innerRadius="78%"
-              outerRadius="100%"
-              cornerRadius="50%"
-              text={({ value }) => `${Math.round(value ?? 0)}%`}
-              sx={{
-                [`& .${gaugeClasses.valueText}`]: {
-                  fontSize: 32,
-                  fontWeight: 700,
-                  fill: semantic.ink,
-                  transform: 'translateY(-6px)',
-                },
-                [`& .${gaugeClasses.valueArc}`]: { fill: gaugeColor },
-                [`& .${gaugeClasses.referenceArc}`]: {
-                  fill: alpha(semantic.neutral, 0.35),
-                },
-              }}
+              valueColor={gaugeColor}
+              trackColor="rgb(255 255 255 / 0.12)"
+              textColor="rgb(255 255 255)"
             />
-            <Typography
-              variant="body2"
-              sx={{ mt: -1, color: semantic.expense, fontWeight: 600 }}
-            >
-              {remainingLabel}
-            </Typography>
-          </Box>
+            <p className="numeric -mt-1 text-sm font-semibold text-white/60">{remainingLabel}</p>
+          </div>
 
           {/* Progress rows */}
-          <Box className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
             <ProgressRow
               label="Days elapsed"
               detail={`${pacing.daysElapsed} / ${pacing.daysInMonth}`}
               percent={pacing.daysPct * 100}
-              color={semantic.neutral}
-              textColor={semantic.ink}
+              color="rgb(255 255 255 / 0.55)"
             />
 
             <ProgressRow
@@ -146,97 +100,58 @@ const PlanStoryHero = ({ plan, pacing, headline, drifting }: PlanStoryHeroProps)
               detail={`${currency.format(pacing.actualExpenses)} / ${currency.format(pacing.plannedExpenses)}`}
               percent={pacing.spentPct * 100}
               color={gaugeColor}
-              textColor={semantic.ink}
             />
 
-            <Box>
-              <Box className="flex items-baseline justify-between">
-                <Typography
-                  variant="body2"
-                  sx={{ fontWeight: 600, color: semantic.ink }}
-                >
-                  Projection
-                </Typography>
-                <Typography variant="caption" sx={{ color: semantic.expense }}>
+            <div>
+              <div className="flex items-baseline justify-between">
+                <p className="text-sm font-semibold text-white">Projection</p>
+                <span className="numeric text-xs text-white/60">
                   {`Projects to ${currency.format(pacing.projectedEnd)}`}
-                </Typography>
-              </Box>
-              <Box sx={{ position: 'relative', mt: 1 }}>
-                <LinearProgress
-                  variant="determinate"
+                </span>
+              </div>
+              <div className="relative mt-2">
+                <Progress
                   value={Math.min(projectionPct, 100)}
-                  sx={{
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: alpha(semantic.neutral, 0.35),
-                    '& .MuiLinearProgress-bar': {
-                      backgroundColor: overshoot ? semantic.overspend : semantic.income,
-                    },
-                  }}
+                  height={8}
+                  barColor={overshoot ? semanticColors.overspend : semanticColors.income}
+                  trackColor="rgb(255 255 255 / 0.12)"
                 />
                 {/* 100% marker */}
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: -2,
-                    bottom: -2,
-                    left: 'calc(100% - 1px)',
-                    width: 2,
-                    backgroundColor: semantic.ink,
-                    opacity: 0.5,
-                  }}
+                <div
+                  aria-hidden
+                  className="absolute -bottom-0.5 -top-0.5 w-0.5 bg-white/40"
+                  style={{ left: 'calc(100% - 1px)' }}
                 />
                 {overshoot && (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: semantic.overspend,
-                      fontWeight: 600,
-                      display: 'block',
-                      mt: 0.5,
-                    }}
-                  >
+                  <span className="numeric mt-1.5 block text-xs font-semibold text-warning-light">
                     {`Overshoot: +${currency.format(pacing.projectedEnd - pacing.plannedExpenses)}`}
-                  </Typography>
+                  </span>
                 )}
-              </Box>
-              <Typography
-                variant="caption"
-                sx={{ color: semantic.expense, mt: 0.5, display: 'block' }}
-              >
+              </div>
+              <span className="numeric mt-1.5 block text-xs text-white/50">
                 {pacing.perDiemToStay > 0
                   ? `Stay-on-plan rate: ${currencyPrecise.format(pacing.perDiemToStay)}/day`
                   : `No days remaining in this plan month`}
-              </Typography>
-            </Box>
-          </Box>
-        </Box>
+              </span>
+            </div>
+          </div>
+        </div>
 
         {drifting.length > 0 && (
-          <Box sx={{ mt: 3, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-            <Typography
-              variant="caption"
-              sx={{ color: semantic.expense, fontWeight: 600, mr: 1 }}
-            >
-              Drifting:
-            </Typography>
+          <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-white/10 pt-6">
+            <span className="mr-1 text-xs font-semibold uppercase tracking-[0.06em] text-white/50">
+              Drifting
+            </span>
             {drifting.map((d) => (
-              <Chip
+              <Badge
                 key={d.key}
                 label={`${d.name} +${currency.format(d.overBy)}`}
-                size="small"
-                variant="outlined"
-                sx={{
-                  borderColor: semantic.overspend,
-                  color: semantic.ink,
-                  backgroundColor: alpha(semantic.overspend, 0.08),
-                  fontWeight: 500,
-                }}
+                className="border-white/20 bg-white/10 text-white"
               />
             ))}
-          </Box>
+          </div>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 };
@@ -246,35 +161,22 @@ interface ProgressRowProps {
   detail: string;
   percent: number;
   color: string;
-  textColor: string;
 }
 
-const ProgressRow = ({ label, detail, percent, color, textColor }: ProgressRowProps) => {
-  const theme = useTheme();
-  const semantic = getSemanticColors(theme);
-  return (
-    <Box>
-      <Box className="flex items-baseline justify-between">
-        <Typography variant="body2" sx={{ fontWeight: 600, color: textColor }}>
-          {label}
-        </Typography>
-        <Typography variant="caption" sx={{ color: semantic.expense }}>
-          {detail}
-        </Typography>
-      </Box>
-      <LinearProgress
-        variant="determinate"
-        value={clampPct(percent)}
-        sx={{
-          mt: 1,
-          height: 10,
-          borderRadius: 5,
-          backgroundColor: alpha(semantic.neutral, 0.35),
-          '& .MuiLinearProgress-bar': { backgroundColor: color },
-        }}
-      />
-    </Box>
-  );
-};
+const ProgressRow = ({ label, detail, percent, color }: ProgressRowProps) => (
+  <div>
+    <div className="flex items-baseline justify-between">
+      <p className="text-sm font-semibold text-white">{label}</p>
+      <span className="numeric text-xs text-white/60">{detail}</span>
+    </div>
+    <Progress
+      value={clampPct(percent)}
+      height={8}
+      barColor={color}
+      trackColor="rgb(255 255 255 / 0.12)"
+      className="mt-2"
+    />
+  </div>
+);
 
 export default PlanStoryHero;

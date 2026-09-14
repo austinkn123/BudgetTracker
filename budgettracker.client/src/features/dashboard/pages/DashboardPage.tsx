@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
+import { PageHeader } from '../../../shared/components/ui';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { useUser } from '../../user/hooks/useUser';
@@ -14,6 +13,9 @@ import WhereItWent from '../components/WhereItWent';
 import CategoryDrillGrid from '../components/CategoryDrillGrid';
 import BucketBreakdown from '../components/BucketBreakdown';
 import RecentActivityFeed from '../components/RecentActivityFeed';
+import StatStrip from '../components/StatStrip';
+import UncategorizedNudge from '../components/UncategorizedNudge';
+import type { Stat } from '../components/StatStrip';
 import { useDateRange } from '../hooks/useDateRange';
 import { useBudgetAnalysis } from '../hooks/useBudgetAnalysis';
 import { getStatusHeadline } from '../utils/planCopy';
@@ -24,6 +26,13 @@ import {
   selectTopSpend,
   selectWaterfall,
 } from '../utils/selectors';
+
+const money = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
 
 // How much of the server's analysis this particular screen chooses to show.
 const TREND_MONTHS = 3;
@@ -61,11 +70,12 @@ const DashboardPage = () => {
     if (!planMonth) return null;
     return {
       plan: planMonth.plan,
+      analyzedMonth: planMonth.analyzedMonth,
       pacing: planMonth.pacing,
       headline: getStatusHeadline(
         planMonth.pacing.pacingDelta,
         planMonth.pacing.daysPct,
-        planMonth.plan.planMonth,
+        planMonth.analyzedMonth,
       ),
       drifting: selectDrifting(planMonth.byCategory, categoryNames, DRIFTING_CATEGORIES),
     };
@@ -100,6 +110,43 @@ const DashboardPage = () => {
     [windowTransactions],
   );
 
+  const stats = useMemo<Stat[]>(() => {
+    const pacing = planMonth?.pacing;
+    if (!pacing) return [];
+    const daysLeft = Math.max(0, pacing.daysInMonth - pacing.daysElapsed);
+    return [
+      {
+        label: 'Spent',
+        value: money.format(pacing.actualExpenses),
+        detail: `of ${money.format(pacing.plannedExpenses)} planned`,
+      },
+      {
+        label: pacing.remaining >= 0 ? 'Remaining' : 'Over plan',
+        value: money.format(Math.abs(pacing.remaining)),
+        tone: pacing.remaining >= 0 ? 'positive' : 'negative',
+        detail: pacing.remaining >= 0 ? 'still available' : 'above the plan',
+      },
+      {
+        label: 'Projected',
+        value: money.format(pacing.projectedEnd),
+        tone: pacing.projectedEnd > pacing.plannedExpenses ? 'negative' : 'positive',
+        detail: 'at the current pace',
+      },
+      {
+        label: 'Days left',
+        value: String(daysLeft),
+        detail: `of ${pacing.daysInMonth} in the plan month`,
+      },
+    ];
+  }, [planMonth]);
+
+  // Counted across the whole ledger, not the selected range: a row outside the current window
+  // is still missing from the plan-vs-actual maths.
+  const uncategorizedCount = useMemo(
+    () => transactions.filter((t) => t.categoryId == null).length,
+    [transactions],
+  );
+
   const isLoading = loadingUser || loadingCategories || loadingTransactions || loadingAnalysis;
   const hasErrors = userError || categoriesError || transactionsError || analysisError;
 
@@ -118,25 +165,29 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header row: title + range selector */}
-      <Box className="flex flex-col gap-4 rounded-2xl border border-border bg-surface px-5 py-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
-        <Box>
-          <Typography variant="h4" className="font-bold text-ink">
-            Dashboard
-          </Typography>
-          {hero && (
-            <Typography variant="body2" className="mt-1 text-ink-muted">
+      <PageHeader
+        title="Dashboard"
+        description={
+          hero ? (
+            <>
               Tracking against <span className="font-semibold text-ink">{hero.plan.name}</span>
-            </Typography>
-          )}
-        </Box>
-        <RangeSelector value={range} onChange={setRange} />
-      </Box>
+            </>
+          ) : (
+            'Your financial position at a glance'
+          )
+        }
+        actions={<RangeSelector value={range} onChange={setRange} />}
+      />
+
+      {stats.length > 0 && <StatStrip stats={stats} />}
+
+      <UncategorizedNudge count={uncategorizedCount} />
 
       {/* Hero */}
       {hero ? (
         <PlanStoryHero
           plan={hero.plan}
+          analyzedMonth={hero.analyzedMonth}
           pacing={hero.pacing}
           headline={hero.headline}
           drifting={hero.drifting}

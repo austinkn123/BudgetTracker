@@ -1,11 +1,20 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import { BarChart } from '@mui/x-charts/BarChart';
-import { useTheme } from '@mui/material/styles';
 import { useMemo } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import type { TooltipContentProps } from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import Card from '../../../shared/components/ui/Card';
+import { withAlpha } from '../../../shared/theme/tokens';
 import type { WaterfallBar } from '../utils/selectors';
-import { getSemanticColors } from '../utils/chartTheme';
+import { semanticColors } from '../utils/chartTheme';
 
 interface CashflowWaterfallProps {
   /** Ordered bars: income → top expense categories → Other → net. */
@@ -19,134 +28,156 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
+interface WaterfallRow {
+  label: string;
+  /** [low, high] — Recharts renders a floating bar from a 2-tuple dataKey. */
+  range: [number, number];
+  amount: number;
+  kind: WaterfallBar['kind'];
+  positive: boolean;
+}
+
+const LEGEND = [
+  { label: 'Income', color: semanticColors.income },
+  { label: 'Expense', color: semanticColors.expense },
+  { label: 'Net deficit', color: semanticColors.overspend },
+] as const;
+
+const barColor = (row: WaterfallRow): string => {
+  if (row.kind === 'income') return semanticColors.income;
+  if (row.kind === 'net') return row.positive ? semanticColors.income : semanticColors.overspend;
+  return semanticColors.expense;
+};
+
+const WaterfallTooltip = ({ active, payload }: TooltipContentProps<ValueType, NameType>) => {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload as WaterfallRow | undefined;
+  if (!row) return null;
+
+  const sign = row.kind === 'expense' || !row.positive ? '−' : '+';
+
+  return (
+    <div className="rounded border border-border bg-surface px-3 py-2 shadow-md">
+      <p className="text-sm font-semibold text-ink">{row.label}</p>
+      <p className="text-sm text-ink-muted">
+        {sign}
+        {currency.format(Math.abs(row.amount))}
+      </p>
+    </div>
+  );
+};
+
 /**
- * Pseudo-waterfall built on `BarChart`. We split the value column into three
- * stacked series (income, expense, net) so each gets a single color via
- * `series.color`, then push a transparent "base" series to float the bars
- * to their proper running-total position.
+ * Waterfall on Recharts (BUD-20). Uses range bars ([low, high] tuples) rather
+ * than a transparent stacked "base" series — Recharts stacks positive and
+ * negative values in opposite directions, so the float trick renders nothing.
  */
 const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
-  const theme = useTheme();
-  const semantic = getSemanticColors(theme);
-
-  const chartData = useMemo(() => {
-    if (items.length === 0) {
-      return null;
-    }
-    const bases: number[] = [];
-    const incomeData: (number | null)[] = [];
-    const expenseData: (number | null)[] = [];
-    const netPositive: (number | null)[] = [];
-    const netNegative: (number | null)[] = [];
+  const rows = useMemo<WaterfallRow[] | null>(() => {
+    if (items.length === 0) return null;
 
     let running = 0;
-    for (const item of items) {
+    return items.map((item) => {
       if (item.kind === 'net') {
-        bases.push(item.signed >= 0 ? 0 : item.signed);
-        incomeData.push(null);
-        expenseData.push(null);
-        if (item.signed >= 0) {
-          netPositive.push(item.value);
-          netNegative.push(null);
-        } else {
-          netPositive.push(null);
-          netNegative.push(item.value);
-        }
-        continue;
+        const positive = item.signed >= 0;
+        return {
+          label: item.label,
+          range: (positive ? [0, item.signed] : [item.signed, 0]) as [number, number],
+          amount: item.value,
+          kind: item.kind,
+          positive,
+        };
       }
 
       if (item.kind === 'income') {
-        bases.push(running);
-        incomeData.push(item.value);
-        expenseData.push(null);
-        netPositive.push(null);
-        netNegative.push(null);
+        const start = running;
         running += item.value;
-      } else {
-        const newRunning = running - item.value;
-        bases.push(newRunning);
-        incomeData.push(null);
-        expenseData.push(item.value);
-        netPositive.push(null);
-        netNegative.push(null);
-        running = newRunning;
+        return {
+          label: item.label,
+          range: [start, running] as [number, number],
+          amount: item.value,
+          kind: item.kind,
+          positive: true,
+        };
       }
-    }
 
-    return { bases, incomeData, expenseData, netPositive, netNegative };
+      const start = running;
+      running -= item.value;
+      return {
+        label: item.label,
+        range: [running, start] as [number, number],
+        amount: item.value,
+        kind: item.kind,
+        positive: false,
+      };
+    });
   }, [items]);
 
-  if (!chartData) {
+  if (!rows) {
     return (
-      <Card className="h-full">
-        <CardContent className="flex flex-col items-center justify-center h-full min-h-[320px]">
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-            Cashflow Waterfall
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            No transactions yet this plan month
-          </Typography>
-        </CardContent>
+      <Card
+        title="Cashflow Waterfall"
+        fullHeight
+        contentClassName="flex min-h-[320px] items-center justify-center"
+      >
+        <p className="text-sm text-ink-muted">No transactions yet this plan month</p>
       </Card>
     );
   }
 
-  const labels = items.map((i) => i.label);
-
   return (
-    <Card className="h-full">
-      <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-          Cashflow Waterfall
-        </Typography>
-        <BarChart
-          height={320}
-          xAxis={[{ data: labels, scaleType: 'band' }]}
-          series={[
-            {
-              data: chartData.bases,
-              stack: 'waterfall',
-              color: 'transparent',
-              label: 'base',
-              valueFormatter: () => null,
-            },
-            {
-              data: chartData.incomeData,
-              stack: 'waterfall',
-              color: semantic.income,
-              label: 'Income',
-              valueFormatter: (v) => (v == null ? '' : `+${currency.format(v)}`),
-            },
-            {
-              data: chartData.expenseData,
-              stack: 'waterfall',
-              color: semantic.expense,
-              label: 'Expense',
-              valueFormatter: (v) => (v == null ? '' : `-${currency.format(v)}`),
-            },
-            {
-              data: chartData.netPositive,
-              stack: 'waterfall',
-              color: semantic.income,
-              label: 'Net surplus',
-              valueFormatter: (v) => (v == null ? '' : `+${currency.format(v)}`),
-            },
-            {
-              data: chartData.netNegative,
-              stack: 'waterfall',
-              color: semantic.overspend,
-              label: 'Net deficit',
-              valueFormatter: (v) => (v == null ? '' : `-${currency.format(v)}`),
-            },
-          ]}
-          slotProps={{
-            legend: {
-              direction: 'horizontal',
-              position: { vertical: 'top', horizontal: 'center' },
-            },
-          }}
-        />
-      </CardContent>
+    <Card
+      title="Cashflow Waterfall"
+      actions={
+        // Hidden on narrow screens: the legend would crowd the title out.
+        <div className="hidden flex-wrap items-center gap-3 sm:flex">
+          {LEGEND.map((entry) => (
+            <span key={entry.label} className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: entry.color }}
+                aria-hidden
+              />
+              {entry.label}
+            </span>
+          ))}
+        </div>
+      }
+      fullHeight
+    >
+      <ResponsiveContainer width="100%" height={320}>
+        <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke={withAlpha(semanticColors.ink, 0.08)} />
+          {/* Category names are long and collide at this width — truncate and
+              angle rather than dropping ticks, so every bar stays labelled. */}
+          <XAxis
+            dataKey="label"
+            axisLine={false}
+            tickLine={false}
+            interval={0}
+            height={64}
+            angle={-35}
+            textAnchor="end"
+            tickFormatter={(value: string) =>
+              value.length > 14 ? `${value.slice(0, 13)}…` : value
+            }
+            tick={{ fontSize: 10, fill: semanticColors.expense }}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: semanticColors.expense }}
+            tickFormatter={(value: number) => currency.format(value)}
+            width={72}
+          />
+          <Tooltip content={WaterfallTooltip} cursor={{ fill: withAlpha(semanticColors.ink, 0.04) }} />
+          <Bar dataKey="range" radius={3}>
+            {rows.map((row) => (
+              <Cell key={row.label} fill={barColor(row)} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </Card>
   );
 };

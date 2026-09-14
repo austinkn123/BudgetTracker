@@ -1,21 +1,15 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './useAuth';
-import CircularProgress from '@mui/material/CircularProgress';
-import Box from '@mui/material/Box';
+import { Spinner } from '../shared/components/ui';
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <CircularProgress />
-      </Box>
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner size={28} />
+      </div>
     );
   }
 

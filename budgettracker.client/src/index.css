@@ -1,3 +1,85 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Global baseline (BUD-20). Fills the gaps Tailwind preflight does NOT cover
+ * after removing MUI's CssBaseline:
+ *   - body background/color (preflight leaves body transparent + UA text color)
+ *   - font smoothing (without it text renders heavy on macOS)
+ *   - base size / line-height
+ *   - color-scheme is emitted per theme by the token plugin (BUD-17), not here
+ *   - global tracking (Stripe-leaning -0.011em)
+ */
+@layer base {
+  html {
+    letter-spacing: -0.011em;
+  }
+
+  body {
+    @apply bg-background text-body text-ink antialiased;
+  }
+
+  @media print {
+    body {
+      print-color-adjust: exact;
+    }
+  }
+}
+
+@layer components {
+  /* Currency / figure treatment (BUD-17). Tabular lining figures so columns of
+     money align on the decimal, plus the optical tightening the larger display
+     sizes need. Apply to any element rendering an amount, count, or date. */
+  .numeric {
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.022em;
+  }
+
+  /* The one focus treatment, applied to every interactive element. Uses
+     native :focus-visible — keyboard only, no mouse-click rings. */
+  .focus-ring {
+    @apply outline-none focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/25;
+  }
+
+  /* Transactions calendar day tinting (BUD-20). Classes rather than inline
+     utilities because they must compose with react-day-picker's
+     data-selected state on the same day cell. */
+  .day-pos {
+    @apply border border-success/[0.32] bg-success/[0.14];
+  }
+  .day-pos button {
+    @apply font-semibold text-success-dark;
+  }
+  .day-pos:hover {
+    @apply bg-success/[0.22];
+  }
+  .day-pos[data-selected='true'] {
+    @apply border-success bg-success;
+  }
+  .day-pos[data-selected='true'] button {
+    @apply text-white;
+  }
+  .day-pos[data-selected='true']:hover {
+    @apply bg-success-dark;
+  }
+
+  .day-neg {
+    @apply border border-error/[0.32] bg-error/[0.14];
+  }
+  .day-neg button {
+    @apply font-semibold text-error-dark;
+  }
+  .day-neg:hover {
+    @apply bg-error/[0.22];
+  }
+  .day-neg[data-selected='true'] {
+    @apply border-error bg-error;
+  }
+  .day-neg[data-selected='true'] button {
+    @apply text-white;
+  }
+  .day-neg[data-selected='true']:hover {
+    @apply bg-error-dark;
+  }
+}

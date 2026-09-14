@@ -1,20 +1,20 @@
 import { useMemo } from 'react';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
-import Tooltip from '@mui/material/Tooltip';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmModal,
+  Input,
+  Modal,
+  ModalActions,
+  Select,
+  Tooltip,
+} from '../../shared/components/ui';
 import type { Category } from '../../shared/types/api';
+import { PLAID_CATEGORY_OPTIONS } from '../../shared/constants/plaidCategories';
 import { categorySchema, type CategoryFormValues } from '../../shared/validation/categorySchema';
 import { useTransactions } from '../transactions/hooks/useTransactions';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
@@ -33,6 +33,12 @@ const GROUPS: { label: string; type: string; color: 'success' | 'error' | 'info'
   { label: 'Both', type: 'Both', color: 'info' },
 ];
 
+const CATEGORY_TYPE_OPTIONS = [
+  { value: 'Income', label: 'Income' },
+  { value: 'Expense', label: 'Expense' },
+  { value: 'Both', label: 'Both' },
+] as const;
+
 const CategoriesSection = ({
   isLoading,
   setStatusMessage,
@@ -50,12 +56,7 @@ const CategoriesSection = ({
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<CategoryFormValues>({
+  const { control, handleSubmit, reset } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
       name: '',
@@ -81,6 +82,10 @@ const CategoriesSection = ({
     }
 
     for (const transaction of transactions) {
+      // Uncategorised rows belong to no category, so they cannot count toward any category's
+      // usage. Before categoryId was typed nullable these accumulated under a null key.
+      if (transaction.categoryId == null) continue;
+
       const usage = map.get(transaction.categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
       usage.transactions += 1;
       usage.total += 1;
@@ -104,7 +109,7 @@ const CategoriesSection = ({
 
   const openAddDialog = () => {
     setEditingCategoryId(null);
-    reset({ name: '', categoryType: 'Expense' });
+    reset({ name: '', categoryType: 'Expense', plaidCategoryPrimary: '' });
     setDialogMode('add');
     setDialogOpen(true);
   };
@@ -119,6 +124,7 @@ const CategoriesSection = ({
     reset({
       name: category.name,
       categoryType,
+      plaidCategoryPrimary: category.plaidCategoryPrimary ?? '',
     });
     setDialogMode('edit');
     setDialogOpen(true);
@@ -136,6 +142,7 @@ const CategoriesSection = ({
           userId: 0,
           name: values.name,
           categoryType: values.categoryType,
+          plaidCategoryPrimary: values.plaidCategoryPrimary ?? '',
         });
         closeDialog();
         return;
@@ -148,6 +155,9 @@ const CategoriesSection = ({
         userId: 0,
         name: values.name,
         categoryType: values.categoryType,
+        // Always sent — omitting it makes the server treat the mapping as "not supplied",
+        // which used to wipe auto-categorisation on a simple rename.
+        plaidCategoryPrimary: values.plaidCategoryPrimary ?? '',
       });
       closeDialog();
     } catch {
@@ -168,20 +178,17 @@ const CategoriesSection = ({
   const isSaving = createCategory.isPending || updateCategory.isPending || deleteCategory.isPending;
 
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <Typography variant="subtitle1" fontWeight={600}>
-            Categories
-          </Typography>
-          <Button variant="contained" size="small" onClick={openAddDialog}>
-            Add Category
-          </Button>
-        </div>
+    <Card
+      title="Categories"
+      actions={
+        <Button size="sm" onClick={openAddDialog}>
+          Add Category
+        </Button>
+      }
+    >
+      <>
         {categories.length === 0 ? (
-          <Typography color="text.secondary" fontStyle="italic">
-            No categories found
-          </Typography>
+          <p className="text-body italic text-ink-muted">No categories found</p>
         ) : (
           <div className="space-y-3">
             {GROUPS.map((group) => {
@@ -189,24 +196,25 @@ const CategoriesSection = ({
               if (!items || items.length === 0) return null;
               return (
                 <div key={group.type}>
-                  <Typography variant="caption" color="text.secondary" className="mb-1 block">
+                  <span className="mb-1.5 block text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
                     {group.label}
-                  </Typography>
+                  </span>
                   <div className="flex flex-wrap gap-1">
                     {items.map((cat) => {
                       const usage = getUsage(cat.id);
                       const tooltipLabel = `Used in ${usage.transactions} transaction${usage.transactions === 1 ? '' : 's'} and ${usage.planEntries} budget plan entr${usage.planEntries === 1 ? 'y' : 'ies'}`;
 
                       return (
-                        <Tooltip key={cat.id} title={tooltipLabel} arrow>
-                          <Chip
-                            label={`${cat.name} (${usage.total})`}
-                            size="small"
-                            color={group.color}
-                            variant="outlined"
-                            onClick={() => openEditDialog(cat)}
-                            onDelete={() => setDeleteTarget(cat)}
-                          />
+                        <Tooltip key={cat.id} title={tooltipLabel}>
+                          <span className="inline-flex">
+                            <Badge
+                              label={`${cat.name} (${usage.total})`}
+                              color={group.color}
+                              variant="outline"
+                              onClick={() => openEditDialog(cat)}
+                              onDelete={() => setDeleteTarget(cat)}
+                            />
+                          </span>
                         </Tooltip>
                       );
                     })}
@@ -216,71 +224,60 @@ const CategoriesSection = ({
             })}
           </div>
         )}
-      </CardContent>
+      </>
 
-      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="xs" fullWidth>
-        <DialogTitle>{dialogMode === 'add' ? 'Add Category' : 'Edit Category'}</DialogTitle>
-        <DialogContent className="space-y-4 pt-4">
-          <Controller
-            name="name"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Name"
-                fullWidth
-                autoFocus
-                error={Boolean(errors.name)}
-                helperText={errors.name?.message}
-                {...field}
-              />
-            )}
+      <Modal
+        open={dialogOpen}
+        onClose={closeDialog}
+        title={dialogMode === 'add' ? 'Add Category' : 'Edit Category'}
+        maxWidth="xs"
+        disableBackdropClose={isSaving}
+        actions={
+          <ModalActions
+            onCancel={closeDialog}
+            onConfirm={onSave}
+            confirmLabel={dialogMode === 'add' ? 'Create' : 'Save'}
+            isPending={isSaving}
           />
-          <Controller
-            name="categoryType"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                label="Type"
-                select
-                fullWidth
-                error={Boolean(errors.categoryType)}
-                helperText={errors.categoryType?.message}
-                {...field}
-              >
-                <MenuItem value="Income">Income</MenuItem>
-                <MenuItem value="Expense">Expense</MenuItem>
-                <MenuItem value="Both">Both</MenuItem>
-              </TextField>
-            )}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDialog} disabled={isSaving}>Cancel</Button>
-          <Button onClick={onSave} variant="contained" disabled={isSaving}>
-            {isSaving ? 'Saving...' : dialogMode === 'add' ? 'Create' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        }
+      >
+        <Input control={control} name="name" label="Name" autoFocus />
+        <Select
+          control={control}
+          name="categoryType"
+          label="Type"
+          options={CATEGORY_TYPE_OPTIONS}
+        />
+        <Select
+          control={control}
+          name="plaidCategoryPrimary"
+          label="Auto-categorise imports as"
+          options={PLAID_CATEGORY_OPTIONS}
+          emptyOptionLabel="No automatic mapping"
+          helperText="Imported transactions Plaid tags with this category are assigned here automatically."
+        />
+      </Modal>
 
-      <Dialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete Category</DialogTitle>
-        <DialogContent>
-          {deleteTarget && (
-            <Typography variant="caption" color="text.secondary" className="mb-2 block">
-              Used in {getUsage(deleteTarget.id).transactions} transactions and {getUsage(deleteTarget.id).planEntries} budget plan entries.
-            </Typography>
-          )}
-          <Typography variant="body2">
-            Delete {deleteTarget?.name}? This cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={isSaving}>Cancel</Button>
-          <Button color="error" onClick={onConfirmDelete} disabled={isSaving}>
-            {isSaving ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete Category"
+        message={
+          deleteTarget ? (
+            <>
+              Delete <strong>{deleteTarget.name}</strong>? It is used in{' '}
+              {getUsage(deleteTarget.id).transactions} transactions and{' '}
+              {getUsage(deleteTarget.id).planEntries} budget plan entries. This cannot be undone.
+            </>
+          ) : (
+            ''
+          )
+        }
+        confirmLabel="Delete"
+        destructive
+        isPending={isSaving}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={onConfirmDelete}
+      />
     </Card>
   );
 };

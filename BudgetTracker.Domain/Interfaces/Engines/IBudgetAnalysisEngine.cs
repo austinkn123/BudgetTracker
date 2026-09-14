@@ -6,11 +6,14 @@ namespace BudgetTracker.Domain.Interfaces.Engines;
 public interface IBudgetAnalysisEngine
 {
     /// <summary>
-    /// Analyse the plan against actuals for the plan's own month. Scoping to that month is a
-    /// business rule (the plan defines its period), so it happens here rather than in the caller.
-    /// <paramref name="now"/> drives pacing and is passed in to keep the engine deterministic.
+    /// Analyse actuals for the month containing <paramref name="now"/> against the supplied plan.
+    ///
+    /// A plan rolls forward: its <see cref="BudgetPlan.PlanMonth"/> is the month it TAKES EFFECT,
+    /// not the only month it governs, so the analysed month and the plan month differ once the
+    /// plan is older than the current month. Scoping to a single month is a business rule (a plan
+    /// states monthly amounts), so it happens here rather than in the caller.
     /// </summary>
-    PlanPerformance AnalyzePlanMonth(IReadOnlyList<Transaction> transactions, BudgetPlan plan, DateTime now);
+    PlanPerformance AnalyzeMonth(IReadOnlyList<Transaction> transactions, BudgetPlan plan, DateTime now);
 
     /// <summary>
     /// Total expense magnitude per category across whatever transactions are supplied.

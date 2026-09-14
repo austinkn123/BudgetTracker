@@ -14,16 +14,7 @@ public class UserAccessor(BudgetTrackerDbContext context) : IUserAccessor
         return user.Id;
     }
 
-    public async Task<bool> DeleteAsync(int id)
-    {
-        var user = await context.Users.FindAsync(id);
-        if (user is null) return false;
-
-        context.Users.Remove(user);
-        return await context.SaveChangesAsync() > 0;
-    }
-
-    public async Task<User> GetByIdAsync(int id)
+    public async Task<User?> GetByIdAsync(int id)
     {
         return await context.Users
             .AsNoTracking()
@@ -35,11 +26,5 @@ public class UserAccessor(BudgetTrackerDbContext context) : IUserAccessor
         return await context.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.CognitoSub == sub);
-    }
-
-    public async Task<bool> UpdateAsync(User user)
-    {
-        context.Users.Update(user);
-        return await context.SaveChangesAsync() > 0;
     }
 }

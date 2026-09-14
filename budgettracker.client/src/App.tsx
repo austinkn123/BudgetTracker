@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import Layout from './shared/components/Layout';
+import AppShell from './shared/components/layout/AppShell';
 import DashboardPage from './features/dashboard/pages/DashboardPage';
 import TransactionsPage from './features/transactions/pages/TransactionsPage';
 import BudgetPlansPage from './features/budget-plans/pages/BudgetPlansPage';
@@ -21,7 +21,7 @@ function App() {
 
       {/* Protected app routes */}
       <Route element={<ProtectedRoute />}>
-        <Route element={<Layout />}>
+        <Route element={<AppShell />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/budget-plans" element={<BudgetPlansPage />} />

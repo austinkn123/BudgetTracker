@@ -1,26 +1,8 @@
-import { format, startOfDay } from 'date-fns';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import Divider from '@mui/material/Divider';
-import List from '@mui/material/List';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemText from '@mui/material/ListItemText';
-import Stack from '@mui/material/Stack';
-import { alpha, type SxProps, type Theme } from '@mui/material/styles';
-import Typography from '@mui/material/Typography';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import {
-  DateCalendar,
-  LocalizationProvider,
-  PickerDay,
-  type PickerDayProps,
-} from '@mui/x-date-pickers';
+import { useMemo } from 'react';
+import { format, startOfDay, startOfMonth } from 'date-fns';
+import { Badge, Calendar, Separator } from '../../../shared/components/ui';
 import type { Category, Transaction } from '../../../shared/types/api';
-import {
-  toDateKey,
-  type TransactionDaySummary,
-} from '../utils/transactionGroups';
+import type { TransactionDaySummary } from '../utils/transactionGroups';
 
 type TransactionTableProps = {
   categories: Category[];
@@ -30,29 +12,7 @@ type TransactionTableProps = {
   maskByPlaidAccountId: Map<string, string | null | undefined>;
   onDateChange: (date: Date) => void;
   onMonthChange: (month: Date) => void;
-  onAddTransaction: (occurredAt?: string) => void;
   onRowClick: (transaction: Transaction) => void;
-};
-
-const getHighlightedDaySx = (netTotal: number): SxProps<Theme> => (theme) => {
-  const tone = netTotal >= 0 ? theme.palette.success : theme.palette.error;
-
-  return {
-    fontWeight: 700,
-    color: tone.dark,
-    bgcolor: alpha(tone.main, 0.14),
-    border: `1px solid ${alpha(tone.main, 0.32)}`,
-    '&:hover, &:focus': {
-      bgcolor: alpha(tone.main, 0.22),
-    },
-    '&.Mui-selected': {
-      bgcolor: tone.main,
-      color: theme.palette.common.white,
-      '&:hover, &:focus': {
-        bgcolor: tone.dark,
-      },
-    },
-  };
 };
 
 const TransactionTable = ({
@@ -63,75 +23,86 @@ const TransactionTable = ({
   maskByPlaidAccountId,
   onDateChange,
   onMonthChange,
-  onAddTransaction,
   onRowClick,
 }: TransactionTableProps) => {
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
-  const selectedDateKey = toDateKey(selectedDate);
   const selectedTransactions = selectedDaySummary?.transactions ?? [];
   const selectedIncomeTotal = selectedDaySummary?.incomeTotal ?? 0;
   const selectedOutflowTotal = selectedDaySummary?.outflowTotal ?? 0;
   const selectedNetTotal = selectedDaySummary?.netTotal ?? 0;
 
-  const TransactionCalendarDay = (props: PickerDayProps) => {
-    const dateKey = toDateKey(props.day);
-    const summary = daySummaries.get(dateKey);
+  const visibleMonth = startOfMonth(selectedDate);
 
-    return (
-      <PickerDay
-        {...props}
-        sx={
-          props.outsideCurrentMonth || !summary
-            ? undefined
-            : getHighlightedDaySx(summary.netTotal)
-        }
-      />
-    );
-  };
+  // Day tinting: only days in the visible month with a summary.
+  // Filtering here reproduces the old outside-month/no-summary guard —
+  // react-day-picker applies modifiers to outside days too.
+  const { positiveDays, negativeDays } = useMemo(() => {
+    const positive: Date[] = [];
+    const negative: Date[] = [];
+    const monthKeyPrefix = format(visibleMonth, 'yyyy-MM');
+    for (const [dateKey, summary] of daySummaries) {
+      if (!dateKey.startsWith(monthKeyPrefix)) continue;
+      const [year, month, day] = dateKey.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      (summary.netTotal >= 0 ? positive : negative).push(date);
+    }
+    return { positiveDays: positive, negativeDays: negative };
+  }, [daySummaries, visibleMonth]);
 
   return (
-    <Stack direction={{ xs: 'column', lg: 'row' }} spacing={0} alignItems="stretch">
-      <Box
-        sx={{
-          order: { xs: 1, lg: 2 },
-          p: 2.5,
-          pb: 2,
-          flex: 1,
-          minWidth: 0,
-          borderBottom: { xs: '1px solid', lg: 'none' },
-          borderLeft: { xs: 'none', lg: '1px solid' },
-          borderColor: (theme) => alpha(theme.palette.divider, 0.35),
-          backgroundColor: (theme) => alpha(theme.palette.grey[500], 0.03),
-        }}
-      >
-        <Stack spacing={2}>
-          <Box>
-            <Typography variant="overline" color="text.secondary">
+    <div className="flex flex-col items-stretch lg:flex-row">
+      <div className="order-1 min-w-0 flex-1 border-b border-border-subtle bg-background/40 px-5 py-5 lg:order-2 lg:border-b-0 lg:border-l">
+        <div className="flex flex-col gap-5">
+          <div>
+            <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-ink-muted">
               Selected Day
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            </span>
+            <h3 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink">
               {format(selectedDate, 'PPPP')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
+            </h3>
+            <p className="mt-0.5 text-sm text-ink-muted">
               {selectedTransactions.length > 0
                 ? `Review ${selectedTransactions.length} ${selectedTransactions.length === 1 ? 'transaction' : 'transactions'} for this day.`
                 : 'No transactions are recorded for this day yet.'}
-            </Typography>
-          </Box>
+            </p>
+          </div>
 
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Chip size="small" label={`${selectedTransactions.length} item${selectedTransactions.length === 1 ? '' : 's'}`} />
-            <Chip size="small" variant="outlined" color="success" label={`Income $${selectedIncomeTotal.toFixed(2)}`} />
-            <Chip size="small" variant="outlined" color="error" label={`Outflow $${selectedOutflowTotal.toFixed(2)}`} />
-            <Chip
-              size="small"
-              color={selectedNetTotal >= 0 ? 'success' : 'error'}
-              label={`Net ${selectedNetTotal >= 0 ? '+' : '-'}$${Math.abs(selectedNetTotal).toFixed(2)}`}
-            />
-          </Stack>
+          {/* Day totals as a stat strip rather than loose pills */}
+          <div className="grid grid-cols-3 divide-x divide-border-subtle overflow-hidden rounded-lg bg-surface ring-1 ring-ink/[0.06]">
+            <div className="px-3 py-2.5">
+              <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                Income
+              </span>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-success-dark">
+                ${selectedIncomeTotal.toFixed(2)}
+              </p>
+            </div>
+            <div className="px-3 py-2.5">
+              <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                Outflow
+              </span>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-ink">
+                ${selectedOutflowTotal.toFixed(2)}
+              </p>
+            </div>
+            <div className="px-3 py-2.5">
+              <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                Net
+              </span>
+              <p
+                className={
+                  selectedNetTotal >= 0
+                    ? 'mt-0.5 text-sm font-semibold tabular-nums text-success-dark'
+                    : 'mt-0.5 text-sm font-semibold tabular-nums text-error'
+                }
+              >
+                {selectedNetTotal >= 0 ? '+' : '−'}${Math.abs(selectedNetTotal).toFixed(2)}
+              </p>
+            </div>
+          </div>
 
           {selectedTransactions.length > 0 ? (
-            <List disablePadding sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden' }}>
+            <ul className="overflow-hidden rounded-lg bg-surface ring-1 ring-ink/[0.06]">
               {selectedTransactions.map((transaction, index) => {
                 // An Adjustment is a user-driven balance correction. Its sign carries
                 // semantic meaning: negative = balance was overstated (outflow correction,
@@ -142,121 +113,81 @@ const TransactionTable = ({
                 const isInflow =
                   transaction.transactionType === 'Income' ||
                   (transaction.transactionType === 'Adjustment' && transaction.amount > 0);
-                const color = isInflow ? 'success.main' : 'error.main';
                 const sign = isInflow ? '+' : '-';
 
                 const mask = transaction.plaidAccountId
                   ? maskByPlaidAccountId.get(transaction.plaidAccountId)
                   : undefined;
+                const categoryName =
+                  transaction.categoryId == null
+                    ? 'Uncategorized'
+                    : (categoryMap.get(transaction.categoryId) ?? 'Uncategorized');
                 const secondaryText = [
-                  categoryMap.get(transaction.categoryId) ?? 'Uncategorized',
+                  categoryName,
                   transaction.notes || transaction.transactionType,
                 ]
                   .filter(Boolean)
                   .join(' · ');
 
                 return (
-                  <Box key={transaction.id}>
-                    {index > 0 && <Divider component="li" />}
-                    <ListItemButton alignItems="flex-start" onClick={() => onRowClick(transaction)}>
-                      <ListItemText
-                        primary={transaction.payee || categoryMap.get(transaction.categoryId) || 'Uncategorized transaction'}
-                        secondaryTypographyProps={{ component: 'div' }}
-                        secondary={
-                          <>
-                            <Typography variant="body2" color="text.secondary" component="span">
-                              {secondaryText}
-                            </Typography>
-                            {transaction.isImported && (
-                              <Stack
-                                direction="row"
-                                spacing={0.75}
-                                useFlexGap
-                                flexWrap="wrap"
-                                alignItems="center"
-                                sx={{ mt: 0.5 }}
-                              >
-                                <Chip size="small" variant="outlined" label="Imported" />
-                                {mask && (
-                                  <Typography variant="caption" color="text.secondary" component="span">
-                                    {`•••• ${mask}`}
-                                  </Typography>
-                                )}
-                                {transaction.isPending && (
-                                  <Chip size="small" color="warning" label="Pending" />
-                                )}
-                              </Stack>
-                            )}
-                          </>
+                  <li key={transaction.id}>
+                    {index > 0 && <Separator />}
+                    <button
+                      type="button"
+                      onClick={() => onRowClick(transaction)}
+                      className="focus-ring flex w-full items-start justify-between gap-4 px-4 py-3 text-left transition-colors duration-120 hover:bg-background"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ink">
+                          {transaction.payee || categoryName}
+                        </p>
+                        <span className="text-sm text-ink-muted">{secondaryText}</span>
+                        {transaction.isImported && (
+                          <span className="mt-1 flex flex-row flex-wrap items-center gap-1.5">
+                            <Badge variant="outline" label="Imported" />
+                            {mask && <span className="text-xs text-ink-muted">{`•••• ${mask}`}</span>}
+                            {transaction.isPending && <Badge color="warning" label="Pending" />}
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className={
+                          isInflow
+                            ? 'whitespace-nowrap text-sm font-semibold tabular-nums text-success-dark'
+                            : 'whitespace-nowrap text-sm font-semibold tabular-nums text-ink'
                         }
-                      />
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color,
-                          fontWeight: 700,
-                          ml: 2,
-                          whiteSpace: 'nowrap',
-                        }}
                       >
                         {sign}${Math.abs(transaction.amount).toFixed(2)}
-                      </Typography>
-                    </ListItemButton>
-                  </Box>
+                      </span>
+                    </button>
+                  </li>
                 );
               })}
-            </List>
+            </ul>
           ) : (
-            <Box
-              sx={{
-                border: '1px dashed',
-                borderColor: 'divider',
-                borderRadius: 3,
-                p: 3,
-                textAlign: 'center',
-                backgroundColor: 'grey.50',
-              }}
-            >
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            <div className="rounded-md border border-dashed border-border bg-background p-6 text-center">
+              <p className="text-sm font-semibold text-ink">
                 No transactions on {format(selectedDate, 'PP')}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, mb: 2 }}>
-                Choose another date on the calendar or add a transaction for this day.
-              </Typography>
-              <Button variant="contained" onClick={() => onAddTransaction(selectedDateKey)}>
-                Add Transaction for This Day
-              </Button>
-            </Box>
+              </p>
+              <p className="mt-1.5 text-sm text-ink-muted">
+                Transactions arrive automatically from your linked bank.
+              </p>
+            </div>
           )}
-        </Stack>
-      </Box>
+        </div>
+      </div>
 
-      <Box
-        sx={{
-          order: { xs: 2, lg: 1 },
-          px: { xs: 1, md: 2 },
-          py: 2,
-          flexShrink: 0,
-          display: 'flex',
-          justifyContent: 'center',
-        }}
-      >
-        <LocalizationProvider dateAdapter={AdapterDateFns}>
-          <DateCalendar
-            value={selectedDate}
-            onChange={(value) => {
-              if (value) {
-                onDateChange(startOfDay(value));
-              }
-            }}
-            onMonthChange={(month) => onMonthChange(startOfDay(month))}
-            fixedWeekNumber={6}
-            showDaysOutsideCurrentMonth
-            slots={{ day: TransactionCalendarDay }}
-          />
-        </LocalizationProvider>
-      </Box>
-    </Stack>
+      <div className="order-2 flex shrink-0 justify-center px-2 py-4 md:px-4 lg:order-1 lg:w-[340px]">
+        <Calendar
+          selected={selectedDate}
+          onSelect={(date) => onDateChange(startOfDay(date))}
+          month={visibleMonth}
+          onMonthChange={(month) => onMonthChange(startOfDay(month))}
+          positiveDays={positiveDays}
+          negativeDays={negativeDays}
+        />
+      </div>
+    </div>
   );
 };
 

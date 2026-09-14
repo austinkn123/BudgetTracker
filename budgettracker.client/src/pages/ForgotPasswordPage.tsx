@@ -1,14 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
-import Alert from '@mui/material/Alert';
+import { Wallet } from 'lucide-react';
+import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import {
   forgotPasswordSchema,
@@ -85,134 +80,95 @@ const ForgotPasswordPage = () => {
   });
 
   return (
-    <Box
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      minHeight="100vh"
-      bgcolor="background.default"
-      p={2}
-    >
-      <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
-        <Stack spacing={3}>
+    <div className="flex min-h-screen items-center justify-center bg-grey-900 p-4 dark:bg-background">
+      <div className="w-full max-w-[400px]">
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          <span className="flex text-primary-light">
+            <Wallet size={24} />
+          </span>
+          <span className="text-[17px] font-semibold tracking-[-0.01em] text-white">
+            BudgetTracker
+          </span>
+        </div>
+        <Card padding="lg">
+        <div className="flex flex-col gap-6">
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
-              Reset Password
-            </Typography>
-            <Typography variant="body2" className="text-ink-muted">
+            <h1 className="mb-1.5 text-[22px] font-semibold tracking-[-0.02em] text-ink">Reset Password</h1>
+            <p className="text-sm text-ink-muted">
               {step === 'request'
                 ? 'Enter your email to receive a reset code'
                 : `Confirm the code sent to ${email}`}
-            </Typography>
+            </p>
           </div>
 
-          {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
+          {error && <Alert severity="error" message={error} />}
+          {success && <Alert severity="success" message={success} />}
 
           {step === 'request' ? (
             <form onSubmit={handleRequestCode}>
-              <Stack spacing={3}>
-                <Controller
-                  name="email"
+              <div className="flex flex-col gap-5">
+                <Input
                   control={requestForm.control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Email"
-                      type="email"
-                      fullWidth
-                      error={Boolean(requestForm.formState.errors.email)}
-                      helperText={requestForm.formState.errors.email?.message}
-                      disabled={isSubmitting}
-                    />
-                  )}
+                  name="email"
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  disabled={isSubmitting}
                 />
 
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  size="large"
-                  disabled={isSubmitting}
-                >
+                <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                   {isSubmitting ? 'Sending Code...' : 'Send Reset Code'}
                 </Button>
-              </Stack>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleResetPassword}>
-              <Stack spacing={3}>
-                <Controller
+              <div className="flex flex-col gap-5">
+                <Input
+                  control={resetForm.control}
                   name="code"
-                  control={resetForm.control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Confirmation Code"
-                      placeholder="000000"
-                      fullWidth
-                      inputProps={{ maxLength: 6, pattern: '[0-9]*' }}
-                      error={Boolean(resetForm.formState.errors.code)}
-                      helperText={resetForm.formState.errors.code?.message}
-                      disabled={isSubmitting}
-                      autoComplete="one-time-code"
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="newPassword"
-                  control={resetForm.control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="New Password"
-                      type="password"
-                      fullWidth
-                      error={Boolean(resetForm.formState.errors.newPassword)}
-                      helperText={resetForm.formState.errors.newPassword?.message}
-                      disabled={isSubmitting}
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="confirmPassword"
-                  control={resetForm.control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      label="Confirm Password"
-                      type="password"
-                      fullWidth
-                      error={Boolean(resetForm.formState.errors.confirmPassword)}
-                      helperText={resetForm.formState.errors.confirmPassword?.message}
-                      disabled={isSubmitting}
-                    />
-                  )}
-                />
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  size="large"
+                  label="Confirmation Code"
+                  placeholder="000000"
+                  maxLength={6}
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
                   disabled={isSubmitting}
-                >
+                />
+
+                <Input
+                  control={resetForm.control}
+                  name="newPassword"
+                  label="New Password"
+                  type="password"
+                  autoComplete="new-password"
+                  disabled={isSubmitting}
+                />
+
+                <Input
+                  control={resetForm.control}
+                  name="confirmPassword"
+                  label="Confirm Password"
+                  type="password"
+                  autoComplete="new-password"
+                  disabled={isSubmitting}
+                />
+
+                <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                   {isSubmitting ? 'Resetting Password...' : 'Reset Password'}
                 </Button>
-              </Stack>
+              </div>
             </form>
           )}
 
-          <Typography variant="body2" className="text-center text-ink-muted">
+          <p className="text-center text-sm text-ink-muted">
             <Link to="/login" className="font-semibold text-primary hover:text-primary-dark">
               Back to Sign In
             </Link>
-          </Typography>
-        </Stack>
-      </Card>
-    </Box>
+          </p>
+        </div>
+        </Card>
+      </div>
+    </div>
   );
 };
 

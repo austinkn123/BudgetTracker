@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Typography from '@mui/material/Typography';
+import { PageHeader } from '../../../shared/components/ui';
 import { useBudgetPlans } from '../hooks/useBudgetPlans';
 import { useCategories } from '../../categories/hooks/useCategories';
 import StatusBanner from '../../../shared/components/StatusBanner';
@@ -16,14 +16,10 @@ const BudgetPlansPage = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Typography variant="h4" className="font-bold text-ink">
-          Budget Plans
-        </Typography>
-        <Typography variant="body2" className="text-ink-muted mt-1">
-          Create and manage your monthly budget plans
-        </Typography>
-      </div>
+      <PageHeader
+        title="Budget Plans"
+        description="Create and manage your monthly budget plans"
+      />
 
       <StatusBanner statusMessage={statusMessage} statusError={statusError} />
 

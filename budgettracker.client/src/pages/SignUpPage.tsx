@@ -1,14 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
-import Alert from '@mui/material/Alert';
+import { Wallet } from 'lucide-react';
+import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import { signUpSchema, type SignUpFormData } from '../shared/validation/auth';
 
@@ -18,7 +13,7 @@ const SignUpPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<SignUpFormData>({
+  const { control, handleSubmit } = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
       email: '',
@@ -45,128 +40,88 @@ const SignUpPage = () => {
   });
 
   return (
-    <Box
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      minHeight="100vh"
-      bgcolor="background.default"
-      p={2}
-    >
-      <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
-        <Stack spacing={3}>
+    <div className="flex min-h-screen items-center justify-center bg-grey-900 p-4 dark:bg-background">
+      <div className="w-full max-w-[400px]">
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          <span className="flex text-primary-light">
+            <Wallet size={24} />
+          </span>
+          <span className="text-[17px] font-semibold tracking-[-0.01em] text-white">
+            BudgetTracker
+          </span>
+        </div>
+        <Card padding="lg">
+        <div className="flex flex-col gap-6">
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
-              Create Account
-            </Typography>
-            <Typography variant="body2" className="text-ink-muted">
+            <h1 className="mb-1.5 text-[22px] font-semibold tracking-[-0.02em] text-ink">Create Account</h1>
+            <p className="text-sm text-ink-muted">
               Join BudgetTracker to start managing your finances
-            </Typography>
+            </p>
           </div>
 
-          {error && <Alert severity="error">{error}</Alert>}
+          {error && <Alert severity="error" message={error} />}
 
           <form onSubmit={onSubmit}>
-            <Stack spacing={3}>
-              <Controller
+            <div className="flex flex-col gap-5">
+              <Input
+                control={control}
                 name="email"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Email"
-                    type="email"
-                    fullWidth
-                    error={Boolean(errors.email)}
-                    helperText={errors.email?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Controller
-                name="firstName"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="First Name (optional)"
-                    fullWidth
-                    error={Boolean(errors.firstName)}
-                    helperText={errors.firstName?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Controller
-                name="lastName"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Last Name (optional)"
-                    fullWidth
-                    error={Boolean(errors.lastName)}
-                    helperText={errors.lastName?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Controller
-                name="password"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Password"
-                    type="password"
-                    fullWidth
-                    error={Boolean(errors.password)}
-                    helperText={errors.password?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Controller
-                name="confirmPassword"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Confirm Password"
-                    type="password"
-                    fullWidth
-                    error={Boolean(errors.confirmPassword)}
-                    helperText={errors.confirmPassword?.message}
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
+                label="Email"
+                type="email"
+                autoComplete="email"
                 disabled={isSubmitting}
-              >
+              />
+
+              <Input
+                control={control}
+                name="firstName"
+                label="First Name (optional)"
+                autoComplete="given-name"
+                disabled={isSubmitting}
+              />
+
+              <Input
+                control={control}
+                name="lastName"
+                label="Last Name (optional)"
+                autoComplete="family-name"
+                disabled={isSubmitting}
+              />
+
+              <Input
+                control={control}
+                name="password"
+                label="Password"
+                type="password"
+                autoComplete="new-password"
+                disabled={isSubmitting}
+              />
+
+              <Input
+                control={control}
+                name="confirmPassword"
+                label="Confirm Password"
+                type="password"
+                autoComplete="new-password"
+                disabled={isSubmitting}
+              />
+
+              <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                 {isSubmitting ? 'Creating Account...' : 'Sign Up'}
               </Button>
-            </Stack>
+            </div>
           </form>
 
-          <Typography variant="body2" className="text-center text-ink-muted">
+          <p className="text-center text-sm text-ink-muted">
             Already have an account?{' '}
             <Link to="/login" className="font-semibold text-primary hover:text-primary-dark">
               Sign in
             </Link>
-          </Typography>
-        </Stack>
-      </Card>
-    </Box>
+          </p>
+        </div>
+        </Card>
+      </div>
+    </div>
   );
 };
 

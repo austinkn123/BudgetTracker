@@ -10,4 +10,7 @@ public interface ICurrentUserProvider
 
     /// <summary>The Cognito subject claim — stable external identifier safe to hand to third parties (e.g. Plaid's client_user_id).</summary>
     string CognitoSub { get; }
+
+    /// <summary>The email address from the Cognito token. Cognito owns this value; it is never persisted locally.</summary>
+    string Email { get; }
 }

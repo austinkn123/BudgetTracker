@@ -4,7 +4,7 @@ This document captures the mobile strategy for BudgetTracker, including the curr
 
 ## Current State
 
-The frontend (`budgettracker.client`) is a React + TypeScript + Vite SPA with Tailwind CSS and Material UI installed. The current mobile readiness:
+The frontend (`budgettracker.client`) is a React + TypeScript + Vite SPA with Tailwind CSS and Radix-based shared primitives. The current mobile readiness:
 
 ### What's working
 - Viewport meta tag is set correctly (`width=device-width, initial-scale=1.0`)
