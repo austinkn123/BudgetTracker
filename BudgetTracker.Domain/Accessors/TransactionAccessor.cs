@@ -23,11 +23,21 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
             .Where(t => t.Account.UserId == userId);
 
         {
+            // Compare on calendar days, matching BudgetAnalysisManager — otherwise the ledger and
+            // the analysis disagree about which rows are in the month. The end bound is an
+            // exclusive next-midnight rather than a CAST to date: it includes a row with any time
+            // component, and it stays sargable so IX_Transactions_AccountId_OccurredAt is still used.
             if (filter.From is DateTime from)
-                query = query.Where(t => t.OccurredAt >= from);
+            {
+                var fromDate = from.Date;
+                query = query.Where(t => t.OccurredAt >= fromDate);
+            }
 
             if (filter.To is DateTime to)
-                query = query.Where(t => t.OccurredAt <= to);
+            {
+                var dayAfterTo = to.Date.AddDays(1);
+                query = query.Where(t => t.OccurredAt < dayAfterTo);
+            }
 
             if (filter.Uncategorized is bool uncategorized)
                 query = uncategorized

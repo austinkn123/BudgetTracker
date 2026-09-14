@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { transactionService } from '../../../shared/services/transaction.service';
 import type { Transaction } from '../../../shared/types/api';
@@ -15,6 +15,27 @@ export const useTransactionReview = (
 ) => {
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  const visibleIds = useMemo(
+    () => new Set(visibleTransactions.map((t) => t.id)),
+    [visibleTransactions],
+  );
+
+  /**
+   * Selection is scoped to what is on screen. Changing month, view, status or search swaps the
+   * visible set, and a retained id would then be written by a bulk action the user cannot see the
+   * target of — so drop anything that has scrolled out of scope.
+   *
+   * Returns the existing Set untouched when nothing was pruned; a fresh Set every run would make
+   * this effect re-trigger itself.
+   */
+  useEffect(() => {
+    setSelectedIds((current) => {
+      if (current.size === 0) return current;
+      const retained = [...current].filter((id) => visibleIds.has(id));
+      return retained.length === current.size ? current : new Set(retained);
+    });
+  }, [visibleIds]);
 
   const invalidate = useCallback(() => {
     // Every filtered slice is a separate cache entry, so invalidate the whole family.
@@ -82,10 +103,13 @@ export const useTransactionReview = (
 
   const setCategoryForSelected = useCallback(
     (categoryId: number | null) => {
-      if (selectedIds.size === 0) return;
-      categorizeMutation.mutate({ ids: [...selectedIds], categoryId });
+      // Intersect again at write time. The effect above keeps selection in step, but a bulk write
+      // must never be able to reach a row outside the set the user is looking at.
+      const ids = [...selectedIds].filter((id) => visibleIds.has(id));
+      if (ids.length === 0) return;
+      categorizeMutation.mutate({ ids, categoryId });
     },
-    [categorizeMutation, selectedIds],
+    [categorizeMutation, selectedIds, visibleIds],
   );
 
   const setNotesFor = useCallback(

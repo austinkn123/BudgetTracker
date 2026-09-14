@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import type { TransactionQuery } from '../../../shared/services/transaction.service';
 
 export type TransactionStatusFilter = 'all' | 'uncategorized' | 'pending';
@@ -18,7 +19,14 @@ export const statusToQuery = (status: TransactionStatusFilter): TransactionQuery
   }
 };
 
-/** Build the full query for the review list: status chip + search text + visible month. */
+/**
+ * Build the full query for a month: status chip + search text + month bounds.
+ *
+ * Bounds are sent as calendar dates (`yyyy-MM-dd`), never `toISOString()`. `OccurredAt` is stored
+ * as a timezone-free calendar date at midnight, so an instant would shift the window for anyone
+ * outside UTC — in UTC−5 an April query serialised to `2026-04-01T05:00:00Z`, dropping an April 1
+ * row and letting a May 1 row in. A bare date has no such offset to lose.
+ */
 export const buildListQuery = (
   status: TransactionStatusFilter,
   search: string,
@@ -27,6 +35,6 @@ export const buildListQuery = (
 ): TransactionQuery => ({
   ...statusToQuery(status),
   ...(search.trim() ? { search: search.trim() } : {}),
-  from: monthStart.toISOString(),
-  to: monthEnd.toISOString(),
+  from: format(monthStart, 'yyyy-MM-dd'),
+  to: format(monthEnd, 'yyyy-MM-dd'),
 });

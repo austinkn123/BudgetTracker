@@ -52,12 +52,25 @@ const TransactionsSection = ({
   // The calendar tints every day of its visible month, so it needs the unfiltered ledger.
   const { data: allTransactions = [] } = useTransactions();
 
-  const monthQuery = useMemo<TransactionQuery>(
+  // Two month queries, deliberately.
+  //
+  // The List view is a search tool, so its results carry the status chip and the search box.
+  // The Plan view is a reckoning: its buckets have to add up to the same month the header reports
+  // from the server analysis, which knows nothing about the chips. Feeding it the filtered slice
+  // produced contradictory totals with no visible cause, since the chips are not even rendered in
+  // Plan view.
+  const listQuery = useMemo<TransactionQuery>(
     () => buildListQuery(status, search, monthStart, monthEnd),
     [status, search, monthStart, monthEnd],
   );
 
-  const { data: monthTransactions = [] } = useTransactions(monthQuery);
+  const planQuery = useMemo<TransactionQuery>(
+    () => buildListQuery('all', '', monthStart, monthEnd),
+    [monthStart, monthEnd],
+  );
+
+  const { data: listTransactions = [] } = useTransactions(listQuery);
+  const { data: planTransactions = [] } = useTransactions(planQuery);
   const { data: categories = [] } = useCategories();
   const { data: budgetPlans = [] } = useBudgetPlans();
 
@@ -76,7 +89,15 @@ const TransactionsSection = ({
     [connection],
   );
 
-  const review = useTransactionReview(monthTransactions, setStatusMessage, setStatusError);
+  // Selection is scoped to the rows actually on screen, so the hook is told which set that is.
+  // Calendar has no checkboxes, so it selects nothing.
+  const visibleTransactions = useMemo(() => {
+    if (view === 'plan') return planTransactions;
+    if (view === 'list') return listTransactions;
+    return [];
+  }, [view, planTransactions, listTransactions]);
+
+  const review = useTransactionReview(visibleTransactions, setStatusMessage, setStatusError);
 
   const categoryNames = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
@@ -100,12 +121,12 @@ const TransactionsSection = ({
   const grouping = useMemo(
     () =>
       groupByPlan(
-        monthTransactions,
+        planTransactions,
         governingPlan,
         categoryNames,
         analysis?.planMonth?.byCategory,
       ),
-    [monthTransactions, governingPlan, categoryNames, analysis],
+    [planTransactions, governingPlan, categoryNames, analysis],
   );
 
   // Counted across the whole ledger rather than the month on screen, so the number does not shift
@@ -212,20 +233,20 @@ const TransactionsSection = ({
           <Card padding="none">
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                {monthTransactions.length}{' '}
-                {monthTransactions.length === 1 ? 'transaction' : 'transactions'}
+                {listTransactions.length}{' '}
+                {listTransactions.length === 1 ? 'transaction' : 'transactions'}
               </span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => review.toggleAll(review.selectedIds.size !== monthTransactions.length)}
+                onClick={() => review.toggleAll(review.selectedIds.size !== listTransactions.length)}
               >
-                {review.selectedIds.size === monthTransactions.length && monthTransactions.length > 0
+                {review.selectedIds.size === listTransactions.length && listTransactions.length > 0
                   ? 'Deselect all'
                   : 'Select all'}
               </Button>
             </div>
-            <TransactionRows transactions={monthTransactions} {...rowProps} />
+            <TransactionRows transactions={listTransactions} {...rowProps} />
           </Card>
         </div>
       )}

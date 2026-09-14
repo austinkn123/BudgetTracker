@@ -136,14 +136,26 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
                     )}
                   </td>
                   <td className="px-3 py-3">
-                    <ChevronRight
-                      size={15}
-                      aria-hidden
-                      className={cn(
-                        'text-ink-muted/60 transition-transform duration-160',
-                        expanded && 'rotate-90',
-                      )}
-                    />
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      aria-label={`${expanded ? 'Hide' : 'Show'} transactions for ${data.name}`}
+                      onClick={(event) => {
+                        // The row is clickable too; stop this from toggling twice.
+                        event.stopPropagation();
+                        setExpandedKey((prev) => (prev === data.key ? null : data.key));
+                      }}
+                      className="focus-ring rounded p-0.5"
+                    >
+                      <ChevronRight
+                        size={15}
+                        aria-hidden
+                        className={cn(
+                          'text-ink-muted/60 transition-transform duration-160',
+                          expanded && 'rotate-90',
+                        )}
+                      />
+                    </button>
                   </td>
                 </tr>
 
