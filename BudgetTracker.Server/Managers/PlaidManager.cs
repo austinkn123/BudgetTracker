@@ -19,6 +19,7 @@ public class PlaidManager(
     IPlaidItemAccessor itemAccessor,
     ITransactionAccessor transactionAccessor,
     IAccountAccessor accountAccessor,
+    ICategoryAccessor categoryAccessor,
     IPlaidEngine engine,
     IPlaidWebhookEngine webhookEngine,
     IOptions<PlaidOptions> options,
@@ -319,6 +320,10 @@ public class PlaidManager(
         var changes = syncResult.Added.Concat(syncResult.Modified).ToList();
         var mapped = new List<Transaction>(changes.Count);
 
+        // Plaid sends a suggested category on every transaction; resolving it here is what lets
+        // imported rows reach BudgetAnalysisEngine, which groups purely by CategoryId (BUD-9).
+        var userCategories = (await categoryAccessor.GetByUserIdAsync(userId)).ToList();
+
         foreach (var plaidTxn in changes)
         {
             var matchingSnapshot = plaidAccountSnapshots.FirstOrDefault(a => a.PlaidAccountId == plaidTxn.AccountId);
@@ -336,7 +341,8 @@ public class PlaidManager(
             if (resolvedAccountId is null)
                 continue; // Defensive — exchange flow ensures one exists; skip orphans rather than crash.
 
-            mapped.Add(engine.MapToBudgetTrackerTransaction(plaidTxn, resolvedAccountId.Value));
+            var resolvedCategoryId = engine.ResolveCategoryId(plaidTxn, userCategories);
+            mapped.Add(engine.MapToBudgetTrackerTransaction(plaidTxn, resolvedAccountId.Value, resolvedCategoryId));
         }
 
         var (inserted, updated) = await transactionAccessor.UpsertImportedAsync(mapped);

@@ -1,54 +1,92 @@
 import { describe, expect, it } from 'vitest';
-import { budgetTrackerTheme } from './theme';
-import { colorTokens } from './tokens';
+import {
+  colorTokens,
+  fontSizeTokens,
+  hexToChannels,
+  motionTokens,
+  radiusTokens,
+  shadowTokens,
+  withAlpha,
+} from './tokens';
 
 /**
- * BUD-13 — theme shape test.
- * Guards the token contract: palette keys exist and resolve to the values in
- * tokens.ts (the same file tailwind.config.ts consumes).
+ * BUD-20 — token shape tests.
+ * tokens.ts is the single source of truth for the design system; these guard
+ * its contract now that the MUI theme is gone.
  */
-describe('budgetTrackerTheme', () => {
-  it('defines brand colors from the token file', () => {
-    expect(budgetTrackerTheme.palette.primary.main).toBe(colorTokens.primary.main);
-    expect(budgetTrackerTheme.palette.secondary.main).toBe(colorTokens.secondary.main);
-  });
+describe('colorTokens', () => {
+  it.each(['primary', 'secondary', 'success', 'warning', 'error', 'info'] as const)(
+    '%s exposes main/light/dark/subtle/contrastText',
+    (key) => {
+      const scale = colorTokens[key];
+      for (const shade of ['main', 'light', 'dark', 'subtle', 'contrastText'] as const) {
+        expect(scale[shade]).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      }
+    },
+  );
 
-  it('defines all semantic colors from the token file', () => {
-    expect(budgetTrackerTheme.palette.success.main).toBe(colorTokens.success.main);
-    expect(budgetTrackerTheme.palette.warning.main).toBe(colorTokens.warning.main);
-    expect(budgetTrackerTheme.palette.error.main).toBe(colorTokens.error.main);
-    expect(budgetTrackerTheme.palette.info.main).toBe(colorTokens.info.main);
-  });
-
-  it('exposes light/dark/subtle/contrastText shades on each palette color', () => {
-    for (const key of ['primary', 'secondary', 'success', 'warning', 'error', 'info'] as const) {
-      const color = budgetTrackerTheme.palette[key];
-      expect(color.light).toBe(colorTokens[key].light);
-      expect(color.dark).toBe(colorTokens[key].dark);
-      expect(color.subtle).toBe(colorTokens[key].subtle);
-      expect(color.contrastText).toBe(colorTokens[key].contrastText);
+  it('exposes the full neutral set including the border scale', () => {
+    const { neutral } = colorTokens;
+    for (const key of [
+      'background',
+      'surface',
+      'borderSubtle',
+      'border',
+      'borderStrong',
+      'textPrimary',
+      'textSecondary',
+    ] as const) {
+      expect(neutral[key]).toMatch(/^#[0-9A-Fa-f]{6}$/);
     }
   });
 
-  it('defines neutral background, surface, border, and text tokens', () => {
-    expect(budgetTrackerTheme.palette.background.default).toBe(colorTokens.neutral.background);
-    expect(budgetTrackerTheme.palette.background.paper).toBe(colorTokens.neutral.surface);
-    expect(budgetTrackerTheme.palette.divider).toBe(colorTokens.neutral.border);
-    expect(budgetTrackerTheme.palette.text.primary).toBe(colorTokens.neutral.textPrimary);
-    expect(budgetTrackerTheme.palette.text.secondary).toBe(colorTokens.neutral.textSecondary);
+  it('aligns the border scale with the grey ramp', () => {
+    expect(colorTokens.neutral.borderSubtle).toBe(colorTokens.grey[100]);
+    expect(colorTokens.neutral.border).toBe(colorTokens.grey[200]);
+    expect(colorTokens.neutral.borderStrong).toBe(colorTokens.grey[300]);
+  });
+});
+
+describe('color helpers', () => {
+  it('converts hex to space-separated rgb channels', () => {
+    expect(hexToChannels('#635BFF')).toBe('99 91 255');
+    expect(hexToChannels('#FFFFFF')).toBe('255 255 255');
+    expect(hexToChannels('#fff')).toBe('255 255 255');
   });
 
-  it('uses Inter as the primary font family', () => {
-    expect(budgetTrackerTheme.typography.fontFamily).toMatch(/^"Inter"/);
-    for (const variant of ['h1', 'h2', 'h3', 'h4', 'body1', 'body2', 'caption', 'overline'] as const) {
-      const { fontSize, fontWeight, lineHeight } = budgetTrackerTheme.typography[variant];
-      expect(fontSize).toBeDefined();
-      expect(fontWeight).toBeDefined();
-      expect(lineHeight).toBeDefined();
+  it('produces hash-free alpha colors (hex-audit safe)', () => {
+    const result = withAlpha(colorTokens.primary.main, 0.14);
+    expect(result).toBe(`rgb(${hexToChannels(colorTokens.primary.main)} / 0.14)`);
+    expect(result).not.toContain('#');
+  });
+});
+
+describe('scale tokens (Stripe-leaning, BUD-20)', () => {
+  it('clamps the radius scale at 12px', () => {
+    const px = (v: string) => (v === '9999px' ? 9999 : Number.parseInt(v, 10));
+    for (const value of Object.values(radiusTokens)) {
+      if (value !== '9999px') {
+        expect(px(value)).toBeLessThanOrEqual(12);
+      }
+    }
+    expect(radiusTokens.DEFAULT).toBe('6px');
+    expect(radiusTokens.md).toBe('8px');
+  });
+
+  it('defines four layered shadows referencing the shadow channel var', () => {
+    for (const key of ['xs', 'sm', 'md', 'lg'] as const) {
+      expect(shadowTokens[key]).toContain('var(--bud-shadow)');
     }
   });
 
-  it('uses an 8px spacing base unit', () => {
-    expect(budgetTrackerTheme.spacing(1)).toBe('8px');
+  it('defines the motion scale', () => {
+    expect(motionTokens.duration[120]).toBe('120ms');
+    expect(motionTokens.duration[240]).toBe('240ms');
+    expect(motionTokens.easing['out-soft']).toContain('cubic-bezier');
+  });
+
+  it('defines the extra font sizes', () => {
+    expect(fontSizeTokens['2xs'][0]).toBe('0.6875rem');
+    expect(fontSizeTokens.body[0]).toBe('0.9375rem');
   });
 });

@@ -209,6 +209,10 @@ namespace BudgetTracker.Domain.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("PlaidCategoryPrimary")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
@@ -217,6 +221,11 @@ namespace BudgetTracker.Domain.Migrations
                     b.HasIndex("UserId", "Name")
                         .IsUnique()
                         .HasDatabaseName("UQ_Categories_User_Name");
+
+                    b.HasIndex("UserId", "PlaidCategoryPrimary")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_Categories_User_PlaidCategory")
+                        .HasFilter("[PlaidCategoryPrimary] IS NOT NULL");
 
                     b.ToTable("Categories", null, t =>
                         {
@@ -381,6 +390,10 @@ namespace BudgetTracker.Domain.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("PlaidCategoryPrimary")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("PlaidTransactionId")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -439,21 +452,12 @@ namespace BudgetTracker.Domain.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETDATE()");
 
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CognitoSub")
                         .IsUnique()
                         .HasDatabaseName("IX_Users_CognitoSub")
                         .HasFilter("[CognitoSub] IS NOT NULL");
-
-                    b.HasIndex("Email")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_Users_Email");
 
                     b.ToTable("Users", (string)null);
                 });

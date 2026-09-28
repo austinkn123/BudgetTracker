@@ -1,9 +1,4 @@
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-import Button from '@mui/material/Button';
+import ConfirmModal from '../../../shared/components/ui/ConfirmModal';
 
 interface ReplaceConnectionDialogProps {
   open: boolean;
@@ -22,23 +17,20 @@ const ReplaceConnectionDialog = ({
   onCancel,
   onConfirm,
 }: ReplaceConnectionDialogProps) => (
-  <Dialog open={open} onClose={onCancel}>
-    <DialogTitle>Replace your current connection?</DialogTitle>
-    <DialogContent>
-      <DialogContentText>
+  <ConfirmModal
+    open={open}
+    title="Replace your current connection?"
+    message={
+      <>
         You're already connected to <strong>{currentInstitutionName ?? 'a bank'}</strong>.
-        Connecting a new bank will disconnect the current one. Imported transactions stay in
-        your history, but no new transactions will sync from {currentInstitutionName ?? 'it'}
-        {' '}afterwards.
-      </DialogContentText>
-    </DialogContent>
-    <DialogActions>
-      <Button onClick={onCancel}>Cancel</Button>
-      <Button onClick={onConfirm} color="primary" variant="contained">
-        Replace connection
-      </Button>
-    </DialogActions>
-  </Dialog>
+        Connecting a new bank will disconnect the current one. Imported transactions stay in your
+        history, but no new transactions will sync from {currentInstitutionName ?? 'it'} afterwards.
+      </>
+    }
+    confirmLabel="Replace connection"
+    onCancel={onCancel}
+    onConfirm={onConfirm}
+  />
 );
 
 export default ReplaceConnectionDialog;

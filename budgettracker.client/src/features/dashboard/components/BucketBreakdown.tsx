@@ -1,10 +1,7 @@
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Box from '@mui/material/Box';
-import { alpha, useTheme } from '@mui/material/styles';
+import Card from '../../../shared/components/ui/Card';
+import { Badge } from '../../../shared/components/ui';
 import type { BucketPerformance } from '../../../shared/types/api';
-import { getSemanticColors } from '../utils/chartTheme';
+import { semanticColors } from '../utils/chartTheme';
 
 interface BucketBreakdownProps {
   /** Core/Buffer planned-vs-actual, straight from the analysis. */
@@ -19,20 +16,10 @@ const currency = new Intl.NumberFormat('en-US', {
 });
 
 const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
-  const theme = useTheme();
-  const semantic = getSemanticColors(theme);
-
   if (rows.length === 0 || rows.every((r) => r.planned === 0 && r.actual === 0)) {
     return (
-      <Card className="h-full">
-        <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px]">
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-            Bucket Breakdown
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            No bucket data for this plan yet
-          </Typography>
-        </CardContent>
+      <Card title="Bucket Breakdown" fullHeight contentClassName="flex min-h-[200px] items-center justify-center">
+        <p className="text-sm text-ink-muted">No bucket data for this plan yet</p>
       </Card>
     );
   }
@@ -40,63 +27,64 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
   const maxValue = rows.reduce((m, r) => Math.max(m, r.planned, r.actual), 0);
 
   return (
-    <Card className="h-full">
-      <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-          Bucket Breakdown
-        </Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          {rows.map((row) => {
-            const baseWidth = maxValue > 0 ? (Math.min(row.planned, row.actual) / maxValue) * 100 : 0;
-            const overage = Math.max(0, row.actual - row.planned);
-            const overageWidth = maxValue > 0 ? (overage / maxValue) * 100 : 0;
-            const underUsed = row.actual < row.planned;
-            return (
-              <Box key={row.bucket}>
-                <Box className="flex items-baseline justify-between">
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: semantic.ink }}>
-                    {row.bucket}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: semantic.expense }}>
-                    {`${currency.format(row.actual)} of ${currency.format(row.planned)}`}
-                    {overage > 0 && ` (+${currency.format(overage)})`}
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    mt: 0.75,
-                    position: 'relative',
-                    height: 14,
-                    borderRadius: 7,
-                    backgroundColor: alpha(semantic.neutral, 0.25),
-                    overflow: 'hidden',
-                    display: 'flex',
-                  }}
-                >
-                  <Box
-                    sx={{
+    <Card title="Bucket Breakdown" subtitle="Planned versus actual by bucket" fullHeight>
+      <ul className="flex flex-col gap-6">
+        {rows.map((row) => {
+          const baseWidth = maxValue > 0 ? (Math.min(row.planned, row.actual) / maxValue) * 100 : 0;
+          const overage = Math.max(0, row.actual - row.planned);
+          const overageWidth = maxValue > 0 ? (overage / maxValue) * 100 : 0;
+          const plannedWidth = maxValue > 0 ? (row.planned / maxValue) * 100 : 0;
+          const underUsed = row.actual < row.planned;
+
+          return (
+            <li key={row.bucket}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-[13px] font-semibold text-ink">{row.bucket}</p>
+                  {overage > 0 && (
+                    <Badge color="warning" label={`+${currency.format(overage)}`} />
+                  )}
+                </div>
+                <span className="text-[13px] tabular-nums text-ink-muted">
+                  <span className="font-semibold text-ink">{currency.format(row.actual)}</span>
+                  {' of '}
+                  {currency.format(row.planned)}
+                </span>
+              </div>
+
+              <div className="relative mt-2 h-2.5">
+                {/* Track */}
+                <div className="absolute inset-0 rounded-full bg-border-subtle" />
+                {/* Actual (+ overage continuation). inset-0 so the percentage
+                    widths below resolve against the full track, not auto. */}
+                <div className="absolute inset-0 flex overflow-hidden rounded-full">
+                  <div
+                    className="h-full transition-all duration-240 ease-out-soft"
+                    style={{
                       width: `${baseWidth}%`,
-                      height: '100%',
-                      backgroundColor: underUsed
-                        ? alpha(semantic.income, 0.65)
-                        : semantic.neutral,
+                      backgroundColor: underUsed ? semanticColors.income : semanticColors.neutral,
                     }}
                   />
                   {overage > 0 && (
-                    <Box
-                      sx={{
-                        width: `${overageWidth}%`,
-                        height: '100%',
-                        backgroundColor: semantic.overspend,
-                      }}
+                    <div
+                      className="h-full transition-all duration-240 ease-out-soft"
+                      style={{ width: `${overageWidth}%`, backgroundColor: semanticColors.overspend }}
                     />
                   )}
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
-      </CardContent>
+                </div>
+                {/* Plan marker */}
+                {row.planned > 0 && (
+                  <span
+                    aria-hidden
+                    className="absolute -top-0.5 h-3.5 w-px bg-ink/40"
+                    style={{ left: `${plannedWidth}%` }}
+                  />
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 };

@@ -10,15 +10,22 @@ public record BudgetAnalysis(
     IReadOnlyList<CategorySpend> WindowSpend,
     IReadOnlyList<CategoryMonthSpend> MonthlyTrend);
 
-/// <summary>Performance of the active plan against actuals for the plan's own month.</summary>
+/// <summary>
+/// Performance of the governing plan against actuals for ONE month.
+///
+/// <paramref name="AnalyzedMonth"/> is the month the figures describe; <c>Plan.PlanMonth</c> is the
+/// month that plan took effect. They differ whenever a plan rolls forward past its own month.
+/// </summary>
 public record PlanPerformance(
     AnalyzedPlan Plan,
+    DateTime AnalyzedMonth,
     PeriodPacing Pacing,
     IReadOnlyList<CategoryPerformance> ByCategory,
     IReadOnlyList<BucketPerformance> ByBucket,
     decimal Income,
     decimal Expenses);
 
+/// <summary>The plan in force. <paramref name="PlanMonth"/> is the month it TOOK EFFECT.</summary>
 public record AnalyzedPlan(int Id, string Name, DateTime PlanMonth);
 
 /// <summary>How spending is tracking against the plan relative to how much of the month has passed.</summary>

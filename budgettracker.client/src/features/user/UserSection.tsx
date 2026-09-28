@@ -1,10 +1,20 @@
 import { format } from 'date-fns';
 import { User as UserIcon } from 'lucide-react';
+import Card from '../../shared/components/ui/Card';
 import { useUser } from './hooks/useUser';
 
 type UserSectionProps = {
   isLoading: boolean;
 };
+
+const Field = ({ label, value }: { label: string; value: string }) => (
+  <div>
+    <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
+      {label}
+    </span>
+    <p className="mt-1 text-sm text-ink">{value}</p>
+  </div>
+);
 
 const UserSection = ({ isLoading }: UserSectionProps) => {
   const { data: user } = useUser();
@@ -12,34 +22,24 @@ const UserSection = ({ isLoading }: UserSectionProps) => {
   if (isLoading) return null;
 
   return (
-    <section className="bg-surface rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <UserIcon className="w-5 h-5 text-primary" />
-          <h2 className="text-xl font-semibold text-ink">User Information</h2>
+    <Card
+      title={
+        <span className="flex items-center gap-2">
+          <UserIcon size={18} className="text-primary" />
+          User Information
+        </span>
+      }
+    >
+      {user ? (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <Field label="User ID" value={String(user.id)} />
+          <Field label="Email" value={user.email} />
+          <Field label="Created" value={format(new Date(user.createdAt), 'PPP')} />
         </div>
-      </div>
-      <div className="px-6 py-4">
-        {user ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <span className="text-sm font-medium text-ink-muted">User ID:</span>
-              <p className="mt-1 text-ink">{user.id}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-ink-muted">Email:</span>
-              <p className="mt-1 text-ink">{user.email}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-ink-muted">Created At:</span>
-              <p className="mt-1 text-ink">{format(new Date(user.createdAt), 'PPP')}</p>
-            </div>
-          </div>
-        ) : (
-          <p className="text-ink-muted italic">No user data found</p>
-        )}
-      </div>
-    </section>
+      ) : (
+        <p className="text-sm italic text-ink-muted">No user data found</p>
+      )}
+    </Card>
   );
 };
 

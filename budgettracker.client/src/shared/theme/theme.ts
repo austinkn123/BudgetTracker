@@ -1,86 +1,58 @@
-import { createTheme } from '@mui/material/styles';
-import { colorTokens } from './tokens';
-
 /**
- * Expose the `subtle` shade on every palette color so components can reference
- * it through sx paths like `bgcolor: 'primary.subtle'` instead of hex values.
- */
-declare module '@mui/material/styles' {
-  interface PaletteColor {
-    subtle: string;
-  }
-  interface SimplePaletteColorOptions {
-    subtle?: string;
-  }
-}
-
-/**
- * BudgetTracker MUI theme (BUD-13).
+ * Theme preference runtime (BUD-17).
  *
- * All color values come from src/shared/theme/tokens.ts — the same token file
- * tailwind.config.ts consumes, so the two systems can never diverge.
+ * The visual switch is entirely a token swap — `tailwind.config.ts` emits the
+ * light values on `:root` and the dark values on `.dark`, so this module's only
+ * job is deciding whether that class is on `<html>` and remembering the choice.
+ *
+ * Deliberately framework-free so `index.html` can inline the same logic before
+ * first paint (see the bootstrap script there) and avoid a light flash.
  */
-export const budgetTrackerTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { ...colorTokens.primary },
-    secondary: { ...colorTokens.secondary },
-    success: { ...colorTokens.success },
-    warning: { ...colorTokens.warning },
-    error: { ...colorTokens.error },
-    info: { ...colorTokens.info },
-    grey: { ...colorTokens.grey },
-    background: {
-      default: colorTokens.neutral.background,
-      paper: colorTokens.neutral.surface,
-    },
-    text: {
-      primary: colorTokens.neutral.textPrimary,
-      secondary: colorTokens.neutral.textSecondary,
-    },
-    divider: colorTokens.neutral.border,
-  },
 
-  typography: {
-    // Inter is self-hosted via @fontsource/inter (imported in main.tsx).
-    fontFamily:
-      '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
-    h1: { fontSize: '2.25rem', fontWeight: 700, lineHeight: 1.2 },
-    h2: { fontSize: '1.875rem', fontWeight: 700, lineHeight: 1.25 },
-    h3: { fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.3 },
-    h4: { fontSize: '1.25rem', fontWeight: 600, lineHeight: 1.4 },
-    body1: { fontSize: '1rem', fontWeight: 400, lineHeight: 1.5 },
-    body2: { fontSize: '0.875rem', fontWeight: 400, lineHeight: 1.5 },
-    caption: { fontSize: '0.75rem', fontWeight: 400, lineHeight: 1.4 },
-    overline: {
-      fontSize: '0.75rem',
-      fontWeight: 600,
-      lineHeight: 1.5,
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-    },
-  },
+/** What the user picked. `system` defers to the OS setting, and keeps tracking it. */
+export type ThemePreference = 'light' | 'dark' | 'system';
 
-  /**
-   * Spacing base unit: 8px (MUI default, stated explicitly per BUD-13).
-   * `theme.spacing(1)` === '8px'; sx shorthands (p: 2, gap: 1, ...) are 8px multiples.
-   * Tailwind's default spacing scale is 4px-based, so Tailwind `p-2` === MUI `p: 1`.
-   */
-  spacing: 8,
+/** What actually gets painted once `system` is resolved. */
+export type ResolvedTheme = 'light' | 'dark';
 
-  shape: {
-    // Matches the pre-BUD-13 app-wide radius; revisit when radius tokens are formalized.
-    borderRadius: 12,
-  },
+export const THEME_STORAGE_KEY = 'bud-theme';
 
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          fontWeight: 600,
-        },
-      },
-    },
-  },
-});
+export const THEME_PREFERENCES: readonly ThemePreference[] = ['light', 'dark', 'system'];
+
+const isPreference = (value: unknown): value is ThemePreference =>
+  value === 'light' || value === 'dark' || value === 'system';
+
+/** Reads the saved choice. Falls back to `system` when absent or unreadable. */
+export const readStoredPreference = (): ThemePreference => {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return isPreference(stored) ? stored : 'system';
+  } catch {
+    // Private mode / blocked storage — the preference just doesn't persist.
+    return 'system';
+  }
+};
+
+export const storePreference = (preference: ThemePreference): void => {
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+  } catch {
+    // Non-fatal: the theme still applies for this session.
+  }
+};
+
+export const prefersDark = (): boolean =>
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+export const resolveTheme = (preference: ThemePreference): ResolvedTheme =>
+  preference === 'system' ? (prefersDark() ? 'dark' : 'light') : preference;
+
+/**
+ * Applies the resolved theme to `<html>`. The class drives Tailwind's `dark:`
+ * variant AND the `.dark` custom-property block, so this single toggle is the
+ * whole switch.
+ */
+export const applyTheme = (theme: ResolvedTheme): void => {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+};

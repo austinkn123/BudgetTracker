@@ -16,15 +16,26 @@ public class PlaidManagerTests
     private readonly Mock<IPlaidItemAccessor> _itemAccessor = new(MockBehavior.Strict);
     private readonly Mock<ITransactionAccessor> _txnAccessor = new(MockBehavior.Strict);
     private readonly Mock<IAccountAccessor> _accountAccessor = new(MockBehavior.Strict);
+    private readonly Mock<ICategoryAccessor> _categoryAccessor = new(MockBehavior.Strict);
     private readonly Mock<IPlaidWebhookEngine> _webhookEngine = new(MockBehavior.Strict);
     private readonly PlaidEngine _engine = new();
     private readonly PlaidOptions _options = new();
+
+    public PlaidManagerTests()
+    {
+        // Sync resolves Plaid's suggested category against the user's categories (BUD-9).
+        // Default to "no mappings configured"; tests that care override this.
+        _categoryAccessor
+            .Setup(a => a.GetByUserIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(Array.Empty<Category>());
+    }
 
     private PlaidManager BuildSut() => new(
         _plaidAccessor.Object,
         _itemAccessor.Object,
         _txnAccessor.Object,
         _accountAccessor.Object,
+        _categoryAccessor.Object,
         _engine,
         _webhookEngine.Object,
         Options.Create(_options),
@@ -195,6 +206,118 @@ public class PlaidManagerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, result.Value!.Removed);
+    }
+
+    [Fact]
+    public async Task Sync_AppliesMappedCategoryToImportedTransactions()
+    {
+        const int userId = 5;
+        var plaidItem = new PlaidItem
+        {
+            Id = 11,
+            UserId = userId,
+            PlaidItemId = "plaid-item-1",
+            SyncCursor = "prev-cursor",
+            Accounts = [new PlaidAccount { Id = 1, PlaidAccountId = "plaid-acct-1", Name = "Plaid Checking", Mask = "0000" }]
+        };
+
+        _itemAccessor.Setup(a => a.GetActiveByUserIdAsync(userId)).ReturnsAsync(plaidItem);
+        _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync("access-token-xyz");
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(new List<Account>
+        {
+            new() { Id = 77, UserId = userId, Name = "Chase - Plaid Checking (••0000)", AccountType = "depository" }
+        });
+
+        // The user has mapped their "Food" category to Plaid's FOOD_AND_DRINK taxonomy value.
+        _categoryAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(new List<Category>
+        {
+            new() { Id = 8, UserId = userId, Name = "Food (Groceries + Eating Out)", PlaidCategoryPrimary = "FOOD_AND_DRINK" }
+        });
+
+        var incoming = new PlaidTransactionDto(
+            TransactionId: "plaid-txn-1",
+            AccountId: "plaid-acct-1",
+            Amount: 12.75m,
+            Date: new DateTime(2026, 4, 7),
+            MerchantName: "H-E-B",
+            Name: "H-E-B #123",
+            Pending: false,
+            PersonalFinanceCategoryPrimary: "FOOD_AND_DRINK");
+
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidSyncResult(
+                Added: [incoming],
+                Modified: [],
+                RemovedTransactionIds: [],
+                NextCursor: "next-cursor"));
+
+        List<Transaction>? captured = null;
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(t => captured = t.ToList())
+            .ReturnsAsync((1, 0));
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, "next-cursor", It.IsAny<DateTime>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await BuildSut().SyncAsync(userId);
+
+        Assert.True(result.IsSuccess);
+        var mapped = Assert.Single(captured!);
+        Assert.Equal(8, mapped.CategoryId);
+        Assert.Equal("FOOD_AND_DRINK", mapped.PlaidCategoryPrimary);
+    }
+
+    [Fact]
+    public async Task Sync_UnmappedPlaidCategory_LeavesTransactionUncategorized()
+    {
+        const int userId = 5;
+        var plaidItem = new PlaidItem
+        {
+            Id = 11,
+            UserId = userId,
+            PlaidItemId = "plaid-item-1",
+            SyncCursor = "prev-cursor",
+            Accounts = [new PlaidAccount { Id = 1, PlaidAccountId = "plaid-acct-1", Name = "Plaid Checking", Mask = "0000" }]
+        };
+
+        _itemAccessor.Setup(a => a.GetActiveByUserIdAsync(userId)).ReturnsAsync(plaidItem);
+        _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync("access-token-xyz");
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(new List<Account>
+        {
+            new() { Id = 77, UserId = userId, Name = "Chase - Plaid Checking (••0000)", AccountType = "depository" }
+        });
+        // Default fixture setup: the user has mapped nothing.
+
+        var incoming = new PlaidTransactionDto(
+            TransactionId: "plaid-txn-2",
+            AccountId: "plaid-acct-1",
+            Amount: 12.75m,
+            Date: new DateTime(2026, 4, 7),
+            MerchantName: "H-E-B",
+            Name: "H-E-B #123",
+            Pending: false,
+            PersonalFinanceCategoryPrimary: "FOOD_AND_DRINK");
+
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidSyncResult(
+                Added: [incoming],
+                Modified: [],
+                RemovedTransactionIds: [],
+                NextCursor: "next-cursor"));
+
+        List<Transaction>? captured = null;
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(t => captured = t.ToList())
+            .ReturnsAsync((1, 0));
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, "next-cursor", It.IsAny<DateTime>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await BuildSut().SyncAsync(userId);
+
+        Assert.True(result.IsSuccess);
+        var mapped = Assert.Single(captured!);
+        Assert.Null(mapped.CategoryId);
+        // The suggestion is still persisted so it can be surfaced and accepted later.
+        Assert.Equal("FOOD_AND_DRINK", mapped.PlaidCategoryPrimary);
     }
 
     // ── GetConnectionAsync ──────────────────────────────────────────────────
@@ -691,6 +814,7 @@ public class PlaidManagerTests
         _itemAccessor.Object,
         _txnAccessor.Object,
         _accountAccessor.Object,
+        _categoryAccessor.Object,
         _engine,
         new PlaidWebhookEngine(),
         Options.Create(_options),

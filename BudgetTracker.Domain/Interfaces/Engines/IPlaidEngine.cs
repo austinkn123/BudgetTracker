@@ -15,7 +15,15 @@ public interface IPlaidEngine
     /// </summary>
     /// <param name="dto">Plaid's raw transaction record.</param>
     /// <param name="accountId">BudgetTracker account id the imported transaction is attached to.</param>
-    Transaction MapToBudgetTrackerTransaction(PlaidTransactionDto dto, int accountId);
+    /// <param name="categoryId">Category resolved from Plaid's suggestion, or null to leave it uncategorized.</param>
+    Transaction MapToBudgetTrackerTransaction(PlaidTransactionDto dto, int accountId, int? categoryId = null);
+
+    /// <summary>
+    /// Resolve Plaid's suggested category (personal_finance_category.primary) to one of the user's
+    /// categories, via the mapping stored on <see cref="Category.PlaidCategoryPrimary"/>.
+    /// Returns null when Plaid sent no suggestion or the user has not mapped that value.
+    /// </summary>
+    int? ResolveCategoryId(PlaidTransactionDto dto, IEnumerable<Category> userCategories);
 
     /// <summary>
     /// Resolve which BudgetTracker <see cref="Account"/> should host transactions for a Plaid account.

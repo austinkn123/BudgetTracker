@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
+
+import { Alert, Badge, Button, Card, Spinner } from '../../../shared/components/ui';
 import { useLinkedAccount } from '../hooks/useLinkedAccount';
 import PlaidLinkLauncher from './PlaidLinkLauncher';
 import ReplaceConnectionDialog from './ReplaceConnectionDialog';
@@ -62,59 +60,50 @@ const LinkedAccountCard = () => {
   })();
 
   return (
-    <div className="border rounded-lg p-4 space-y-3">
-      <Typography variant="subtitle1" className="font-semibold text-gray-700">
-        Linked Bank
-      </Typography>
-
+    <Card title="Linked Bank" contentClassName="flex flex-col gap-3">
       {isLoadingConnection ? (
-        <div className="flex items-center gap-2 text-gray-500">
-          <CircularProgress size={16} />
-          <Typography variant="body2">Checking connection…</Typography>
+        <div className="flex items-center gap-2 text-ink-muted">
+          <Spinner size={16} />
+          <span className="text-sm">Checking connection…</span>
         </div>
       ) : connection ? (
         <div className="space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <Typography variant="body1" className="font-medium">
+            <p className="text-body font-medium text-ink">
               Connected to {connection.institutionName}
-            </Typography>
-            <Chip label="Active" color="success" size="small" />
+            </p>
+            <Badge label="Active" color="success" />
           </div>
           {connection.accounts.length > 0 && (
             <div className="flex gap-2 flex-wrap">
               {connection.accounts.map((account) => (
-                <Chip
+                <Badge
                   key={`${account.name}-${account.mask ?? ''}`}
                   label={`${account.name}${account.mask ? ` ••${account.mask}` : ''}`}
-                  variant="outlined"
-                  size="small"
+                  variant="outline"
                 />
               ))}
             </div>
           )}
-          <Typography variant="caption" className="text-gray-500 block">
+          <span className="block text-xs text-ink-muted">
             Last synced: {formattedLastSync}
-          </Typography>
+          </span>
           <div className="flex gap-2 flex-wrap">
-            <Button
-              variant="contained"
-              onClick={refresh}
-              disabled={isSyncing || isDisconnecting}
-            >
+            <Button onClick={refresh} loading={isSyncing} disabled={isDisconnecting}>
               {isSyncing ? 'Refreshing…' : 'Refresh'}
             </Button>
             <Button
-              variant="outlined"
+              variant="secondary"
               onClick={handleConnectClick}
               disabled={isPreparingLink || isSyncing || isDisconnecting || isExchanging}
             >
               {isPreparingLink ? 'Preparing…' : 'Connect a different bank'}
             </Button>
             <Button
-              variant="outlined"
-              color="error"
+              variant="destructive"
               onClick={disconnect}
-              disabled={isDisconnecting || isSyncing}
+              loading={isDisconnecting}
+              disabled={isSyncing}
             >
               {isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
             </Button>
@@ -122,13 +111,12 @@ const LinkedAccountCard = () => {
         </div>
       ) : (
         <div className="space-y-2">
-          <Typography variant="body2" className="text-gray-600">
+          <p className="text-sm text-ink-muted">
             Link your bank so transactions import automatically.
-          </Typography>
+          </p>
           <Button
-            variant="contained"
             onClick={handleConnectClick}
-            disabled={isPreparingLink || isExchanging}
+            loading={isPreparingLink || isExchanging}
           >
             {isPreparingLink ? 'Preparing…' : isExchanging ? 'Linking…' : 'Connect a bank'}
           </Button>
@@ -136,16 +124,12 @@ const LinkedAccountCard = () => {
       )}
 
       {lastSync && (
-        <Typography variant="caption" className="text-gray-500 block">
+        <span className="block text-xs text-ink-muted">
           Last sync added {lastSync.inserted}, updated {lastSync.updated}, removed {lastSync.removed}.
-        </Typography>
+        </span>
       )}
 
-      {errorMessage && (
-        <Typography variant="body2" className="text-red-600">
-          {errorMessage}
-        </Typography>
-      )}
+      {errorMessage && <Alert severity="error" message={errorMessage} />}
 
       {linkToken && (
         <PlaidLinkLauncher
@@ -161,7 +145,7 @@ const LinkedAccountCard = () => {
         onCancel={() => setReplaceDialogOpen(false)}
         onConfirm={handleConfirmReplace}
       />
-    </div>
+    </Card>
   );
 };
 

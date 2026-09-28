@@ -52,12 +52,12 @@ public class BudgetAnalysisEngineTests
         Entries = entries
     };
 
-    // ---- AnalyzePlanMonth ----
+    // ---- AnalyzeMonth ----
 
     [Fact]
     public void SignedExpense_AggregatesAsPositiveMagnitude()
     {
-        var result = _sut.AnalyzePlanMonth([Expense(1, -50m, MidJune)], Plan(ExpenseLine(1, 100m)), MidJune);
+        var result = _sut.AnalyzeMonth([Expense(1, -50m, MidJune)], Plan(ExpenseLine(1, 100m)), MidJune);
 
         Assert.Equal(50m, result.Pacing.ActualExpenses);
         Assert.Equal(50m, result.Expenses);
@@ -68,7 +68,7 @@ public class BudgetAnalysisEngineTests
     [Fact]
     public void PlanMonthScope_ExcludesAdjacentMonths()
     {
-        var result = _sut.AnalyzePlanMonth(
+        var result = _sut.AnalyzeMonth(
             [
                 Expense(1, -10m, new DateTime(2026, 5, 31)),
                 Expense(2, -20m, MidJune),
@@ -82,7 +82,7 @@ public class BudgetAnalysisEngineTests
     [Fact]
     public void Income_SumsSignedAndIsSeparateFromExpenses()
     {
-        var result = _sut.AnalyzePlanMonth(
+        var result = _sut.AnalyzeMonth(
             [Income(1, 1000m, MidJune), Expense(2, -250m, MidJune)],
             Plan(ExpenseLine(1, 100m)), MidJune);
 
@@ -91,15 +91,16 @@ public class BudgetAnalysisEngineTests
     }
 
     [Theory]
-    [InlineData(2026, 5, 1, 0)]     // before the plan month
-    [InlineData(2026, 6, 15, 15)]   // during
-    [InlineData(2026, 8, 1, 30)]    // after
-    public void DaysElapsed_ClampsAroundPlanMonth(int year, int month, int day, int expected)
+    [InlineData(2026, 6, 15, 15, 30)]   // mid-month, 30-day month
+    [InlineData(2026, 8, 1, 1, 31)]     // first day of a 31-day month
+    [InlineData(2026, 2, 28, 28, 28)]   // last day of February (2026 is not a leap year)
+    public void DaysElapsed_TracksDayOfTheAnalysedMonth(
+        int year, int month, int day, int expectedElapsed, int expectedDaysInMonth)
     {
-        var result = _sut.AnalyzePlanMonth([], Plan(ExpenseLine(1, 100m)), new DateTime(year, month, day));
+        var result = _sut.AnalyzeMonth([], Plan(ExpenseLine(1, 100m)), new DateTime(year, month, day));
 
-        Assert.Equal(expected, result.Pacing.DaysElapsed);
-        Assert.Equal(30, result.Pacing.DaysInMonth);
+        Assert.Equal(expectedElapsed, result.Pacing.DaysElapsed);
+        Assert.Equal(expectedDaysInMonth, result.Pacing.DaysInMonth);
     }
 
     [Theory]
@@ -108,7 +109,7 @@ public class BudgetAnalysisEngineTests
     [InlineData(-55, PacingStatus.Behind)]     // delta exactly +0.05
     public void Status_ThresholdsAreInclusiveAtFivePercent(int signedSpend, PacingStatus expected)
     {
-        var result = _sut.AnalyzePlanMonth([Expense(1, signedSpend, MidJune)], Plan(ExpenseLine(1, 100m)), MidJune);
+        var result = _sut.AnalyzeMonth([Expense(1, signedSpend, MidJune)], Plan(ExpenseLine(1, 100m)), MidJune);
 
         Assert.Equal(expected, result.Pacing.Status);
     }
@@ -116,7 +117,7 @@ public class BudgetAnalysisEngineTests
     [Fact]
     public void ProjectionAndPerDiem_UseLinearRunRate()
     {
-        var pacing = _sut.AnalyzePlanMonth([Expense(1, -45m, MidJune)], Plan(ExpenseLine(1, 100m)), MidJune).Pacing;
+        var pacing = _sut.AnalyzeMonth([Expense(1, -45m, MidJune)], Plan(ExpenseLine(1, 100m)), MidJune).Pacing;
 
         Assert.Equal(90m, pacing.ProjectedEnd);        // 45 over 15 days, extrapolated to 30
         Assert.Equal(55m, pacing.Remaining);
@@ -125,29 +126,39 @@ public class BudgetAnalysisEngineTests
     }
 
     [Fact]
-    public void BeforeMonthStarts_ProjectionFallsBackToActualAndPerDiemUsesWholeMonth()
+    public void PlanRollsForward_AnalysesTheCurrentMonthNotThePlanMonth()
     {
-        var pacing = _sut.AnalyzePlanMonth(
-            [Expense(1, -20m, MidJune)], Plan(ExpenseLine(1, 100m)), new DateTime(2026, 5, 1)).Pacing;
+        // The plan took effect in June; we are now in August. August actuals are what count,
+        // and June spend must NOT leak in.
+        var august = new DateTime(2026, 8, 20);
 
-        Assert.Equal(0, pacing.DaysElapsed);
-        Assert.Equal(20m, pacing.ProjectedEnd);   // no run rate yet, so no extrapolation
-        Assert.Equal(80m / 30, pacing.PerDiemToStay);
+        var result = _sut.AnalyzeMonth(
+            [Expense(1, -400m, MidJune), Expense(2, -60m, new DateTime(2026, 8, 5))],
+            Plan(ExpenseLine(1, 100m)),
+            august);
+
+        Assert.Equal(new DateTime(2026, 8, 1), result.AnalyzedMonth);
+        Assert.Equal(PlanMonth, result.Plan.PlanMonth);   // plan still reports when it took effect
+        Assert.Equal(60m, result.Expenses);               // June is excluded
+        Assert.Equal(20, result.Pacing.DaysElapsed);
+        Assert.Equal(31, result.Pacing.DaysInMonth);
     }
 
     [Fact]
-    public void AfterMonthEnds_PerDiemIsZero()
+    public void OnTheLastDayOfTheMonth_PerDiemIsZero()
     {
-        var pacing = _sut.AnalyzePlanMonth(
-            [Expense(1, -20m, MidJune)], Plan(ExpenseLine(1, 100m)), new DateTime(2026, 8, 1)).Pacing;
+        // No days left to spread the remainder over.
+        var pacing = _sut.AnalyzeMonth(
+            [Expense(1, -20m, MidJune)], Plan(ExpenseLine(1, 100m)), new DateTime(2026, 6, 30)).Pacing;
 
+        Assert.Equal(30, pacing.DaysElapsed);
         Assert.Equal(0m, pacing.PerDiemToStay);
     }
 
     [Fact]
     public void NothingPlanned_SpentPctIsZeroRatherThanDivideByZero()
     {
-        var pacing = _sut.AnalyzePlanMonth([Expense(1, -30m, MidJune)], Plan(), MidJune).Pacing;
+        var pacing = _sut.AnalyzeMonth([Expense(1, -30m, MidJune)], Plan(), MidJune).Pacing;
 
         Assert.Equal(0m, pacing.SpentPct);
         Assert.Equal(30m, pacing.ActualExpenses);
@@ -156,7 +167,7 @@ public class BudgetAnalysisEngineTests
     [Fact]
     public void Buckets_UnplannedCategoryFallsBackToBuffer()
     {
-        var result = _sut.AnalyzePlanMonth(
+        var result = _sut.AnalyzeMonth(
             [
                 Expense(1, -30m, MidJune, categoryId: 1),   // planned as Core
                 Expense(2, -40m, MidJune, categoryId: 2)    // absent from the plan
@@ -172,7 +183,7 @@ public class BudgetAnalysisEngineTests
     [Fact]
     public void Buckets_AlwaysReturnsCoreAndBufferEvenWhenEmpty()
     {
-        var result = _sut.AnalyzePlanMonth([], Plan(), MidJune);
+        var result = _sut.AnalyzeMonth([], Plan(), MidJune);
 
         Assert.Equal(["Core", "Buffer"], result.ByBucket.Select(b => b.Bucket));
     }
@@ -180,7 +191,7 @@ public class BudgetAnalysisEngineTests
     [Fact]
     public void UncategorizedSpend_UsesNullCategoryIdAndLandsInBuffer()
     {
-        var result = _sut.AnalyzePlanMonth(
+        var result = _sut.AnalyzeMonth(
             [Expense(1, -35m, MidJune, categoryId: null)], Plan(ExpenseLine(1, 100m)), MidJune);
 
         Assert.Contains(result.ByCategory, c => c.CategoryId is null && c.Actual == 35m);
@@ -190,7 +201,7 @@ public class BudgetAnalysisEngineTests
     [Fact]
     public void ByCategory_UnionsPlannedAndActualAndExposesOverBy()
     {
-        var result = _sut.AnalyzePlanMonth(
+        var result = _sut.AnalyzeMonth(
             [Expense(1, -30m, MidJune, categoryId: 2)],           // actual only
             Plan(ExpenseLine(1, 100m), ExpenseLine(2, 10m)),      // category 1 planned only
             MidJune);
@@ -208,7 +219,7 @@ public class BudgetAnalysisEngineTests
             .Select(i => Expense(i, -(i * 10), MidJune, categoryId: i))
             .ToList();
 
-        var result = _sut.AnalyzePlanMonth(transactions, Plan(), MidJune);
+        var result = _sut.AnalyzeMonth(transactions, Plan(), MidJune);
 
         Assert.Equal(12, result.ByCategory.Count);
     }

@@ -20,4 +20,23 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // BUD-20: MUI was removed entirely. The UI is Radix + Tailwind, styled from
+    // shared/theme/tokens.ts. Nothing may reintroduce MUI or its emotion runtime.
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@mui/*', '@mui/**', '@emotion/*', '@emotion/**'],
+              message:
+                'MUI was removed (BUD-20). Use shared/components/ui + Tailwind tokens instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ])
