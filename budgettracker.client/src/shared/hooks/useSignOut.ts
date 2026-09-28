@@ -9,7 +9,7 @@ export interface UseSignOutResult {
 }
 
 /**
- * Sign-out with redirect, extracted from SettingsPage so the sidebar and any
+ * Sign-out with redirect, extracted from SettingsPage so the nav and any
  * future caller share one implementation (BUD-14).
  */
 export const useSignOut = (): UseSignOutResult => {

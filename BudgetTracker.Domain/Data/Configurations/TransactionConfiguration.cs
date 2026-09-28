@@ -45,6 +45,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.Property(t => t.PlaidAccountId)
             .HasMaxLength(100);
 
+        builder.Property(t => t.PlaidCategoryPrimary)
+            .HasMaxLength(100);
+
         builder.Property(t => t.IsImported)
             .HasDefaultValue(false);
 
@@ -68,5 +71,6 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .WithMany()
             .HasForeignKey(t => t.TransferAccountId)
             .OnDelete(DeleteBehavior.NoAction);
+
     }
 }

@@ -1,23 +1,19 @@
-import Typography from '@mui/material/Typography';
+import { PageHeader } from '../../../shared/components/ui';
 import { useUser } from '../../user/hooks/useUser';
 import UserSection from '../../user/UserSection';
 import LinkedAccountCard from '../../linked-accounts/components/LinkedAccountCard';
+import AppearanceSection from '../components/AppearanceSection';
 
 const SettingsPage = () => {
   const { isLoading: loadingUser } = useUser();
 
   return (
     <div className="space-y-6">
-      <div>
-        <Typography variant="h4" className="font-bold text-ink">
-          Settings
-        </Typography>
-        <Typography variant="body2" className="text-ink-muted mt-1">
-          Your account information
-        </Typography>
-      </div>
+      <PageHeader title="Settings" description="Your account information" />
 
       <UserSection isLoading={loadingUser} />
+
+      <AppearanceSection />
 
       <LinkedAccountCard />
     </div>

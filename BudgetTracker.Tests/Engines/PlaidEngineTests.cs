@@ -86,6 +86,86 @@ public class PlaidEngineTests
         Assert.Equal(42, result.AccountId);
     }
 
+    // ── Plaid category suggestion (BUD-9) ───────────────────────────────────
+
+    [Fact]
+    public void Map_PersistsPlaidCategorySuggestion()
+    {
+        var dto = BuildPlaidDebit();
+
+        var result = _sut.MapToBudgetTrackerTransaction(dto, accountId: 7);
+
+        Assert.Equal("FOOD_AND_DRINK", result.PlaidCategoryPrimary);
+    }
+
+    [Fact]
+    public void Map_AppliesResolvedCategoryId()
+    {
+        var dto = BuildPlaidDebit();
+
+        var result = _sut.MapToBudgetTrackerTransaction(dto, accountId: 7, categoryId: 99);
+
+        Assert.Equal(99, result.CategoryId);
+        // The raw suggestion survives alongside the resolved category so an override stays traceable.
+        Assert.Equal("FOOD_AND_DRINK", result.PlaidCategoryPrimary);
+    }
+
+    [Fact]
+    public void Map_WithoutResolvedCategory_LeavesCategoryNull()
+    {
+        var dto = BuildPlaidDebit();
+
+        var result = _sut.MapToBudgetTrackerTransaction(dto, accountId: 7);
+
+        Assert.Null(result.CategoryId);
+    }
+
+    [Fact]
+    public void ResolveCategoryId_MatchesMappedCategory()
+    {
+        var dto = BuildPlaidDebit();
+        var categories = new[]
+        {
+            new Category { Id = 3, Name = "Rent", PlaidCategoryPrimary = "RENT_AND_UTILITIES" },
+            new Category { Id = 8, Name = "Food (Groceries + Eating Out)", PlaidCategoryPrimary = "FOOD_AND_DRINK" }
+        };
+
+        Assert.Equal(8, _sut.ResolveCategoryId(dto, categories));
+    }
+
+    [Fact]
+    public void ResolveCategoryId_IsCaseInsensitive()
+    {
+        var dto = BuildPlaidDebit() with { PersonalFinanceCategoryPrimary = "food_and_drink" };
+        var categories = new[] { new Category { Id = 8, PlaidCategoryPrimary = "FOOD_AND_DRINK" } };
+
+        Assert.Equal(8, _sut.ResolveCategoryId(dto, categories));
+    }
+
+    [Fact]
+    public void ResolveCategoryId_NoMappingConfigured_ReturnsNull()
+    {
+        var dto = BuildPlaidDebit();
+        var categories = new[] { new Category { Id = 3, Name = "Rent", PlaidCategoryPrimary = null } };
+
+        Assert.Null(_sut.ResolveCategoryId(dto, categories));
+    }
+
+    [Fact]
+    public void ResolveCategoryId_PlaidSentNoSuggestion_ReturnsNull()
+    {
+        var dto = BuildPlaidDebit() with { PersonalFinanceCategoryPrimary = null };
+        var categories = new[] { new Category { Id = 8, PlaidCategoryPrimary = "FOOD_AND_DRINK" } };
+
+        Assert.Null(_sut.ResolveCategoryId(dto, categories));
+    }
+
+    [Fact]
+    public void ResolveCategoryId_EmptyCategories_ReturnsNull()
+    {
+        Assert.Null(_sut.ResolveCategoryId(BuildPlaidDebit(), Array.Empty<Category>()));
+    }
+
     [Fact]
     public void Map_StampsPlaidIdentifiersAndImportedFlag()
     {

@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
 
@@ -8,6 +7,7 @@ public class CognitoCurrentUserProvider(IHttpContextAccessor contextAccessor, IU
 {
     private int? _userId;
     private string? _cognitoSub;
+    private string? _email;
 
     public int UserId
     {
@@ -27,6 +27,15 @@ public class CognitoCurrentUserProvider(IHttpContextAccessor contextAccessor, IU
         }
     }
 
+    public string Email
+    {
+        get
+        {
+            EnsureResolved();
+            return _email!;
+        }
+    }
+
     private void EnsureResolved()
     {
         if (_userId.HasValue)
@@ -38,11 +47,12 @@ public class CognitoCurrentUserProvider(IHttpContextAccessor contextAccessor, IU
         var sub = user.FindFirst("sub")?.Value ?? throw new InvalidOperationException("Cognito sub claim not found");
         var email = user.FindFirst("email")?.Value ?? throw new InvalidOperationException("Email claim not found");
 
-        var result = userManager.GetOrProvisionByCognitoSubAsync(sub, email).GetAwaiter().GetResult();
+        var result = userManager.GetOrProvisionByCognitoSubAsync(sub).GetAwaiter().GetResult();
         if (!result.IsSuccess)
             throw new InvalidOperationException($"Failed to provision user: {result.Error}");
 
         _userId = result.Value;
         _cognitoSub = sub;
+        _email = email;
     }
 }

@@ -67,6 +67,30 @@ public class PlaidAccessor : IPlaidAccessor
     }
 
     /// <inheritdoc />
+    public async Task<string> CreateSandboxPublicTokenAsync(string customUserJson, CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            client_id = _options.ClientId,
+            secret = _options.Secret,
+            // ins_109508 is Plaid's canonical Sandbox institution ("First Platypus Bank").
+            institution_id = "ins_109508",
+            initial_products = new[] { "transactions" },
+            options = new
+            {
+                // The custom-user handshake: the "password" IS the configuration document.
+                override_username = "user_custom",
+                override_password = customUserJson,
+                webhook = string.IsNullOrWhiteSpace(_options.WebhookUrl) ? null : _options.WebhookUrl
+            }
+        };
+
+        var response = await PostAsync("/sandbox/public_token/create", body, cancellationToken);
+        return response.GetProperty("public_token").GetString()
+            ?? throw new InvalidOperationException("Plaid response missing public_token");
+    }
+
+    /// <inheritdoc />
     public async Task<PlaidExchangeResult> ExchangePublicTokenAsync(string publicToken, CancellationToken cancellationToken = default)
     {
         var body = new

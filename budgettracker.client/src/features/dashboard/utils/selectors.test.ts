@@ -38,6 +38,7 @@ const txn = (id: number, categoryId: number | null, occurredAt: string): Transac
 
 const plan = (byCategory: CategoryPerformance[], income = 0, expenses = 0): PlanPerformance => ({
   plan: { id: 1, name: 'June', planMonth: '2026-06-01' },
+  analyzedMonth: '2026-06-01',
   pacing: {
     daysElapsed: 15, daysInMonth: 30, daysPct: 0.5, spentPct: 0.5, projectedEnd: 0,
     pacingDelta: 0, status: 'OnTrack', plannedExpenses: 0, actualExpenses: 0,

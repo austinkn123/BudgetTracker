@@ -1,70 +1,61 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import defaultTheme from 'tailwindcss/defaultTheme';
 import tailwindConfig from '../../../tailwind.config';
-import { budgetTrackerTheme } from './theme';
-import { colorTokens } from './tokens';
+import { colorTokens, hexToChannels } from './tokens';
 
 /**
- * BUD-13 — design-token contract tests (QA guard rails).
+ * BUD-13 / BUD-20 — design-token contract tests (QA guard rails).
  *
- * 1. Tailwind parity: tailwind.config.ts must resolve to the exact same values
- *    as tokens.ts (AC5). Catches copy-drift if someone replaces the token
- *    import with hardcoded values.
- * 2. Hex audit: no hardcoded hex colors outside the theme folder (AC2 / AC3).
+ * 1. Tailwind parity: color utilities must be CSS-var references whose
+ *    emitted channels come from tokens.ts. Catches copy-drift if someone
+ *    replaces the token import with hardcoded values.
+ * 2. Hex audit: no hardcoded hex colors outside the theme folder.
  *    Catches regressions where a component bypasses the token system.
  */
 
-type ColorScale = { DEFAULT: string; light: string; dark: string; subtle: string };
 const twColors = (tailwindConfig.theme?.extend?.colors ?? {}) as Record<
   string,
   string | Record<string, string>
 >;
 
+const varRefPattern = (name: string) =>
+  new RegExp(`^rgb\\(var\\(--bud-${name}\\) / <alpha-value>\\)$`);
+
 describe('tailwind config token parity', () => {
   it.each(['primary', 'secondary', 'success', 'warning', 'error', 'info'] as const)(
-    'tailwind %s scale matches the MUI token values',
+    'tailwind %s scale references the token CSS variables',
     (key) => {
-      const scale = twColors[key] as ColorScale;
-      expect(scale.DEFAULT).toBe(colorTokens[key].main);
-      expect(scale.light).toBe(colorTokens[key].light);
-      expect(scale.dark).toBe(colorTokens[key].dark);
-      expect(scale.subtle).toBe(colorTokens[key].subtle);
+      const scale = twColors[key] as Record<string, string>;
+      expect(scale.DEFAULT).toMatch(varRefPattern(key));
+      expect(scale.light).toMatch(varRefPattern(`${key}-light`));
+      expect(scale.dark).toMatch(varRefPattern(`${key}-dark`));
+      expect(scale.subtle).toMatch(varRefPattern(`${key}-subtle`));
     },
   );
 
-  it('maps semantic neutral utilities to the neutral tokens', () => {
-    expect(twColors.background).toBe(colorTokens.neutral.background);
-    expect(twColors.surface).toBe(colorTokens.neutral.surface);
-    expect(twColors.border).toBe(colorTokens.neutral.border);
-    expect((twColors.ink as Record<string, string>).DEFAULT).toBe(colorTokens.neutral.textPrimary);
-    expect((twColors.ink as Record<string, string>).muted).toBe(colorTokens.neutral.textSecondary);
+  it('maps semantic neutral utilities to token CSS variables', () => {
+    expect(twColors.background).toMatch(varRefPattern('background'));
+    expect(twColors.surface).toMatch(varRefPattern('surface'));
+    const border = twColors.border as Record<string, string>;
+    expect(border.subtle).toMatch(varRefPattern('border-subtle'));
+    expect(border.DEFAULT).toMatch(varRefPattern('border'));
+    expect(border.strong).toMatch(varRefPattern('border-strong'));
+    const ink = twColors.ink as Record<string, string>;
+    expect(ink.DEFAULT).toMatch(varRefPattern('ink'));
+    expect(ink.muted).toMatch(varRefPattern('ink-muted'));
   });
 
-  it('uses Inter as the leading sans font, matching the MUI theme', () => {
+  it('uses Inter as the leading sans font', () => {
     const sans = tailwindConfig.theme?.extend?.fontFamily?.sans as string[];
     expect(sans[0]).toBe('Inter');
   });
-});
 
-/**
- * BUD-14 — breakpoint parity.
- *
- * MUI defaults to lg: 1200 while Tailwind's `lg:` is 1024, so `sx={{ display: { lg } }}`
- * and `className="lg:..."` fired at different widths. The MUI theme now mirrors
- * Tailwind's scale; this test keeps the two from drifting apart again.
- */
-describe('breakpoint parity between MUI and Tailwind', () => {
-  const tailwindScreens = defaultTheme.screens as Record<string, string>;
-
-  it.each(['sm', 'md', 'lg', 'xl'] as const)('MUI %s matches the Tailwind screen', (key) => {
-    const tailwindPx = Number.parseInt(tailwindScreens[key], 10);
-    expect(budgetTrackerTheme.breakpoints.values[key]).toBe(tailwindPx);
-  });
-
-  it('starts the xs breakpoint at zero', () => {
-    expect(budgetTrackerTheme.breakpoints.values.xs).toBe(0);
+  it('channel conversion round-trips the brand tokens', () => {
+    // The :root emitter derives channels via hexToChannels; spot-check the math
+    // so a broken converter can't silently shift every color.
+    expect(hexToChannels(colorTokens.primary.main)).toBe('99 91 255');
+    expect(hexToChannels(colorTokens.neutral.textPrimary)).toBe('10 37 64');
   });
 });
 
@@ -98,6 +89,34 @@ describe('hardcoded hex audit (src outside shared/theme)', () => {
         const matches = readFileSync(file, 'utf8').match(HEX_PATTERN);
         return matches ? [`${relative(SRC_ROOT, file)}: ${matches.join(', ')}`] : [];
       });
+
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * The hex audit above catches a literal color. It does NOT catch a plausible-looking
+   * reference to a CSS variable that was never defined — `var(--color-success)` instead of
+   * `var(--bud-success)`. That failure is silent: an unresolvable var() invalidates the whole
+   * declaration, so the element falls back to its class default and every state renders
+   * identically. Shipped exactly that way in PlanGroupedView's four-step spend ramp.
+   *
+   * Only `--bud-*` (emitted by the Tailwind plugin) and `--radix-*` (supplied by Radix at
+   * runtime) exist. Prefer `cssVar()` from tokens.ts over hand-writing either.
+   */
+  const CSS_VAR_PATTERN = /var\(\s*(--[a-zA-Z0-9-]+)/g;
+  const ALLOWED_VAR_PREFIXES = ['--bud-', '--radix-'];
+
+  it('references only CSS variables that are actually defined', () => {
+    const offenders = collectSourceFiles(SRC_ROOT).flatMap((file) => {
+      const contents = readFileSync(file, 'utf8');
+      const unknown = [...contents.matchAll(CSS_VAR_PATTERN)]
+        .map((match) => match[1])
+        .filter((name) => !ALLOWED_VAR_PREFIXES.some((prefix) => name.startsWith(prefix)));
+
+      return unknown.length > 0
+        ? [`${relative(SRC_ROOT, file)}: ${[...new Set(unknown)].join(', ')}`]
+        : [];
+    });
 
     expect(offenders).toEqual([]);
   });

@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import Typography from '@mui/material/Typography';
 import { Plus } from 'lucide-react';
-import { BudBadge, BudButton } from '../../shared/components/ui';
+import { Badge, Button } from '../../shared/components/ui';
 import { useBudgetPlans } from './hooks/useBudgetPlans';
 import { useBudgetPlanForm } from './hooks/useBudgetPlanForm';
 import { useBudgetPlanManagement } from './hooks/useBudgetPlanManagement';
@@ -62,23 +61,21 @@ const BudgetPlansSection = ({
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Typography variant="h6" className="font-semibold text-ink">
-            Budget Plans
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <h2 className="text-base font-semibold text-ink">Budget Plans</h2>
+          <p className="text-sm text-ink-muted">
             Create, edit, switch, and maintain multiple monthly plans.
-          </Typography>
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
           {planManagement.activePlan ? (
-            <BudBadge color="success" label={`Active: ${planManagement.activePlan.name}`} />
+            <Badge color="success" label={`Active: ${planManagement.activePlan.name}`} />
           ) : (
-            <BudBadge label="No Active Plan" />
+            <Badge label="No Active Plan" />
           )}
-          <BudButton startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
+          <Button startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
             Add Plan
-          </BudButton>
+          </Button>
         </div>
       </div>
 
@@ -98,9 +95,7 @@ const BudgetPlansSection = ({
             />
           ))
         ) : (
-          <Typography color="text.secondary" fontStyle="italic">
-            No budget plans found
-          </Typography>
+          <p className="text-body italic text-ink-muted">No budget plans found</p>
         )}
       </div>
 

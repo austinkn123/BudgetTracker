@@ -5,7 +5,7 @@ BudgetTracker is a full-stack personal finance application with a React frontend
 ## Overview
 
 - Frontend: React + TypeScript + Vite
-- Styling: Tailwind CSS + Material UI
+- Styling: Tailwind CSS + Radix primitives (design tokens in `src/shared/theme/`)
 - Forms and validation: React Hook Form + Zod
 - Backend: ASP.NET Core Minimal APIs on .NET 9
 - Database: SQL Server
@@ -99,7 +99,7 @@ Endpoint mappings live in `BudgetTracker.Server/Endpoints/`.
 - TypeScript
 - Vite
 - Tailwind CSS
-- Material UI
+- Radix UI
 - React Hook Form
 - Zod
 

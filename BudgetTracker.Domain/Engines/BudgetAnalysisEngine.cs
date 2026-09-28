@@ -17,10 +17,14 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
     // Uncategorized transactions carry a null CategoryId. Grouping is done with LINQ
     // (ToLookup/GroupBy) rather than Dictionary throughout, because Dictionary rejects null keys.
 
-    public PlanPerformance AnalyzePlanMonth(IReadOnlyList<Transaction> transactions, BudgetPlan plan, DateTime now)
+    public PlanPerformance AnalyzeMonth(IReadOnlyList<Transaction> transactions, BudgetPlan plan, DateTime now)
     {
+        // The analysed month is the one containing `now`, NOT plan.PlanMonth: a plan takes effect
+        // in its month and governs every month after it until a newer plan supersedes it.
+        var analyzedMonth = new DateTime(now.Year, now.Month, 1);
+
         var monthTxns = transactions
-            .Where(t => t.OccurredAt.Year == plan.PlanMonth.Year && t.OccurredAt.Month == plan.PlanMonth.Month)
+            .Where(t => t.OccurredAt.Year == analyzedMonth.Year && t.OccurredAt.Month == analyzedMonth.Month)
             .ToList();
         var monthExpenses = monthTxns.Where(t => t.TransactionType == Expense).ToList();
 
@@ -77,7 +81,8 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
 
         return new PlanPerformance(
             new AnalyzedPlan(plan.Id, plan.Name, plan.PlanMonth),
-            ComputePacing(plan.PlanMonth, plannedTotal, actualTotal, now),
+            analyzedMonth,
+            ComputePacing(analyzedMonth, plannedTotal, actualTotal, now),
             byCategory,
             byBucket,
             monthTxns.Where(t => t.TransactionType == Income).Sum(t => t.Amount),
@@ -115,15 +120,12 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
             .ToList();
     }
 
-    private static PeriodPacing ComputePacing(DateTime planMonth, decimal plannedExpenses, decimal actualExpenses, DateTime now)
+    private static PeriodPacing ComputePacing(DateTime month, decimal plannedExpenses, decimal actualExpenses, DateTime now)
     {
-        var daysInMonth = DateTime.DaysInMonth(planMonth.Year, planMonth.Month);
-        var monthStart = new DateTime(planMonth.Year, planMonth.Month, 1);
-        var monthEndExclusive = monthStart.AddMonths(1);
-
-        var daysElapsed = now < monthStart ? 0
-            : now >= monthEndExclusive ? daysInMonth
-            : now.Day;
+        // `month` always contains `now` (the caller derives one from the other), so day-of-month
+        // IS days elapsed — no clamping needed.
+        var daysInMonth = DateTime.DaysInMonth(month.Year, month.Month);
+        var daysElapsed = now.Day;
 
         var daysPct = (decimal)daysElapsed / daysInMonth;
         var spentPct = plannedExpenses > 0 ? actualExpenses / plannedExpenses : 0;

@@ -29,6 +29,10 @@ public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor)
         if (error is not null)
             return Result<int>.Failure(error);
 
+        category.PlaidCategoryPrimary = string.IsNullOrWhiteSpace(category.PlaidCategoryPrimary)
+            ? null
+            : category.PlaidCategoryPrimary.Trim();
+
         var id = await accessor.CreateAsync(category);
         return Result<int>.Success(id);
     }
@@ -45,6 +49,16 @@ public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor)
 
         existing.Name = category.Name;
         existing.CategoryType = category.CategoryType;
+
+        // null means "not supplied", NOT "clear it". The category form PUTs only name and type, so
+        // nulling this on every update would silently destroy the Plaid auto-categorisation mapping
+        // on a simple rename. Clearing is done by sending an explicit empty string.
+        if (category.PlaidCategoryPrimary is not null)
+        {
+            existing.PlaidCategoryPrimary = string.IsNullOrWhiteSpace(category.PlaidCategoryPrimary)
+                ? null
+                : category.PlaidCategoryPrimary.Trim();
+        }
 
         var updated = await accessor.UpdateAsync(existing);
         return updated

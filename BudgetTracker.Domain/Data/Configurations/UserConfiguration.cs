@@ -12,17 +12,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasKey(u => u.Id);
 
-        builder.Property(u => u.Email)
-            .HasMaxLength(255)
-            .IsRequired();
-
         builder.Property(u => u.CognitoSub)
             .HasMaxLength(255)
             .IsRequired(false);
-
-        builder.HasIndex(u => u.Email)
-            .IsUnique()
-            .HasDatabaseName("UQ_Users_Email");
 
         builder.HasIndex(u => u.CognitoSub)
             .IsUnique()

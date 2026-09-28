@@ -60,7 +60,6 @@ export const categoryLabel = (names: CategoryNames, categoryId: number | null): 
   return names.get(categoryId) ?? `Category ${categoryId}`;
 };
 
-/** Transaction.categoryId is declared non-nullable but arrives null for uncategorized rows. */
 const transactionCategoryId = (transaction: Transaction): number | null =>
   transaction.categoryId ?? null;
 

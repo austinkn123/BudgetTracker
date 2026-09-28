@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
-import Box from '@mui/material/Box';
-import Checkbox from '@mui/material/Checkbox';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  BudConfirmModal,
-  BudInput,
-  BudModal,
-  BudModalActions,
+  Checkbox,
+  ConfirmModal,
+  Input,
+  Modal,
+  ModalActions,
 } from '../../../shared/components/ui';
 import {
   budgetPlanSchema,
@@ -60,14 +58,14 @@ const BudgetPlanDialog = ({
 
   return (
     <>
-      <BudModal
+      <Modal
         open={open}
         onClose={onClose}
         title={mode === 'add' ? 'Add Budget Plan' : 'Edit Budget Plan'}
         maxWidth="sm"
         disableBackdropClose={isSaving}
         actions={
-          <BudModalActions
+          <ModalActions
             onCancel={onClose}
             onConfirm={() => void submit()}
             confirmLabel={mode === 'add' ? 'Create Plan' : 'Save Changes'}
@@ -77,18 +75,16 @@ const BudgetPlanDialog = ({
           />
         }
       >
-        <Box
-          sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}
-        >
-          <BudInput
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input
             control={control}
             name="name"
             label="Plan Name"
             required
-            sx={{ gridColumn: { sm: '1 / -1' } }}
+            className="sm:col-span-2"
           />
-          <BudInput control={control} name="planMonth" label="Plan Month" type="month" required />
-          <BudInput
+          <Input control={control} name="planMonth" label="Plan Month" type="month" required />
+          <Input
             control={control}
             name="netIncomeMonthly"
             label="Net Monthly Income"
@@ -98,26 +94,12 @@ const BudgetPlanDialog = ({
             step="0.01"
             required
           />
-        </Box>
+        </div>
 
-        <Controller
-          name="isActive"
-          control={control}
-          render={({ field }) => (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={field.value}
-                  onChange={(event) => field.onChange(event.target.checked)}
-                />
-              }
-              label="Set as active budget plan"
-            />
-          )}
-        />
-      </BudModal>
+        <Checkbox control={control} name="isActive" label="Set as active budget plan" />
+      </Modal>
 
-      <BudConfirmModal
+      <ConfirmModal
         open={confirmDelete}
         title="Delete budget plan?"
         message="This removes the plan and all of its lines. This cannot be undone."

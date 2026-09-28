@@ -1,20 +1,20 @@
 import { useMemo } from 'react';
-import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  BudBadge,
-  BudButton,
-  BudCard,
-  BudConfirmModal,
-  BudInput,
-  BudModal,
-  BudModalActions,
-  BudSelect,
+  Badge,
+  Button,
+  Card,
+  ConfirmModal,
+  Input,
+  Modal,
+  ModalActions,
+  Select,
+  Tooltip,
 } from '../../shared/components/ui';
 import type { Category } from '../../shared/types/api';
+import { PLAID_CATEGORY_OPTIONS } from '../../shared/constants/plaidCategories';
 import { categorySchema, type CategoryFormValues } from '../../shared/validation/categorySchema';
 import { useTransactions } from '../transactions/hooks/useTransactions';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
@@ -82,6 +82,10 @@ const CategoriesSection = ({
     }
 
     for (const transaction of transactions) {
+      // Uncategorised rows belong to no category, so they cannot count toward any category's
+      // usage. Before categoryId was typed nullable these accumulated under a null key.
+      if (transaction.categoryId == null) continue;
+
       const usage = map.get(transaction.categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
       usage.transactions += 1;
       usage.total += 1;
@@ -105,7 +109,7 @@ const CategoriesSection = ({
 
   const openAddDialog = () => {
     setEditingCategoryId(null);
-    reset({ name: '', categoryType: 'Expense' });
+    reset({ name: '', categoryType: 'Expense', plaidCategoryPrimary: '' });
     setDialogMode('add');
     setDialogOpen(true);
   };
@@ -120,6 +124,7 @@ const CategoriesSection = ({
     reset({
       name: category.name,
       categoryType,
+      plaidCategoryPrimary: category.plaidCategoryPrimary ?? '',
     });
     setDialogMode('edit');
     setDialogOpen(true);
@@ -137,6 +142,7 @@ const CategoriesSection = ({
           userId: 0,
           name: values.name,
           categoryType: values.categoryType,
+          plaidCategoryPrimary: values.plaidCategoryPrimary ?? '',
         });
         closeDialog();
         return;
@@ -149,6 +155,9 @@ const CategoriesSection = ({
         userId: 0,
         name: values.name,
         categoryType: values.categoryType,
+        // Always sent — omitting it makes the server treat the mapping as "not supplied",
+        // which used to wipe auto-categorisation on a simple rename.
+        plaidCategoryPrimary: values.plaidCategoryPrimary ?? '',
       });
       closeDialog();
     } catch {
@@ -169,19 +178,17 @@ const CategoriesSection = ({
   const isSaving = createCategory.isPending || updateCategory.isPending || deleteCategory.isPending;
 
   return (
-    <BudCard
+    <Card
       title="Categories"
       actions={
-        <BudButton size="sm" onClick={openAddDialog}>
+        <Button size="sm" onClick={openAddDialog}>
           Add Category
-        </BudButton>
+        </Button>
       }
     >
       <>
         {categories.length === 0 ? (
-          <Typography color="text.secondary" fontStyle="italic">
-            No categories found
-          </Typography>
+          <p className="text-body italic text-ink-muted">No categories found</p>
         ) : (
           <div className="space-y-3">
             {GROUPS.map((group) => {
@@ -189,18 +196,18 @@ const CategoriesSection = ({
               if (!items || items.length === 0) return null;
               return (
                 <div key={group.type}>
-                  <Typography variant="caption" color="text.secondary" className="mb-1 block">
+                  <span className="mb-1.5 block text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
                     {group.label}
-                  </Typography>
+                  </span>
                   <div className="flex flex-wrap gap-1">
                     {items.map((cat) => {
                       const usage = getUsage(cat.id);
                       const tooltipLabel = `Used in ${usage.transactions} transaction${usage.transactions === 1 ? '' : 's'} and ${usage.planEntries} budget plan entr${usage.planEntries === 1 ? 'y' : 'ies'}`;
 
                       return (
-                        <Tooltip key={cat.id} title={tooltipLabel} arrow>
-                          <span>
-                            <BudBadge
+                        <Tooltip key={cat.id} title={tooltipLabel}>
+                          <span className="inline-flex">
+                            <Badge
                               label={`${cat.name} (${usage.total})`}
                               color={group.color}
                               variant="outline"
@@ -219,14 +226,14 @@ const CategoriesSection = ({
         )}
       </>
 
-      <BudModal
+      <Modal
         open={dialogOpen}
         onClose={closeDialog}
         title={dialogMode === 'add' ? 'Add Category' : 'Edit Category'}
         maxWidth="xs"
         disableBackdropClose={isSaving}
         actions={
-          <BudModalActions
+          <ModalActions
             onCancel={closeDialog}
             onConfirm={onSave}
             confirmLabel={dialogMode === 'add' ? 'Create' : 'Save'}
@@ -234,16 +241,24 @@ const CategoriesSection = ({
           />
         }
       >
-        <BudInput control={control} name="name" label="Name" autoFocus />
-        <BudSelect
+        <Input control={control} name="name" label="Name" autoFocus />
+        <Select
           control={control}
           name="categoryType"
           label="Type"
           options={CATEGORY_TYPE_OPTIONS}
         />
-      </BudModal>
+        <Select
+          control={control}
+          name="plaidCategoryPrimary"
+          label="Auto-categorise imports as"
+          options={PLAID_CATEGORY_OPTIONS}
+          emptyOptionLabel="No automatic mapping"
+          helperText="Imported transactions Plaid tags with this category are assigned here automatically."
+        />
+      </Modal>
 
-      <BudConfirmModal
+      <ConfirmModal
         open={deleteTarget !== null}
         title="Delete Category"
         message={
@@ -263,7 +278,7 @@ const CategoriesSection = ({
         onCancel={() => setDeleteTarget(null)}
         onConfirm={onConfirmDelete}
       />
-    </BudCard>
+    </Card>
   );
 };
 

@@ -32,13 +32,18 @@ The sidebar footer shows the signed-in account and hosts the **only** sign-out a
 
 ### Design system
 
-Color, typography, spacing, and breakpoints come from `src/shared/theme/`.
-`tokens.ts` is the single source of truth and is consumed by both `theme.ts` (MUI)
-and `tailwind.config.ts`. MUI breakpoints deliberately mirror Tailwind's scale
-(`sm 640 / md 768 / lg 1024 / xl 1280`) so `sx` and `className` agree.
+Color, typography, spacing, radii, shadows and motion come from `src/shared/theme/`.
+`tokens.ts` is the single source of truth; `tailwind.config.ts` compiles it into
+`--bud-*` CSS variables, which is what makes `bg-primary/10` and dark mode work
+from one definition. `theme.ts` is the light/dark *preference* runtime — it has
+nothing to do with styling values.
 
-A contract test fails the build on any hardcoded hex outside the theme folder —
-use palette paths like `sx={{ bgcolor: 'primary.subtle' }}`.
+Contract tests (`designTokenContract.test.ts`) fail the build on a hardcoded hex
+outside the theme folder, and on any `var(--…)` that is not a real `--bud-*`
+variable. Use Tailwind utilities, or `cssVar()` for inline styles and SVG.
+
+See [`project-docs/design.md`](../project-docs/design.md) for the design language
+itself — persona, voice, visual and interaction character.
 
 ---
 

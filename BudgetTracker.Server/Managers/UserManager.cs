@@ -16,51 +16,17 @@ public class UserManager(IUserEngine engine, IUserAccessor accessor) : IUserMana
             : Result<User>.Failure("User not found");
     }
 
-    public async Task<Result<int>> CreateAsync(User user)
-    {
-        var error = engine.ValidateUser(user);
-        if (error is not null)
-            return Result<int>.Failure(error);
-
-        var id = await accessor.CreateAsync(user);
-        return Result<int>.Success(id);
-    }
-
-    public async Task<Result<bool>> UpdateAsync(User user)
-    {
-        var error = engine.ValidateUser(user);
-        if (error is not null)
-            return Result<bool>.Failure(error);
-
-        var updated = await accessor.UpdateAsync(user);
-        return updated
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("User not found");
-    }
-
-    public async Task<Result<bool>> DeleteAsync(int id)
-    {
-        var deleted = await accessor.DeleteAsync(id);
-        return deleted
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("User not found");
-    }
-
-    public async Task<Result<int>> GetOrProvisionByCognitoSubAsync(string sub, string email)
+    public async Task<Result<int>> GetOrProvisionByCognitoSubAsync(string sub)
     {
         var existingUser = await accessor.GetByCognitoSubAsync(sub);
         if (existingUser is not null)
             return Result<int>.Success(existingUser.Id);
 
-        var validationResult = engine.ValidateProvisioning(sub, email);
+        var validationResult = engine.ValidateProvisioning(sub);
         if (!validationResult.IsSuccess)
             return Result<int>.Failure(validationResult.Error!);
 
-        var newUser = new User
-        {
-            Email = email,
-            CognitoSub = sub
-        };
+        var newUser = new User { CognitoSub = sub };
 
         var userId = await accessor.CreateAsync(newUser);
         return Result<int>.Success(userId);

@@ -2,10 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
-import { BudAlert, BudButton, BudCard, BudInput } from '../shared/components/ui';
+import { Wallet } from 'lucide-react';
+import { Alert, Button, Card, Input } from '../shared/components/ui';
 import { useAuth } from '../auth/useAuth';
 import { confirmSignUpSchema, type ConfirmSignUpFormData } from '../shared/validation/auth';
 
@@ -79,31 +77,31 @@ const ConfirmSignUpPage = () => {
   };
 
   return (
-    <Box
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      minHeight="100vh"
-      bgcolor="background.default"
-      p={2}
-    >
-      <BudCard padding="lg" sx={{ width: '100%', maxWidth: 400 }}>
-        <Stack spacing={3}>
+    <div className="flex min-h-screen items-center justify-center bg-grey-900 p-4 dark:bg-background">
+      <div className="w-full max-w-[400px]">
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          <span className="flex text-primary-light">
+            <Wallet size={24} />
+          </span>
+          <span className="text-[17px] font-semibold tracking-[-0.01em] text-white">
+            BudgetTracker
+          </span>
+        </div>
+        <Card padding="lg">
+        <div className="flex flex-col gap-6">
           <div>
-            <Typography variant="h4" component="h1" className="font-bold text-ink mb-2">
-              Verify Email
-            </Typography>
-            <Typography variant="body2" className="text-ink-muted">
+            <h1 className="mb-1.5 text-[22px] font-semibold tracking-[-0.02em] text-ink">Verify Email</h1>
+            <p className="text-sm text-ink-muted">
               {email ? `We sent a code to ${email}` : 'Enter the confirmation code'}
-            </Typography>
+            </p>
           </div>
 
-          {error && <BudAlert severity="error" message={error} />}
-          {success && <BudAlert severity="success" message={success} />}
+          {error && <Alert severity="error" message={error} />}
+          {success && <Alert severity="success" message={success} />}
 
           <form onSubmit={onSubmit}>
-            <Stack spacing={3}>
-              <BudInput
+            <div className="flex flex-col gap-5">
+              <Input
                 control={control}
                 name="code"
                 label="Confirmation Code"
@@ -114,31 +112,32 @@ const ConfirmSignUpPage = () => {
                 disabled={isSubmitting}
               />
 
-              <BudButton type="submit" fullWidth size="lg" loading={isSubmitting}>
+              <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
                 {isSubmitting ? 'Confirming...' : 'Confirm'}
-              </BudButton>
-            </Stack>
+              </Button>
+            </div>
           </form>
 
-          <Stack spacing={2}>
-            <BudButton
+          <div className="flex flex-col gap-3">
+            <Button
               variant="ghost"
               fullWidth
               onClick={handleResendCode}
               loading={isResending}
             >
               {isResending ? 'Resending...' : "Didn't receive a code? Resend"}
-            </BudButton>
+            </Button>
 
-            <Typography variant="body2" className="text-center text-ink-muted">
+            <p className="text-center text-sm text-ink-muted">
               <Link to="/signup" className="font-semibold text-primary hover:text-primary-dark">
                 Back to Sign Up
               </Link>
-            </Typography>
-          </Stack>
-        </Stack>
-      </BudCard>
-    </Box>
+            </p>
+          </div>
+        </div>
+        </Card>
+      </div>
+    </div>
   );
 };
 

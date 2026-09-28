@@ -21,40 +21,18 @@ export default defineConfig([
     },
   },
   {
-    // BUD-16 AC 1: feature and page code must route these primitives through the
-    // shared Bud* library so styling stays in one channel. The library itself
-    // (src/shared/components/ui) is exempt — it is what wraps them.
-    files: ['src/features/**/*.{ts,tsx}', 'src/pages/**/*.{ts,tsx}'],
+    // BUD-20: MUI was removed entirely. The UI is Radix + Tailwind, styled from
+    // shared/theme/tokens.ts. Nothing may reintroduce MUI or its emotion runtime.
+    files: ['**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: [
-                '@mui/material/Button',
-                '@mui/material/TextField',
-                '@mui/material/Select',
-                '@mui/material/Dialog',
-                '@mui/material/DialogActions',
-                '@mui/material/DialogContent',
-                '@mui/material/DialogContentText',
-                '@mui/material/DialogTitle',
-                '@mui/material/Table',
-                '@mui/material/TableBody',
-                '@mui/material/TableCell',
-                '@mui/material/TableContainer',
-                '@mui/material/TableHead',
-                '@mui/material/TableRow',
-                '@mui/material/Chip',
-                '@mui/material/Alert',
-                '@mui/material/AlertTitle',
-                '@mui/material/Card',
-                '@mui/material/CardContent',
-                '@mui/material/CardHeader',
-              ],
+              group: ['@mui/*', '@mui/**', '@emotion/*', '@emotion/**'],
               message:
-                'Use the Bud* wrapper from shared/components/ui instead (BUD-16 AC 1).',
+                'MUI was removed (BUD-20). Use shared/components/ui + Tailwind tokens instead.',
             },
           ],
         },

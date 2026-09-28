@@ -13,7 +13,7 @@ export interface NavItem {
   readonly end: boolean;
 }
 
-/** Primary navigation for authenticated routes, in sidebar order. */
+/** Primary navigation for authenticated routes, in display order. */
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard, end: true },
   { label: 'Budget Plans', path: '/budget-plans', icon: ClipboardList, end: false },

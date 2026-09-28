@@ -19,6 +19,12 @@ public class Transaction
     /// <summary>Plaid's account_id (raw external id) when imported via Plaid; null for manual entries.</summary>
     public string? PlaidAccountId { get; set; }
 
+    /// <summary>
+    /// Plaid's suggested category (personal_finance_category.primary) for imported rows; null for manual entries.
+    /// Retained even after the user overrides <see cref="CategoryId"/> so the original suggestion stays visible.
+    /// </summary>
+    public string? PlaidCategoryPrimary { get; set; }
+
     /// <summary>True for transactions sourced from Plaid sync. Used to lock down merchant/amount/date edits.</summary>
     public bool IsImported { get; set; }
 

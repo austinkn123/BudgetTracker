@@ -32,7 +32,7 @@ const getOutflowMagnitude = (transaction: Transaction) =>
 // render as income). The engine accepts either sign for this type precisely
 // because direction is the user's choice; the UI must honor that choice
 // rather than forcing all Adjustments into the "outflow" bucket.
-const isInflowTransaction = (transaction: Transaction) =>
+export const isInflowTransaction = (transaction: Transaction) =>
   transaction.transactionType === 'Income' ||
   (transaction.transactionType === 'Adjustment' && transaction.amount > 0);
 

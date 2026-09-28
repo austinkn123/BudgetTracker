@@ -5,7 +5,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 ## Tech Stack
 - **Backend**: .NET 9, ASP.NET Core Minimal APIs
 - **Frontend**: React + TypeScript + Vite
-- **Styling**: Tailwind CSS + Material UI
+- **Styling**: Tailwind CSS + Radix primitives (design tokens in `budgettracker.client/src/shared/theme/`)
 - **Forms/Validation**: React Hook Form + Zod (`@hookform/resolvers`)
 - **Database**: Microsoft SQL Server
 - **ORM**: Entity Framework Core (Code-first with Fluent API configurations)

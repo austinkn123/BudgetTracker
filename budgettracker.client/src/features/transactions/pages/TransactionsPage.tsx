@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Typography from '@mui/material/Typography';
+import { PageHeader } from '../../../shared/components/ui';
 import { useTransactions } from '../hooks/useTransactions';
 import StatusBanner from '../../../shared/components/StatusBanner';
 import TransactionsSection from '../TransactionsSection';
@@ -11,14 +11,10 @@ const TransactionsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Typography variant="h4" className="font-bold text-ink">
-          Transactions
-        </Typography>
-        <Typography variant="body2" className="text-ink-muted mt-1">
-          Browse your ledger by calendar day, then drill into that date to add or edit transactions
-        </Typography>
-      </div>
+      <PageHeader
+        title="Transactions"
+        description="Review what your bank imported and give each transaction a category"
+      />
 
       <StatusBanner statusMessage={statusMessage} statusError={statusError} />
 

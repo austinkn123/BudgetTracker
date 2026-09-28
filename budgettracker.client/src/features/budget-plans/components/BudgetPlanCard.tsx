@@ -1,12 +1,9 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
-import { alpha } from '@mui/material/styles';
-import Typography from '@mui/material/Typography';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { BudBadge, BudButton, BudCard, BudTable } from '../../../shared/components/ui';
-import type { BudTableColumn } from '../../../shared/components/ui';
+import { Badge, Button, Card, Table } from '../../../shared/components/ui';
+import type { TableColumn } from '../../../shared/components/ui';
+import { cn } from '../../../shared/utils/cn';
 import type { BudgetPlan, BudgetPlanEntry } from '../../../shared/types/api';
 
 type BudgetPlanCardProps = {
@@ -20,7 +17,16 @@ type BudgetPlanCardProps = {
   onDeletePlan: (plan: BudgetPlan) => void;
 };
 
-/** Summary tile for the income/expenses/net row. */
+const TILE_ACCENT = {
+  success: 'bg-success',
+  error: 'bg-ink/25',
+  primary: 'bg-primary',
+} as const;
+
+/**
+ * Summary tile for the income/expenses/net row. A thin accent rail plus a
+ * large tabular figure reads cleaner than a fully tinted box.
+ */
 const SummaryTile = ({
   label,
   value,
@@ -30,29 +36,25 @@ const SummaryTile = ({
 }: {
   label: string;
   value: number;
-  tone: 'success' | 'error' | 'primary';
+  tone: keyof typeof TILE_ACCENT;
   signed?: boolean;
 }) => (
-  <Box
-    sx={{
-      borderRadius: 3,
-      px: 1.5,
-      py: 1.25,
-      border: (theme) => `1px solid ${alpha(theme.palette[tone].main, 0.2)}`,
-      backgroundColor: (theme) => alpha(theme.palette[tone].main, 0.1),
-    }}
-  >
-    <Typography variant="caption" color={`${tone}.main`}>
-      {label}
-    </Typography>
-    <Typography
-      variant="subtitle1"
-      fontWeight={600}
-      color={signed ? (value >= 0 ? 'success.dark' : 'error.dark') : `${tone}.dark`}
-    >
-      ${value.toFixed(2)}
-    </Typography>
-  </Box>
+  <div className="flex items-stretch gap-3 rounded-lg bg-background px-4 py-3 ring-1 ring-ink/[0.05]">
+    <span className={cn('w-0.5 shrink-0 rounded-full', TILE_ACCENT[tone])} aria-hidden />
+    <div>
+      <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-ink-muted">
+        {label}
+      </span>
+      <p
+        className={cn(
+          'mt-0.5 text-lg font-semibold tabular-nums tracking-[-0.02em]',
+          signed ? (value >= 0 ? 'text-success-dark' : 'text-error') : 'text-ink',
+        )}
+      >
+        ${value.toFixed(2)}
+      </p>
+    </div>
+  </div>
 );
 
 const BudgetPlanCard = ({
@@ -84,7 +86,7 @@ const BudgetPlanCard = ({
     [plan.entries],
   );
 
-  const columns: BudTableColumn<BudgetPlanEntry>[] = useMemo(
+  const columns: TableColumn<BudgetPlanEntry>[] = useMemo(
     () => [
       {
         key: 'categoryId',
@@ -96,7 +98,7 @@ const BudgetPlanCard = ({
         key: 'lineType',
         header: 'Type',
         render: (entry) => (
-          <BudBadge
+          <Badge
             label={entry.lineType}
             color={entry.lineType === 'Income' ? 'success' : 'error'}
             variant="outline"
@@ -110,9 +112,7 @@ const BudgetPlanCard = ({
         header: 'Amount',
         align: 'right',
         render: (entry) => (
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            ${entry.amount.toFixed(2)}
-          </Typography>
+          <span className="text-sm font-semibold text-ink">${entry.amount.toFixed(2)}</span>
         ),
       },
       {
@@ -126,60 +126,53 @@ const BudgetPlanCard = ({
   );
 
   return (
-    <BudCard
+    <Card
       title={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <span className="flex items-center gap-2">
           {plan.name}
-          <BudBadge
+          <Badge
             label={plan.isActive ? 'Active' : 'Inactive'}
             color={plan.isActive ? 'success' : 'neutral'}
           />
-        </Box>
+        </span>
       }
       subtitle={planMonthLabel}
       actions={
-        <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
+        <div className="flex flex-row flex-wrap justify-end gap-2">
           {!plan.isActive && (
-            <BudButton
+            <Button
               size="sm"
               variant="secondary"
               onClick={() => onSwitchActive(plan.id)}
               disabled={isSwitchingPlan}
             >
               Set Active
-            </BudButton>
+            </Button>
           )}
-          <BudButton size="sm" variant="ghost" startIcon={<Plus size={16} />} onClick={() => onAddLine(plan.id)}>
+          <Button size="sm" variant="ghost" startIcon={<Plus size={16} />} onClick={() => onAddLine(plan.id)}>
             Add Entry
-          </BudButton>
-          <BudButton size="sm" variant="ghost" startIcon={<Pencil size={16} />} onClick={() => onEditPlan(plan)}>
+          </Button>
+          <Button size="sm" variant="ghost" startIcon={<Pencil size={16} />} onClick={() => onEditPlan(plan)}>
             Edit
-          </BudButton>
-          <BudButton
+          </Button>
+          <Button
             size="sm"
             variant="destructive-ghost"
             startIcon={<Trash2 size={16} />}
             onClick={() => onDeletePlan(plan)}
           >
             Delete
-          </BudButton>
-        </Stack>
+          </Button>
+        </div>
       }
     >
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
-          gap: 1.5,
-          mb: 3,
-        }}
-      >
+      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
         <SummaryTile label="Monthly Income" value={monthlyIncome} tone="success" />
         <SummaryTile label="Monthly Expenses" value={monthlyExpenses} tone="error" />
         <SummaryTile label="Monthly Net" value={monthlyNet} tone="primary" signed />
-      </Box>
+      </div>
 
-      <BudTable
+      <Table
         columns={columns}
         rows={sortedEntries}
         rowKey={(entry) => entry.id}
@@ -187,7 +180,7 @@ const BudgetPlanCard = ({
         emptyMessage='No plan entries — click "Add Entry" to get started'
         ariaLabel={`${plan.name} plan entries`}
       />
-    </BudCard>
+    </Card>
   );
 };
 
