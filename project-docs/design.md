@@ -147,8 +147,8 @@ the decimal, plus optical tightening. Currency goes through
 whole-dollar roll-ups, `currencyPrecise` for individual transactions, `signedAmount` where direction
 matters.
 
-*Known inconsistency:* several components still use bare `tabular-nums` without `.numeric`, which
-loses the tracking.
+Overages go through `overAmount`, which keeps cents under $10 so a small overage never reads as
+"$0 over".
 
 ### Surface and shape
 
@@ -183,7 +183,11 @@ modal one row at a time is the failure mode this page was rebuilt to remove.
 | `120ms` | colour and hover — the workhorse |
 | `160ms` | transforms, and every *exit* |
 | `240ms` | overlays, and every *enter* (`animate-rise-in` for sections) |
-| `700ms` | data drawing itself in (`animate-grow-x` / `grow-y` on bars), once per load, never chrome |
+| `700ms` | data drawing itself in (`animate-grow-x` on bars, `animate-draw-arc` on the gauge, `useCountUp` on headline figures), once per load, never chrome |
+
+Page roots carry `.stagger-in`: their direct children rise in 40ms apart, so the eye lands on the
+header and reads down. Draw-in and entrance animations use `backwards` fill, so nothing keeps a
+transform after it settles.
 
 Entering uses `ease-out-soft`, leaving uses `ease-in-soft`. No spring physics, no Framer Motion.
 

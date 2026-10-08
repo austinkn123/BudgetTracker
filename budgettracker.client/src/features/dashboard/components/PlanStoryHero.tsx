@@ -4,6 +4,7 @@ import { Badge, Card, Gauge, Progress } from '../../../shared/components/ui';
 import type { AnalyzedPlan, PeriodPacing } from '../../../shared/types/api';
 import type { DriftingCategory } from '../utils/selectors';
 import { heroSurface, semanticColors } from '../utils/chartTheme';
+import { currency, currencyPrecise, overAmount } from '../../../shared/utils/format';
 
 interface PlanStoryHeroProps {
   plan: AnalyzedPlan;
@@ -15,20 +16,6 @@ interface PlanStoryHeroProps {
   drifting: DriftingCategory[];
 }
 
-const currency = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-
-const currencyPrecise = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
-
 const clampPct = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
@@ -38,10 +25,12 @@ const PlanStoryHero = ({ plan, analyzedMonth, pacing, headline, drifting }: Plan
   const gaugeValue = clampPct(pacing.spentPct * 100);
   const onTrack = pacing.pacingDelta <= 0;
   const gaugeColor = onTrack ? semanticColors.income : semanticColors.overspend;
+  // Compare before clamping: clampPct caps at 100, so a clamped value could never overshoot and
+  // the bar stayed green however far past plan the projection ran.
+  const overshoot = pacing.plannedExpenses > 0 && pacing.projectedEnd > pacing.plannedExpenses;
   const projectionPct = pacing.plannedExpenses > 0
     ? clampPct((pacing.projectedEnd / pacing.plannedExpenses) * 100)
     : 0;
-  const overshoot = projectionPct > 100;
 
   const remainingLabel = pacing.remaining >= 0
     ? `${currency.format(pacing.remaining)} left`
@@ -145,7 +134,7 @@ const PlanStoryHero = ({ plan, analyzedMonth, pacing, headline, drifting }: Plan
             {drifting.map((d) => (
               <Badge
                 key={d.key}
-                label={`${d.name} +${currency.format(d.overBy)}`}
+                label={`${d.name} +${overAmount(d.overBy)}`}
                 className="border-white/20 bg-white/10 text-white"
               />
             ))}

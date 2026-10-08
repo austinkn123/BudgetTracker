@@ -31,3 +31,10 @@ export const signedAmount = (amount: number, inflow: boolean) =>
 
 /** "62%" from 0.62. Percentages are always whole numbers in this UI. */
 export const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
+
+/**
+ * How far past plan something is. Whole dollars normally, but cents under $10: rounding
+ * $0.40 over down to "$0 over" says over and nothing at once.
+ */
+export const overAmount = (amount: number) =>
+  Math.abs(amount) < 10 ? currencyPrecise.format(amount) : currency.format(amount);

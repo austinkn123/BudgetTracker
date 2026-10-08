@@ -23,13 +23,16 @@ const Progress = ({ value, height = 8, barColor, trackColor, className }: Progre
       className={cn('relative w-full overflow-hidden rounded-full bg-border-subtle', className)}
       style={{ height, backgroundColor: trackColor }}
     >
-      <RadixProgress.Indicator
-        className="h-full rounded-full bg-primary transition-transform duration-160 ease-out-soft"
-        style={{
-          transform: `translateX(-${100 - clamped}%)`,
-          backgroundColor: barColor,
-        }}
-      />
+      {/* Draws in from the left on mount; later value changes slide via the indicator's transition. */}
+      <div className="h-full origin-left animate-grow-x">
+        <RadixProgress.Indicator
+          className="h-full rounded-full bg-primary transition-transform duration-160 ease-out-soft"
+          style={{
+            transform: `translateX(-${100 - clamped}%)`,
+            backgroundColor: barColor,
+          }}
+        />
+      </div>
     </RadixProgress.Root>
   );
 };

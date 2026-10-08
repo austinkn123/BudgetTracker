@@ -139,6 +139,8 @@ export default {
         // Data draw-in: a bar growing from its origin. Pair with origin-left / origin-bottom.
         'grow-x': { from: { transform: 'scaleX(0)' }, to: { transform: 'scaleX(1)' } },
         'grow-y': { from: { transform: 'scaleY(0)' }, to: { transform: 'scaleY(1)' } },
+        // Gauge arc sweeping from zero to its stroke-dasharray value (no `to`: ends on the attribute).
+        'draw-arc': { from: { strokeDasharray: '0 100' } },
         // Section entrance: a short rise, staggered with animation-delay.
         'rise-in': {
           from: { opacity: '0', transform: 'translateY(6px)' },
@@ -153,9 +155,10 @@ export default {
         'slide-out-left': 'slide-out-left 160ms cubic-bezier(0.4, 0, 1, 1)',
         'collapse-down': 'collapse-down 240ms cubic-bezier(0.16, 1, 0.3, 1)',
         'collapse-up': 'collapse-up 160ms cubic-bezier(0.4, 0, 1, 1)',
-        'grow-x': 'grow-x 700ms cubic-bezier(0.16, 1, 0.3, 1) both',
-        'grow-y': 'grow-y 700ms cubic-bezier(0.16, 1, 0.3, 1) both',
-        'rise-in': 'rise-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        'grow-x': 'grow-x 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+        'grow-y': 'grow-y 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+        'draw-arc': 'draw-arc 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+        'rise-in': 'rise-in 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
       },
     },
   },

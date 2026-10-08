@@ -2,18 +2,12 @@ import Card from '../../../shared/components/ui/Card';
 import { Badge } from '../../../shared/components/ui';
 import type { BucketPerformance } from '../../../shared/types/api';
 import { semanticColors } from '../utils/chartTheme';
+import { currency } from '../../../shared/utils/format';
 
 interface BucketBreakdownProps {
   /** Core/Buffer planned-vs-actual, straight from the analysis. */
   rows: BucketPerformance[];
 }
-
-const currency = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
 
 const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
   if (rows.length === 0 || rows.every((r) => r.planned === 0 && r.actual === 0)) {
@@ -45,7 +39,7 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
                     <Badge color="warning" label={`+${currency.format(overage)}`} />
                   )}
                 </div>
-                <span className="text-[13px] tabular-nums text-ink-muted">
+                <span className="text-[13px] numeric text-ink-muted">
                   <span className="font-semibold text-ink">{currency.format(row.actual)}</span>
                   {' of '}
                   {currency.format(row.planned)}
@@ -57,7 +51,7 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
                 <div className="absolute inset-0 rounded-full bg-border-subtle" />
                 {/* Actual (+ overage continuation). inset-0 so the percentage
                     widths below resolve against the full track, not auto. */}
-                <div className="absolute inset-0 flex overflow-hidden rounded-full">
+                <div className="absolute inset-0 flex origin-left animate-grow-x overflow-hidden rounded-full">
                   <div
                     className="h-full transition-all duration-240 ease-out-soft"
                     style={{

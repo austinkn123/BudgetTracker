@@ -5,23 +5,11 @@ import { Card, Sparkline } from '../../../shared/components/ui';
 import { cn } from '../../../shared/utils/cn';
 import type { CategoryCard } from '../utils/selectors';
 import { semanticColors } from '../utils/chartTheme';
+import { currency, currencyPrecise } from '../../../shared/utils/format';
 
 interface CategoryDrillGridProps {
   cards: CategoryCard[];
 }
-
-const currency = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-
-const currencyPrecise = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-});
 
 /**
  * Category performance as a dense ledger (BUD-20).
@@ -49,7 +37,7 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
       subtitle={`${cards.length} categories`}
       contentClassName="p-0"
     >
-      <table className="w-full border-collapse text-sm tabular-nums">
+      <table className="w-full border-collapse text-sm numeric">
         <thead>
           <tr className="border-b border-border-subtle bg-background/60">
             <th scope="col" className="px-6 py-2.5 text-left text-2xs font-semibold uppercase tracking-[0.07em] text-ink-muted">
@@ -74,7 +62,7 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
         </thead>
 
         <tbody>
-          {cards.map((data) => {
+          {cards.map((data, rowIndex) => {
             const pct = data.planned > 0 ? Math.min(100, (data.actual / data.planned) * 100) : 0;
             const rawPct = data.planned > 0 ? Math.round((data.actual / data.planned) * 100) : null;
             const over = data.planned > 0 && data.actual > data.planned;
@@ -114,8 +102,12 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
                     <div className="flex items-center gap-2.5">
                       <div className="h-1.5 min-w-10 flex-1 overflow-hidden rounded-full bg-border-subtle">
                         <div
-                          className="h-full rounded-full transition-all duration-240 ease-out-soft"
-                          style={{ width: `${pct}%`, backgroundColor: barColor }}
+                          className="h-full origin-left animate-grow-x rounded-full transition-all duration-240 ease-out-soft"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: barColor,
+                            animationDelay: `${rowIndex * 30}ms`,
+                          }}
                         />
                       </div>
                       <span

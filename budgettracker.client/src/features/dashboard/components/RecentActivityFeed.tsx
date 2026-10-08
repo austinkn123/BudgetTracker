@@ -6,6 +6,7 @@ import { withAlpha } from '../../../shared/theme/tokens';
 import type { Category, Transaction } from '../../../shared/types/api';
 import { categoryLabel } from '../utils/selectors';
 import { chartPalette, semanticColors } from '../utils/chartTheme';
+import { currencyPrecise } from '../../../shared/utils/format';
 
 interface RecentActivityFeedProps {
   /** Window-scoped transactions, already sorted newest-first and capped. */
@@ -13,12 +14,6 @@ interface RecentActivityFeedProps {
   /** Full category list — drives names and the stable palette-by-index dot colors. */
   categories: Category[];
 }
-
-const currency = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-});
 
 const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
   const categoryNames = useMemo(
@@ -73,12 +68,12 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
 
                 <span
                   className={cn(
-                    'shrink-0 whitespace-nowrap text-[13px] font-semibold tabular-nums',
+                    'shrink-0 whitespace-nowrap text-[13px] font-semibold numeric',
                     isIncome ? 'text-success-dark' : 'text-ink',
                   )}
                 >
                   {isIncome ? '+' : '−'}
-                  {currency.format(Math.abs(t.amount))}
+                  {currencyPrecise.format(Math.abs(t.amount))}
                 </span>
               </li>
             );

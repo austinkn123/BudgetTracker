@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
+import { useCountUp } from '../../../shared/hooks/useCountUp';
 import { cn } from '../../../shared/utils/cn';
 
 export interface Stat {
   label: string;
-  value: string;
+  /** Raw figure; it counts up on load and is rendered through `format`. */
+  value: number;
+  format: (value: number) => string;
   /** Small qualifier under the figure. */
   detail?: ReactNode;
   tone?: 'default' | 'positive' | 'negative';
@@ -19,6 +22,22 @@ const TONE: Record<NonNullable<Stat['tone']>, string> = {
   negative: 'text-error',
 };
 
+const StatFigure = ({ stat }: { stat: Stat }) => {
+  const shown = useCountUp(stat.value);
+  return (
+    <dd
+      className={cn(
+        'numeric mt-1.5 text-[26px] font-semibold leading-none tracking-[-0.03em]',
+        TONE[stat.tone ?? 'default'],
+      )}
+    >
+      {/* Screen readers get the settled figure, not every frame. */}
+      <span aria-hidden>{stat.format(shown)}</span>
+      <span className="sr-only">{stat.format(stat.value)}</span>
+    </dd>
+  );
+};
+
 /**
  * Headline figures as a borderless divided band (BUD-20).
  *
@@ -32,14 +51,7 @@ const StatStrip = ({ stats }: StatStripProps) => (
         <dt className="text-2xs font-semibold uppercase tracking-[0.08em] text-ink-muted">
           {stat.label}
         </dt>
-        <dd
-          className={cn(
-            'mt-1.5 text-[26px] font-semibold leading-none tracking-[-0.03em] tabular-nums',
-            TONE[stat.tone ?? 'default'],
-          )}
-        >
-          {stat.value}
-        </dd>
+        <StatFigure stat={stat} />
         {stat.detail && <p className="mt-1.5 text-xs text-ink-muted">{stat.detail}</p>}
       </div>
     ))}

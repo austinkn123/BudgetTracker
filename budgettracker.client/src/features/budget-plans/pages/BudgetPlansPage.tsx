@@ -15,7 +15,7 @@ const BudgetPlansPage = () => {
   const isLoading = loadingPlans || loadingCategories;
 
   return (
-    <div className="space-y-6">
+    <div className="stagger-in space-y-6">
       <PageHeader
         title="Budget Plans"
         description="What you intend to spend each month, and the categories it is measured in."

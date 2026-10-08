@@ -15,18 +15,12 @@ import Card from '../../../shared/components/ui/Card';
 import { withAlpha } from '../../../shared/theme/tokens';
 import type { WaterfallBar } from '../utils/selectors';
 import { semanticColors } from '../utils/chartTheme';
+import { currency } from '../../../shared/utils/format';
 
 interface CashflowWaterfallProps {
   /** Ordered bars: income → top expense categories → Other → net. */
   bars: WaterfallBar[];
 }
-
-const currency = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
 
 interface WaterfallRow {
   label: string;
