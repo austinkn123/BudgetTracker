@@ -194,22 +194,32 @@ const DashboardPage = () => {
         <PlanStoryHeroEmpty />
       )}
 
-      {/* Cashflow waterfall + Where it went */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <CashflowWaterfall bars={waterfall} />
+      {planMonth ? (
+        <>
+          {/* Cashflow waterfall + Where it went */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <CashflowWaterfall bars={waterfall} />
+            </div>
+            <WhereItWent rows={topSpend} />
+          </div>
+
+          <CategoryDrillGrid cards={categoryCards} />
+
+          {/* Bucket breakdown + recent activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <BucketBreakdown rows={planMonth.byBucket} />
+            <RecentActivityFeed items={recentActivity} categories={categories} />
+          </div>
+        </>
+      ) : (
+        // Without a plan there is nothing to measure against: the waterfall, drill grid and
+        // buckets would only be empty boxes. Spending and activity still stand on their own.
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <WhereItWent rows={topSpend} />
+          <RecentActivityFeed items={recentActivity} categories={categories} />
         </div>
-        <WhereItWent rows={topSpend} />
-      </div>
-
-      {/* Category drill grid */}
-      {planMonth && <CategoryDrillGrid cards={categoryCards} />}
-
-      {/* Bucket breakdown + recent activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <BucketBreakdown rows={planMonth?.byBucket ?? []} />
-        <RecentActivityFeed items={recentActivity} categories={categories} />
-      </div>
+      )}
     </div>
   );
 };

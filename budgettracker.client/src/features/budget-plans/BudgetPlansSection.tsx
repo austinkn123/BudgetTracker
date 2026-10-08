@@ -82,16 +82,19 @@ const BudgetPlansSection = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {planManagement.activePlan ? (
-            <Badge color="success" label={`Active: ${planManagement.activePlan.name}`} />
-          ) : (
-            <Badge label="No active plan" />
-          )}
-          <Button startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
-            Add plan
-          </Button>
-        </div>
+        {/* With no plans yet, the empty state below owns the one Add plan action. */}
+        {budgetPlans.length > 0 && (
+          <div className="flex items-center gap-2">
+            {planManagement.activePlan ? (
+              <Badge color="success" label={`Active: ${planManagement.activePlan.name}`} />
+            ) : (
+              <Badge label="No active plan" />
+            )}
+            <Button startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
+              Add plan
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">

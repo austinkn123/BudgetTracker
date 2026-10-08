@@ -48,9 +48,9 @@ const PlanStoryHero = ({ plan, analyzedMonth, pacing, headline, drifting }: Plan
       >
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-white">
+            <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-white">
               {headline}
-            </h1>
+            </h2>
             <p className="mt-1.5 text-sm text-white/60">
               {plan.name} · {monthLabel}
             </p>
