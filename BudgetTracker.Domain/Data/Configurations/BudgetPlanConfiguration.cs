@@ -10,7 +10,7 @@ public class BudgetPlanConfiguration : IEntityTypeConfiguration<BudgetPlan>
     {
         builder.ToTable("BudgetPlans", t =>
         {
-            t.HasCheckConstraint("CK_BudgetPlans_NetIncome", "NetIncomeMonthly >= 0");
+            t.HasCheckConstraint("CK_BudgetPlans_NetIncome", "\"NetIncomeMonthly\" >= 0");
         });
 
         builder.HasKey(bp => bp.Id);
@@ -23,18 +23,18 @@ public class BudgetPlanConfiguration : IEntityTypeConfiguration<BudgetPlan>
             .HasColumnType("date");
 
         builder.Property(bp => bp.NetIncomeMonthly)
-            .HasColumnType("decimal(18, 2)");
+            .HasColumnType("numeric(18,2)");
 
         builder.Property(bp => bp.IsActive)
             .HasDefaultValue(true);
 
         builder.Property(bp => bp.CreatedAt)
-            .HasDefaultValueSql("GETDATE()");
+            .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
 
-        builder.HasIndex(bp => new { bp.UserId, bp.PlanMonth, bp.Name })
-            .IsUnique()
-            .HasDatabaseName("UQ_BudgetPlans_User_Month_Name");
-
+        // Names are unique per user and month ignoring case. Postgres compares text case-sensitively and EF Core cannot
+        // model an expression index, so UQ_BudgetPlans_User_Month_Name on ("UserId", "PlanMonth", lower("Name")) is created
+        // with raw SQL in the InitialCreate migration. Re-add that SQL if the migration is ever regenerated
+        // (BudgetPlanNameUniquenessTests fails otherwise). IX_BudgetPlans_User_Month_Active still leads with UserId for the FK.
         builder.HasIndex(bp => new { bp.UserId, bp.PlanMonth, bp.IsActive })
             .HasDatabaseName("IX_BudgetPlans_User_Month_Active")
             .IncludeProperties(bp => new { bp.Name, bp.NetIncomeMonthly });

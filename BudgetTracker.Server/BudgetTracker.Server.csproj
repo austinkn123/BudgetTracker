@@ -9,7 +9,19 @@
     <SpaProxyServerUrl>https://localhost:53608</SpaProxyServerUrl>
   </PropertyGroup>
 
+  <!--
+    AWS Lambda custom runtime (provided.al2023) build, enabled with -p:LambdaCustomRuntime=true (see deploy/README.md).
+    Lambda has no managed .NET 9 zip runtime, so the app ships self-contained and the runtime executes a file named
+    "bootstrap". The minimal AL2023 image has no ICU, hence invariant globalization.
+  -->
+  <PropertyGroup Condition="'$(LambdaCustomRuntime)' == 'true'">
+    <AssemblyName>bootstrap</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
   <ItemGroup>
+    <PackageReference Include="Amazon.Extensions.Configuration.SystemsManager" Version="7.1.1" />
+    <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.2.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">

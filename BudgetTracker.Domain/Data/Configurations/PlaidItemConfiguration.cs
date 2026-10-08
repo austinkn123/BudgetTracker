@@ -6,7 +6,7 @@ namespace BudgetTracker.Domain.Data.Configurations;
 
 /// <summary>
 /// EF Core Fluent API configuration for <see cref="PlaidItem"/>.
-/// Enforces "one active Plaid item per user" via a filtered unique index.
+/// A user may link many institutions, so <c>UserId</c> is a plain lookup index; Plaid's own item id stays globally unique.
 /// </summary>
 public class PlaidItemConfiguration : IEntityTypeConfiguration<PlaidItem>
 {
@@ -39,23 +39,21 @@ public class PlaidItemConfiguration : IEntityTypeConfiguration<PlaidItem>
             .HasDefaultValue(true);
 
         builder.Property(p => p.ConsentExpiresAt)
-            .HasColumnType("datetime2");
+            .HasColumnType("timestamp without time zone");
 
         builder.Property(p => p.LastSyncedAt)
-            .HasColumnType("datetime2");
+            .HasColumnType("timestamp without time zone");
 
         builder.Property(p => p.CreatedAt)
-            .HasColumnType("datetime2")
-            .HasDefaultValueSql("GETDATE()");
+            .HasColumnType("timestamp without time zone")
+            .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
 
         builder.HasIndex(p => p.PlaidItemId)
             .IsUnique()
             .HasDatabaseName("UQ_PlaidItems_PlaidItemId");
 
         builder.HasIndex(p => p.UserId)
-            .IsUnique()
-            .HasFilter("[IsActive] = 1")
-            .HasDatabaseName("UQ_PlaidItems_UserId_Active");
+            .HasDatabaseName("IX_PlaidItems_UserId");
 
         builder.HasOne(p => p.User)
             .WithMany()

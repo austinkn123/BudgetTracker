@@ -31,12 +31,23 @@ public class BudgetPlanManager(IBudgetPlanEngine engine, IBudgetPlanAccessor acc
         if (error is not null)
             return Result<int>.Failure(error);
 
+        var otherNames = await accessor.GetOtherNamesForMonthAsync(userId, budgetPlan.PlanMonth, excludeBudgetPlanId: 0);
+        var duplicateError = engine.ValidateNameIsUnique(budgetPlan.Name, otherNames);
+        if (duplicateError is not null)
+            return Result<int>.Failure(duplicateError);
+
         var categoryOwnershipError = await ValidateCategoryOwnershipAsync(budgetPlan, userId);
         if (categoryOwnershipError is not null)
             return Result<int>.Failure(categoryOwnershipError);
 
-        var id = await accessor.CreateAsync(budgetPlan);
-        return Result<int>.Success(id);
+        try
+        {
+            return Result<int>.Success(await accessor.CreateAsync(budgetPlan));
+        }
+        catch (UniqueNameViolationException)
+        {
+            return Result<int>.Failure(engine.DuplicateNameError(budgetPlan.Name));
+        }
     }
 
     public async Task<Result<bool>> UpdateAsync(BudgetPlan budgetPlan, int userId)
@@ -48,11 +59,25 @@ public class BudgetPlanManager(IBudgetPlanEngine engine, IBudgetPlanAccessor acc
         if (error is not null)
             return Result<bool>.Failure(error);
 
+        var otherNames = await accessor.GetOtherNamesForMonthAsync(userId, budgetPlan.PlanMonth, budgetPlan.Id);
+        var duplicateError = engine.ValidateNameIsUnique(budgetPlan.Name, otherNames);
+        if (duplicateError is not null)
+            return Result<bool>.Failure(duplicateError);
+
         var categoryOwnershipError = await ValidateCategoryOwnershipAsync(budgetPlan, userId);
         if (categoryOwnershipError is not null)
             return Result<bool>.Failure(categoryOwnershipError);
 
-        var updated = await accessor.UpdateAsync(budgetPlan, userId);
+        bool updated;
+        try
+        {
+            updated = await accessor.UpdateAsync(budgetPlan, userId);
+        }
+        catch (UniqueNameViolationException)
+        {
+            return Result<bool>.Failure(engine.DuplicateNameError(budgetPlan.Name));
+        }
+
         return updated
             ? Result<bool>.Success(true)
             : Result<bool>.Failure("Budget plan not found");

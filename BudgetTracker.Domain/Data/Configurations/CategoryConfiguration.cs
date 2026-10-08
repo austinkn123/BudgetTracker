@@ -10,7 +10,7 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
     {
         builder.ToTable("Categories", t =>
         {
-            t.HasCheckConstraint("CK_Categories_CategoryType", "CategoryType IN ('Expense', 'Income', 'Both')");
+            t.HasCheckConstraint("CK_Categories_CategoryType", "\"CategoryType\" IN ('Expense', 'Income', 'Both')");
         });
 
         builder.HasKey(c => c.Id);
@@ -27,14 +27,16 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Property(c => c.PlaidCategoryPrimary)
             .HasMaxLength(100);
 
-        builder.HasIndex(c => new { c.UserId, c.Name })
-            .IsUnique()
-            .HasDatabaseName("UQ_Categories_User_Name");
+        // Names are unique per user ignoring case. Postgres compares text case-sensitively and EF Core cannot model an
+        // expression index, so UQ_Categories_User_Name on ("UserId", lower("Name")) is created with raw SQL in the
+        // InitialCreate migration. Re-add that SQL if the migration is ever regenerated (CategoryNameUniquenessTests fails otherwise).
+        builder.HasIndex(c => c.UserId)
+            .HasDatabaseName("IX_Categories_UserId");
 
         // One category per Plaid taxonomy value per user, so a suggestion resolves deterministically.
         builder.HasIndex(c => new { c.UserId, c.PlaidCategoryPrimary })
             .IsUnique()
-            .HasFilter("[PlaidCategoryPrimary] IS NOT NULL")
+            .HasFilter("\"PlaidCategoryPrimary\" IS NOT NULL")
             .HasDatabaseName("UQ_Categories_User_PlaidCategory");
 
         builder.HasMany(c => c.Transactions)

@@ -31,7 +31,7 @@ public class BudgetPlanEngine : IBudgetPlanEngine
 
     public void NormalizeForPersistence(BudgetPlan budgetPlan)
     {
-        budgetPlan.Name = budgetPlan.Name.Trim();
+        budgetPlan.Name = budgetPlan.Name?.Trim() ?? string.Empty;
         budgetPlan.PlanMonth = new DateTime(budgetPlan.PlanMonth.Year, budgetPlan.PlanMonth.Month, 1);
 
         foreach (var entry in budgetPlan.Entries)
@@ -44,6 +44,20 @@ public class BudgetPlanEngine : IBudgetPlanEngine
                 : entry.Amount;
         }
     }
+
+    /// <inheritdoc />
+    public string? ValidateNameIsUnique(string name, IEnumerable<string> existingNames)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(existingNames);
+
+        return existingNames.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase))
+            ? DuplicateNameError(name)
+            : null;
+    }
+
+    /// <inheritdoc />
+    public string DuplicateNameError(string name) => $"A budget plan named \"{name}\" already exists for this month";
 
     private static string? ValidateEntries(IEnumerable<BudgetPlanEntry> entries)
     {

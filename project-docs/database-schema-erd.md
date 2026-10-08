@@ -22,91 +22,91 @@ referenced here by the minimum linkage needed:
 erDiagram
     USERS {
         int Id PK
-        nvarchar_255 CognitoSub_nullable
-        datetime2 CreatedAt
+        varchar_255 CognitoSub_nullable
+        timestamp CreatedAt
     }
 
     ACCOUNTS {
         int Id PK
         int UserId FK
-        nvarchar_100 Name
-        nvarchar_50 AccountType
-        datetime2 CreatedAt
+        varchar_100 Name
+        varchar_50 AccountType
+        timestamp CreatedAt
     }
 
     CATEGORIES {
         int Id PK
         int UserId FK
-        nvarchar_100 Name
-        nvarchar_20 CategoryType
+        varchar_100 Name
+        varchar_20 CategoryType
     }
 
     BUDGETPLANS {
         int Id PK
         int UserId FK
-        nvarchar_100 Name
+        varchar_100 Name
         date PlanMonth
-        decimal_18_2 NetIncomeMonthly
-        bit IsActive
-        datetime2 CreatedAt
-        datetime2 UpdatedAt_nullable
+        numeric_18_2 NetIncomeMonthly
+        boolean IsActive
+        timestamp CreatedAt
+        timestamp UpdatedAt_nullable
     }
 
     BUDGETPLANENTRIES {
         int Id PK
         int BudgetPlanId FK
         int CategoryId FK_nullable
-        nvarchar_20 LineType
-        nvarchar_20 Bucket
-        nvarchar_20 Cadence
-        decimal_18_2 Amount
-        decimal_18_2 MonthlyEquivalent
-        bit IsStressFactor
-        nvarchar_500 Notes_nullable
+        varchar_20 LineType
+        varchar_20 Bucket
+        varchar_20 Cadence
+        numeric_18_2 Amount
+        numeric_18_2 MonthlyEquivalent
+        boolean IsStressFactor
+        varchar_500 Notes_nullable
         int SortOrder
-        datetime2 CreatedAt
-        datetime2 UpdatedAt_nullable
+        timestamp CreatedAt
+        timestamp UpdatedAt_nullable
     }
 
     TRANSACTIONS {
         int Id PK
         int AccountId FK
         int CategoryId FK_nullable
-        nvarchar_20 TransactionType
-        decimal_18_2 Amount
-        datetime2 OccurredAt
-        nvarchar_255 Payee_nullable
-        nvarchar_1000 Notes_nullable
+        varchar_20 TransactionType
+        numeric_18_2 Amount
+        timestamp OccurredAt
+        varchar_255 Payee_nullable
+        varchar_1000 Notes_nullable
         int TransferAccountId FK_nullable
-        nvarchar_100 PlaidTransactionId_nullable
-        nvarchar_100 PlaidAccountId_nullable
-        bit IsImported
-        bit IsPending
-        datetime2 CreatedAt
+        varchar_100 PlaidTransactionId_nullable
+        varchar_100 PlaidAccountId_nullable
+        boolean IsImported
+        boolean IsPending
+        timestamp CreatedAt
     }
 
     PLAIDITEMS {
         int Id PK
         int UserId FK
-        nvarchar_100 PlaidItemId
-        nvarchar_50 InstitutionId
-        nvarchar_200 InstitutionName
-        nvarchar_500 AccessTokenEncrypted
-        nvarchar_500 SyncCursor_nullable
-        bit IsActive
-        datetime2 ConsentExpiresAt_nullable
-        datetime2 LastSyncedAt_nullable
-        datetime2 CreatedAt
+        varchar_100 PlaidItemId
+        varchar_50 InstitutionId
+        varchar_200 InstitutionName
+        varchar_500 AccessTokenEncrypted
+        varchar_500 SyncCursor_nullable
+        boolean IsActive
+        timestamp ConsentExpiresAt_nullable
+        timestamp LastSyncedAt_nullable
+        timestamp CreatedAt
     }
 
     PLAIDACCOUNTS {
         int Id PK
         int PlaidItemId FK
-        nvarchar_100 PlaidAccountId
-        nvarchar_4 Mask_nullable
-        nvarchar_200 Name
-        nvarchar_50 AccountType
-        nvarchar_50 AccountSubtype_nullable
+        varchar_100 PlaidAccountId
+        varchar_4 Mask_nullable
+        varchar_200 Name
+        varchar_50 AccountType
+        varchar_50 AccountSubtype_nullable
     }
 
     USERS ||--o{ ACCOUNTS : owns
@@ -130,7 +130,7 @@ erDiagram
 - Unique filtered index: USERS (CognitoSub) where CognitoSub is not null
 - Unique filtered index: TRANSACTIONS (PlaidTransactionId) where PlaidTransactionId is not null — the Plaid dedup key
 - Unique index: PLAIDITEMS (PlaidItemId)
-- Unique filtered index: PLAIDITEMS (UserId) where IsActive = 1 — one active institution link per user
+- Index: PLAIDITEMS (UserId) — non-unique; a user may link many institutions (one active row per linked bank)
 - Unique index: PLAIDACCOUNTS (PlaidAccountId)
 - Index: BUDGETPLANS (UserId, PlanMonth, IsActive) including Name, NetIncomeMonthly
 - Index: BUDGETPLANENTRIES (BudgetPlanId, Bucket, LineType) including MonthlyEquivalent, Amount, Cadence, CategoryId, SortOrder

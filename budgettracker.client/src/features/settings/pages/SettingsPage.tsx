@@ -1,7 +1,7 @@
 import { PageHeader } from '../../../shared/components/ui';
 import { useUser } from '../../user/hooks/useUser';
 import UserSection from '../../user/UserSection';
-import LinkedAccountCard from '../../linked-accounts/components/LinkedAccountCard';
+import LinkedAccountsSection from '../../linked-accounts/components/LinkedAccountsSection';
 import AppearanceSection from '../components/AppearanceSection';
 
 const SettingsPage = () => {
@@ -15,7 +15,7 @@ const SettingsPage = () => {
 
       <AppearanceSection />
 
-      <LinkedAccountCard />
+      <LinkedAccountsSection />
     </div>
   );
 };

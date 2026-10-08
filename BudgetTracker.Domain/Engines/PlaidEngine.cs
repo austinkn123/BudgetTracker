@@ -1,3 +1,4 @@
+using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Interfaces.Engines;
 using BudgetTracker.Domain.Models;
 using BudgetTracker.Domain.Plaid;
@@ -68,6 +69,23 @@ public class PlaidEngine : IPlaidEngine
     }
 
     /// <inheritdoc />
+    public bool IsAlreadyLinked(string institutionId, IReadOnlyList<PlaidAccountDto> incomingAccounts, IEnumerable<PlaidItem> activeItems)
+    {
+        ArgumentNullException.ThrowIfNull(incomingAccounts);
+        ArgumentNullException.ThrowIfNull(activeItems);
+
+        return activeItems.Where(item => item.IsActive).Any(item => item.Accounts.Any(existing => incomingAccounts.Any(incoming =>
+            existing.PlaidAccountId == incoming.AccountId ||
+            (item.InstitutionId == institutionId && IsSameAccountByMaskAndName(existing, incoming)))));
+    }
+
+    /// <summary>A null mask is treated as unknown, never as a match, so generic names alone cannot block a link.</summary>
+    private static bool IsSameAccountByMaskAndName(PlaidAccount existing, PlaidAccountDto incoming) =>
+        existing.Mask is not null &&
+        existing.Mask == incoming.Mask &&
+        string.Equals(existing.Name, incoming.Name, StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc />
     public Account BuildBudgetTrackerAccount(PlaidAccountDto plaidAccount, string institutionName, int userId)
     {
         return new Account
@@ -83,5 +101,20 @@ public class PlaidEngine : IPlaidEngine
         var prefix = string.IsNullOrWhiteSpace(institutionName) ? string.Empty : $"{institutionName} - ";
         var maskSuffix = string.IsNullOrEmpty(plaidAccount.Mask) ? string.Empty : $" (••{plaidAccount.Mask})";
         return $"{prefix}{plaidAccount.Name}{maskSuffix}";
+    }
+
+    public Result<IReadOnlyList<PlaidItem>> SelectItemsDueForSync(IEnumerable<PlaidItem> items, DateTime now, int? staleAfterHours)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+
+        if (staleAfterHours is < 0)
+            return Result<IReadOnlyList<PlaidItem>>.Failure("staleAfterHours cannot be negative");
+
+        if (staleAfterHours is not int hours)
+            return Result<IReadOnlyList<PlaidItem>>.Success(items.ToList());
+
+        var cutoff = now.AddHours(-hours);
+        return Result<IReadOnlyList<PlaidItem>>.Success(
+            items.Where(i => i.LastSyncedAt is null || i.LastSyncedAt < cutoff).ToList());
     }
 }

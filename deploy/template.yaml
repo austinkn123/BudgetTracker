@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  BudgetTracker - ASP.NET Core API + React SPA (wwwroot) on a single Lambda behind a Function URL.
+  Database is Neon Postgres. Secrets are read from SSM Parameter Store at cold start (see deploy/README.md).
+
+# Runtime choice: Lambda has no managed .NET 9 zip runtime (managed .NET is 8 and 10; .NET 9 is container-image only).
+# The app is therefore published self-contained for linux-arm64 with the executable named "bootstrap" and runs on
+# the OS-only provided.al2023 runtime. Build the zip first (README step 3); `sam build` is not used.
+
+Parameters:
+  SsmParameterPath:
+    Type: String
+    Default: /budgettracker
+    Description: SSM path prefix loaded into configuration at startup (/budgettracker/Plaid/Secret -> Plaid:Secret).
+  AspNetCoreEnvironment:
+    Type: String
+    Default: Production
+    AllowedValues: [Production, Staging]
+    Description: Never Development here - it would expose the sandbox seed route and OpenAPI document.
+
+Resources:
+  BudgetTrackerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: budgettracker
+      Description: BudgetTracker API + SPA
+      CodeUri: artifacts/budgettracker.zip
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          ASPNETCORE_ENVIRONMENT: !Ref AspNetCoreEnvironment
+          SsmParameterPath: !Ref SsmParameterPath
+      # SAM adds both lambda:InvokeFunctionUrl and lambda:InvokeFunction (InvokedViaFunctionUrl) public
+      # statements for AuthType NONE. Auth is enforced in the app (Cognito JWT on /api, Plaid JWT on the webhook).
+      FunctionUrlConfig:
+        AuthType: NONE
+      Policies:
+        - Statement:
+            - Sid: ReadBudgetTrackerParameters
+              Effect: Allow
+              Action:
+                - ssm:GetParametersByPath
+                - ssm:GetParameters
+                - ssm:GetParameter
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmParameterPath}
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmParameterPath}/*
+      # Covers SecureStrings encrypted with the default aws/ssm key. A customer-managed KMS key would also need kms:Decrypt.
+
+  BudgetTrackerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${BudgetTrackerFunction}
+      RetentionInDays: 14
+
+Outputs:
+  FunctionUrl:
+    Description: Public URL of the app. Set /budgettracker/Plaid/WebhookUrl to <this>api/plaid/webhook.
+    Value: !GetAtt BudgetTrackerFunctionUrl.FunctionUrl
+  FunctionName:
+    Description: Lambda function name
+    Value: !Ref BudgetTrackerFunction

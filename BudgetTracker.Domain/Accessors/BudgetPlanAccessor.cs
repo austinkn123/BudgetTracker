@@ -1,3 +1,4 @@
+using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Models;
@@ -104,10 +105,20 @@ public class BudgetPlanAccessor(BudgetTrackerDbContext context) : IBudgetPlanAcc
         return count == ids.Length;
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> GetOtherNamesForMonthAsync(int userId, DateTime planMonth, int excludeBudgetPlanId)
+    {
+        return await context.BudgetPlans
+            .AsNoTracking()
+            .Where(bp => bp.UserId == userId && bp.PlanMonth == planMonth && bp.Id != excludeBudgetPlanId)
+            .Select(bp => bp.Name)
+            .ToListAsync();
+    }
+
     public async Task<int> CreateAsync(BudgetPlan budgetPlan)
     {
         context.BudgetPlans.Add(budgetPlan);
-        await context.SaveChangesAsync();
+        await SaveTranslatingNameViolationAsync();
         return budgetPlan.Id;
     }
 
@@ -182,7 +193,7 @@ public class BudgetPlanAccessor(BudgetTrackerDbContext context) : IBudgetPlanAcc
             existingEntry.UpdatedAt = DateTime.UtcNow;
         }
 
-        return await context.SaveChangesAsync() > 0;
+        return await SaveTranslatingNameViolationAsync() > 0;
     }
 
     public async Task<bool> DeleteAsync(int id, int userId)
@@ -198,5 +209,17 @@ public class BudgetPlanAccessor(BudgetTrackerDbContext context) : IBudgetPlanAcc
 
         context.BudgetPlans.Remove(budgetPlan);
         return await context.SaveChangesAsync() > 0;
+    }
+
+    private async Task<int> SaveTranslatingNameViolationAsync()
+    {
+        try
+        {
+            return await context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueViolationOf(UniqueViolation.BudgetPlanName))
+        {
+            throw new UniqueNameViolationException(UniqueViolation.BudgetPlanName, ex);
+        }
     }
 }

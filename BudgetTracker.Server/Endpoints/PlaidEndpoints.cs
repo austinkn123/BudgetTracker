@@ -37,13 +37,7 @@ public static class PlaidEndpoints
                 : Results.BadRequest(new { error = result.Error });
         });
 
-        plaidGroup.MapPost("/sync", async (IPlaidManager manager, ICurrentUserProvider currentUser) =>
-        {
-            var result = await manager.SyncAsync(currentUser.UserId);
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : Results.BadRequest(new { error = result.Error });
-        });
+        plaidGroup.MapPost("/sync", SyncAsync);
 
         // Development-only. Replaces Plaid Sandbox's stock "Tartan Bank" fixtures with transactions
         // derived from the user's own plan, so dashboard figures reconcile. Guarded twice: 404 outside
@@ -63,19 +57,9 @@ public static class PlaidEndpoints
                 : Results.BadRequest(new { error = result.Error });
         });
 
-        plaidGroup.MapGet("/connection", async (IPlaidManager manager, ICurrentUserProvider currentUser) =>
-        {
-            var result = await manager.GetConnectionAsync(currentUser.UserId);
-            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound();
-        });
+        plaidGroup.MapGet("/connections", GetConnectionsAsync);
 
-        plaidGroup.MapDelete("/connection", async (IPlaidManager manager, ICurrentUserProvider currentUser) =>
-        {
-            var result = await manager.DisconnectAsync(currentUser.UserId);
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.BadRequest(new { error = result.Error });
-        });
+        plaidGroup.MapDelete("/connections/{plaidItemId:int}", DeleteConnectionAsync);
 
         // Plaid sends no auth token, so this route opts out of the group's RequireAuthorization().
         // Logic lives in HandleWebhookAsync so the raw-body/header/always-200 contract is unit-testable.
@@ -83,6 +67,41 @@ public static class PlaidEndpoints
             .AllowAnonymous();
 
         return plaidGroup;
+    }
+
+    /// <summary>
+    /// <c>POST /api/plaid/sync?staleAfterHours=</c> — syncs the user's active connections and returns the
+    /// aggregated <see cref="PlaidSyncSummary"/>; 400 with <c>{ error }</c> on failure.
+    /// </summary>
+    public static async Task<IResult> SyncAsync(
+        [FromQuery] int? staleAfterHours,
+        IPlaidManager manager,
+        ICurrentUserProvider currentUser)
+    {
+        var result = await manager.SyncAsync(currentUser.UserId, staleAfterHours);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value!)
+            : TypedResults.BadRequest(new { error = result.Error });
+    }
+
+    /// <summary><c>GET /api/plaid/connections</c> — every active connection for the user (empty array if none).</summary>
+    public static async Task<IResult> GetConnectionsAsync(IPlaidManager manager, ICurrentUserProvider currentUser)
+    {
+        var connections = await manager.GetConnectionsAsync(currentUser.UserId);
+        return TypedResults.Ok(connections);
+    }
+
+    /// <summary>
+    /// <c>DELETE /api/plaid/connections/{plaidItemId}</c> — revokes and soft-deletes one connection. 204 on success;
+    /// 404 when the item is missing, owned by another user, or already inactive.
+    /// </summary>
+    public static async Task<IResult> DeleteConnectionAsync(
+        int plaidItemId,
+        IPlaidManager manager,
+        ICurrentUserProvider currentUser)
+    {
+        var result = await manager.DisconnectAsync(currentUser.UserId, plaidItemId);
+        return result.IsSuccess ? TypedResults.NoContent() : TypedResults.NotFound();
     }
 
     /// <summary>

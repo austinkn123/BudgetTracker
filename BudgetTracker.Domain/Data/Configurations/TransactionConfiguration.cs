@@ -11,11 +11,11 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.ToTable("Transactions", t =>
         {
             t.HasCheckConstraint("CK_Transactions_TransactionType",
-                "TransactionType IN ('Expense', 'Income', 'Transfer', 'Adjustment')");
+                "\"TransactionType\" IN ('Expense', 'Income', 'Transfer', 'Adjustment')");
             t.HasCheckConstraint("CK_Transactions_NonZeroAmount",
-                "Amount <> 0");
+                "\"Amount\" <> 0");
             t.HasCheckConstraint("CK_Transactions_TransferAccount",
-                "(TransactionType = 'Transfer' AND TransferAccountId IS NOT NULL) OR (TransactionType <> 'Transfer' AND TransferAccountId IS NULL)");
+                "(\"TransactionType\" = 'Transfer' AND \"TransferAccountId\" IS NOT NULL) OR (\"TransactionType\" <> 'Transfer' AND \"TransferAccountId\" IS NULL)");
         });
 
         builder.HasKey(t => t.Id);
@@ -25,10 +25,10 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .IsRequired();
 
         builder.Property(t => t.Amount)
-            .HasColumnType("decimal(18, 2)");
+            .HasColumnType("numeric(18,2)");
 
         builder.Property(t => t.OccurredAt)
-            .HasColumnType("datetime2");
+            .HasColumnType("timestamp without time zone");
 
         builder.Property(t => t.Payee)
             .HasMaxLength(255);
@@ -37,7 +37,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .HasMaxLength(1000);
 
         builder.Property(t => t.CreatedAt)
-            .HasDefaultValueSql("GETDATE()");
+            .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
 
         builder.Property(t => t.PlaidTransactionId)
             .HasMaxLength(100);
@@ -56,7 +56,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
 
         builder.HasIndex(t => t.PlaidTransactionId)
             .IsUnique()
-            .HasFilter("[PlaidTransactionId] IS NOT NULL")
+            .HasFilter("\"PlaidTransactionId\" IS NOT NULL")
             .HasDatabaseName("UQ_Transactions_PlaidTransactionId");
 
         builder.HasIndex(t => new { t.AccountId, t.OccurredAt })

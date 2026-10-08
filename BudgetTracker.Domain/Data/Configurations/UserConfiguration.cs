@@ -19,10 +19,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(u => u.CognitoSub)
             .IsUnique()
             .HasDatabaseName("IX_Users_CognitoSub")
-            .HasFilter("[CognitoSub] IS NOT NULL");
+            .HasFilter("\"CognitoSub\" IS NOT NULL");
 
         builder.Property(u => u.CreatedAt)
-            .HasDefaultValueSql("GETDATE()");
+            .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
 
         builder.HasMany(u => u.Categories)
             .WithOne(c => c.User)

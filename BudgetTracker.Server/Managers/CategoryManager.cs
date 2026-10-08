@@ -29,12 +29,23 @@ public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor)
         if (error is not null)
             return Result<int>.Failure(error);
 
+        var otherNames = await accessor.GetOtherNamesAsync(category.UserId, excludeCategoryId: 0);
+        var duplicateError = engine.ValidateNameIsUnique(category.Name, otherNames);
+        if (duplicateError is not null)
+            return Result<int>.Failure(duplicateError);
+
         category.PlaidCategoryPrimary = string.IsNullOrWhiteSpace(category.PlaidCategoryPrimary)
             ? null
             : category.PlaidCategoryPrimary.Trim();
 
-        var id = await accessor.CreateAsync(category);
-        return Result<int>.Success(id);
+        try
+        {
+            return Result<int>.Success(await accessor.CreateAsync(category));
+        }
+        catch (UniqueNameViolationException)
+        {
+            return Result<int>.Failure(engine.DuplicateNameError(category.Name));
+        }
     }
 
     public async Task<Result<bool>> UpdateAsync(Category category)
@@ -46,6 +57,11 @@ public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor)
         var existing = await accessor.GetByIdForUserAsync(category.Id, category.UserId);
         if (existing is null)
             return Result<bool>.Failure("Category not found");
+
+        var otherNames = await accessor.GetOtherNamesAsync(category.UserId, category.Id);
+        var duplicateError = engine.ValidateNameIsUnique(category.Name, otherNames);
+        if (duplicateError is not null)
+            return Result<bool>.Failure(duplicateError);
 
         existing.Name = category.Name;
         existing.CategoryType = category.CategoryType;
@@ -60,12 +76,22 @@ public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor)
                 : category.PlaidCategoryPrimary.Trim();
         }
 
-        var updated = await accessor.UpdateAsync(existing);
+        bool updated;
+        try
+        {
+            updated = await accessor.UpdateAsync(existing);
+        }
+        catch (UniqueNameViolationException)
+        {
+            return Result<bool>.Failure(engine.DuplicateNameError(category.Name));
+        }
+
         return updated
             ? Result<bool>.Success(true)
             : Result<bool>.Failure("Category not found");
     }
 
+    // TODO: CategoryManager violates IDesign layering (catches an EF exception type) — consult tony.
     public async Task<Result<bool>> DeleteAsync(int id, int userId)
     {
         bool deleted;

@@ -23,4 +23,18 @@ public class CategoryEngine : ICategoryEngine
 
         return null;
     }
+
+    /// <inheritdoc />
+    public string? ValidateNameIsUnique(string name, IEnumerable<string> existingNames)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(existingNames);
+
+        return existingNames.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase))
+            ? DuplicateNameError(name)
+            : null;
+    }
+
+    /// <inheritdoc />
+    public string DuplicateNameError(string name) => $"A category named \"{name}\" already exists";
 }

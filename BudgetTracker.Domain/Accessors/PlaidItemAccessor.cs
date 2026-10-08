@@ -1,6 +1,8 @@
+using System.Security.Cryptography;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Models;
+using BudgetTracker.Domain.Plaid;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +15,7 @@ namespace BudgetTracker.Domain.Accessors;
 public class PlaidItemAccessor : IPlaidItemAccessor
 {
     /// <summary>Data Protection purpose string — change this and you invalidate previously-stored tokens.</summary>
-    internal const string DataProtectionPurpose = "BudgetTracker.Plaid.AccessToken.v1";
+    public const string DataProtectionPurpose = "BudgetTracker.Plaid.AccessToken.v1";
 
     private readonly BudgetTrackerDbContext _context;
     private readonly IDataProtector _protector;
@@ -25,24 +27,26 @@ public class PlaidItemAccessor : IPlaidItemAccessor
     }
 
     /// <inheritdoc />
-    public async Task<PlaidItem?> GetActiveByUserIdAsync(int userId)
+    public async Task<IReadOnlyList<PlaidItem>> GetAllActiveByUserIdAsync(int userId)
     {
         return await _context.PlaidItems
             .AsNoTracking()
             .Include(p => p.Accounts)
-            .FirstOrDefaultAsync(p => p.UserId == userId && p.IsActive);
+            .Where(p => p.UserId == userId && p.IsActive)
+            .OrderBy(p => p.Id)
+            .ToListAsync();
     }
 
     /// <inheritdoc />
-    public async Task<string?> GetActiveAccessTokenAsync(int userId)
+    public async Task<AccessTokenLookup> GetActiveAccessTokenAsync(int userId, int plaidItemId)
     {
         var encrypted = await _context.PlaidItems
             .AsNoTracking()
-            .Where(p => p.UserId == userId && p.IsActive)
+            .Where(p => p.Id == plaidItemId && p.UserId == userId && p.IsActive)
             .Select(p => p.AccessTokenEncrypted)
             .FirstOrDefaultAsync();
 
-        return encrypted is null ? null : _protector.Unprotect(encrypted);
+        return Decrypt(encrypted);
     }
 
     /// <inheritdoc />
@@ -55,7 +59,7 @@ public class PlaidItemAccessor : IPlaidItemAccessor
     }
 
     /// <inheritdoc />
-    public async Task<string?> GetAccessTokenByPlaidItemIdAsync(string plaidItemId)
+    public async Task<AccessTokenLookup> GetAccessTokenByPlaidItemIdAsync(string plaidItemId)
     {
         var encrypted = await _context.PlaidItems
             .AsNoTracking()
@@ -63,7 +67,7 @@ public class PlaidItemAccessor : IPlaidItemAccessor
             .Select(p => p.AccessTokenEncrypted)
             .FirstOrDefaultAsync();
 
-        return encrypted is null ? null : _protector.Unprotect(encrypted);
+        return Decrypt(encrypted);
     }
 
     /// <inheritdoc />
@@ -76,8 +80,27 @@ public class PlaidItemAccessor : IPlaidItemAccessor
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Decrypts a stored token. A <see cref="CryptographicException"/> means the key ring that encrypted it is gone,
+    /// which is a recoverable state for the caller (re-link), so it is reported rather than thrown.
+    /// </summary>
+    private AccessTokenLookup Decrypt(string? encrypted)
+    {
+        if (encrypted is null)
+            return AccessTokenLookup.NotFound;
+
+        try
+        {
+            return AccessTokenLookup.Found(_protector.Unprotect(encrypted));
+        }
+        catch (CryptographicException)
+        {
+            return AccessTokenLookup.Undecryptable;
+        }
+    }
+
     /// <inheritdoc />
-    public async Task<int> ReplaceActiveAsync(
+    public async Task<int> AddAsync(
         int userId,
         string accessTokenPlaintext,
         string plaidItemId,
@@ -86,24 +109,20 @@ public class PlaidItemAccessor : IPlaidItemAccessor
         DateTime? consentExpiresAt,
         IReadOnlyList<PlaidAccount> accounts)
     {
-        // Atomic replace: deactivate any current active item, insert new — single transaction so the
-        // filtered unique index UQ_PlaidItems_UserId_Active never sees two active rows for one user.
         await using var dbTransaction = await _context.Database.BeginTransactionAsync();
 
-        var existing = await _context.PlaidItems
-            .Include(p => p.Accounts)
-            .Where(p => p.UserId == userId && p.IsActive)
+        // Plaid reuses account_ids when the same credentials are relinked. Drop snapshot rows left behind by
+        // previously unlinked (inactive) items so UQ_PlaidAccounts_PlaidAccountId accepts the reconnect.
+        // Snapshots of still-active items are left alone, so linking an already-linked bank again is rejected.
+        var incomingAccountIds = accounts.Select(a => a.PlaidAccountId).ToList();
+        var staleSnapshots = await _context.PlaidAccounts
+            .Where(a => incomingAccountIds.Contains(a.PlaidAccountId) && !a.Item.IsActive)
             .ToListAsync();
-        foreach (var item in existing)
+        if (staleSnapshots.Count > 0)
         {
-            item.IsActive = false;
-            // Remove the old snapshot rows so UQ_PlaidAccounts_PlaidAccountId doesn't reject a
-            // same-institution reconnect (Plaid reuses account_ids for the same credentials).
-            _context.PlaidAccounts.RemoveRange(item.Accounts);
+            _context.PlaidAccounts.RemoveRange(staleSnapshots);
+            await _context.SaveChangesAsync();
         }
-        await _context.SaveChangesAsync();
-
-        var encryptedToken = _protector.Protect(accessTokenPlaintext);
 
         var newItem = new PlaidItem
         {
@@ -111,7 +130,7 @@ public class PlaidItemAccessor : IPlaidItemAccessor
             PlaidItemId = plaidItemId,
             InstitutionId = institutionId,
             InstitutionName = institutionName,
-            AccessTokenEncrypted = encryptedToken,
+            AccessTokenEncrypted = _protector.Protect(accessTokenPlaintext),
             IsActive = true,
             ConsentExpiresAt = consentExpiresAt,
             Accounts = accounts.ToList()
@@ -137,19 +156,29 @@ public class PlaidItemAccessor : IPlaidItemAccessor
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeactivateActiveAsync(int userId)
+    public async Task<bool> DeactivateAsync(int userId, int plaidItemId)
     {
-        var active = await _context.PlaidItems
-            .Where(p => p.UserId == userId && p.IsActive)
-            .ToListAsync();
+        var item = await _context.PlaidItems
+            .FirstOrDefaultAsync(p => p.Id == plaidItemId && p.UserId == userId && p.IsActive);
 
-        if (active.Count == 0)
+        if (item is null)
             return false;
 
-        foreach (var item in active)
-        {
-            item.IsActive = false;
-        }
+        item.IsActive = false;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ReactivateAsync(int userId, int plaidItemId)
+    {
+        var item = await _context.PlaidItems
+            .FirstOrDefaultAsync(p => p.Id == plaidItemId && p.UserId == userId && !p.IsActive);
+
+        if (item is null)
+            return false;
+
+        item.IsActive = true;
         await _context.SaveChangesAsync();
         return true;
     }

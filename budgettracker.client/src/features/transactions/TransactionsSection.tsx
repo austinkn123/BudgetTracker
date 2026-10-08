@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { endOfMonth, isSameMonth, startOfDay, startOfMonth } from 'date-fns';
 import { Button, Card, InlineSelect, ToggleGroup } from '../../shared/components/ui';
 import { useTransactions } from './hooks/useTransactions';
@@ -7,7 +6,7 @@ import { useTransactionReview } from './hooks/useTransactionReview';
 import { useCategories } from '../categories/hooks/useCategories';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
 import { useBudgetAnalysis } from '../dashboard/hooks/useBudgetAnalysis';
-import { plaidService } from '../../shared/services/plaid.service';
+import { usePlaidConnections } from '../linked-accounts/hooks/usePlaidConnections';
 import type { TransactionQuery } from '../../shared/services/transaction.service';
 import MonthHeader from './components/MonthHeader';
 import PlanGroupedView from './components/PlanGroupedView';
@@ -77,16 +76,18 @@ const TransactionsSection = ({
   // Analysis now follows the requested window, so this is the plan-vs-actual for the month on screen.
   const { data: analysis } = useBudgetAnalysis(monthStart, monthEnd, 3);
 
-  // Read-only share of the Settings page connection cache (same query key) so we can resolve a
-  // Plaid account mask for each imported row. Never mutates.
-  const { data: connection } = useQuery({
-    queryKey: ['plaid', 'connection'],
-    queryFn: plaidService.getConnection,
-  });
+  // Read-only share of the Settings page connections cache (same hook, same query key) so we can
+  // resolve a Plaid account mask for each imported row, whichever institution it came from.
+  const { data: connections } = usePlaidConnections();
 
   const maskByPlaidAccountId = useMemo(
-    () => new Map(connection?.accounts.map((a) => [a.plaidAccountId, a.mask]) ?? []),
-    [connection],
+    () =>
+      new Map(
+        (connections ?? []).flatMap((c) =>
+          c.accounts.map((a) => [a.plaidAccountId, a.mask] as const),
+        ),
+      ),
+    [connections],
   );
 
   // Selection is scoped to the rows actually on screen, so the hook is told which set that is.

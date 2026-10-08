@@ -29,13 +29,21 @@ public interface IPlaidManager
     Task<Result<PlaidLinkTokenResult>> CreateLinkTokenAsync(int userId, string cognitoSub);
 
     /// <summary>
-    /// Exchange a Plaid Link public_token for an access_token, persist the new PlaidItem (replacing any active one),
+    /// Exchange a Plaid Link public_token for an access_token, persist the new PlaidItem alongside any existing ones,
     /// and run the initial transaction sync (~30 days). Returns a sync summary.
     /// </summary>
     Task<Result<PlaidSyncSummary>> ExchangePublicTokenAsync(int userId, string publicToken);
 
-    /// <summary>Re-sync transactions for the user's active PlaidItem. Idempotent via Plaid.transaction_id dedupe.</summary>
-    Task<Result<PlaidSyncSummary>> SyncAsync(int userId);
+    /// <summary>
+    /// Re-sync transactions for the user's active PlaidItems and return the counts aggregated across them.
+    /// Idempotent via Plaid.transaction_id dedupe. A user with nothing linked (or nothing due) gets a zero summary.
+    /// </summary>
+    /// <param name="userId">The current user.</param>
+    /// <param name="staleAfterHours">
+    /// When set, only items never synced or last synced more than this many hours ago are refreshed; null syncs all.
+    /// Negative values are rejected.
+    /// </param>
+    Task<Result<PlaidSyncSummary>> SyncAsync(int userId, int? staleAfterHours = null);
 
     /// <summary>
     /// Handle an inbound Plaid <c>transactions</c> webhook. Verifies the <c>Plaid-Verification</c> JWT
@@ -54,9 +62,12 @@ public interface IPlaidManager
     /// </summary>
     Task<Result> SweepAllAsync();
 
-    /// <summary>Return the user's current active connection metadata, or a NotFound failure if none is linked.</summary>
-    Task<Result<PlaidConnectionView>> GetConnectionAsync(int userId);
+    /// <summary>Return one view per active connection for the user; empty when nothing is linked.</summary>
+    Task<IReadOnlyList<PlaidConnectionView>> GetConnectionsAsync(int userId);
 
-    /// <summary>Soft-delete the active connection and revoke the Plaid item server-side.</summary>
-    Task<Result> DisconnectAsync(int userId);
+    /// <summary>
+    /// Revoke one Plaid item server-side (best-effort) and soft-delete it. Fails with "Bank connection not found"
+    /// when the item does not exist, belongs to another user, or is already inactive.
+    /// </summary>
+    Task<Result> DisconnectAsync(int userId, int plaidItemId);
 }

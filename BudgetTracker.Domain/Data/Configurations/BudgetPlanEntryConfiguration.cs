@@ -10,11 +10,11 @@ public class BudgetPlanEntryConfiguration : IEntityTypeConfiguration<BudgetPlanE
     {
         builder.ToTable("BudgetPlanEntries", t =>
         {
-            t.HasCheckConstraint("CK_BudgetPlanEntries_LineType", "LineType IN ('Income', 'Expense')");
-            t.HasCheckConstraint("CK_BudgetPlanEntries_Bucket", "Bucket IN ('Core', 'Buffer')");
-            t.HasCheckConstraint("CK_BudgetPlanEntries_Cadence", "Cadence IN ('Monthly', 'Annual')");
-            t.HasCheckConstraint("CK_BudgetPlanEntries_Amount", "Amount >= 0");
-            t.HasCheckConstraint("CK_BudgetPlanEntries_MonthlyEq", "MonthlyEquivalent >= 0");
+            t.HasCheckConstraint("CK_BudgetPlanEntries_LineType", "\"LineType\" IN ('Income', 'Expense')");
+            t.HasCheckConstraint("CK_BudgetPlanEntries_Bucket", "\"Bucket\" IN ('Core', 'Buffer')");
+            t.HasCheckConstraint("CK_BudgetPlanEntries_Cadence", "\"Cadence\" IN ('Monthly', 'Annual')");
+            t.HasCheckConstraint("CK_BudgetPlanEntries_Amount", "\"Amount\" >= 0");
+            t.HasCheckConstraint("CK_BudgetPlanEntries_MonthlyEq", "\"MonthlyEquivalent\" >= 0");
         });
 
         builder.HasKey(entry => entry.Id);
@@ -32,10 +32,10 @@ public class BudgetPlanEntryConfiguration : IEntityTypeConfiguration<BudgetPlanE
             .IsRequired();
 
         builder.Property(entry => entry.Amount)
-            .HasColumnType("decimal(18, 2)");
+            .HasColumnType("numeric(18,2)");
 
         builder.Property(entry => entry.MonthlyEquivalent)
-            .HasColumnType("decimal(18, 2)");
+            .HasColumnType("numeric(18,2)");
 
         builder.Property(entry => entry.IsStressFactor)
             .HasDefaultValue(false);
@@ -47,7 +47,7 @@ public class BudgetPlanEntryConfiguration : IEntityTypeConfiguration<BudgetPlanE
             .HasDefaultValue(0);
 
         builder.Property(entry => entry.CreatedAt)
-            .HasDefaultValueSql("GETDATE()");
+            .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
 
         builder.HasIndex(entry => new { entry.BudgetPlanId, entry.Bucket, entry.LineType })
             .HasDatabaseName("IX_BudgetPlanEntries_Plan_Bucket_Type")

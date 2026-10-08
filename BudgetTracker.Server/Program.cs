@@ -1,3 +1,4 @@
+using Amazon.Lambda.AspNetCoreServer.Hosting;
 using BudgetTracker.Domain.Accessors;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Engines;
@@ -9,6 +10,7 @@ using BudgetTracker.Server.Managers;
 using BudgetTracker.Server.Services;
 using BudgetTracker.Server.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text.Json.Serialization;
@@ -17,12 +19,29 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
+// Lambda sets AWS_LAMBDA_FUNCTION_NAME; locally it is absent and the app runs as a normal Kestrel host.
+var isLambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"));
+
+if (isLambda)
+{
+    // Secrets live in SSM Parameter Store (SecureString) under /budgettracker/<Section>/<Key>, e.g.
+    // /budgettracker/Plaid/Secret -> Plaid:Secret. CloudFormation cannot inject SecureStrings into
+    // Lambda environment variables, so they are read (and decrypted) once per cold start instead.
+    builder.Configuration.AddSystemsManager(builder.Configuration["SsmParameterPath"] ?? "/budgettracker");
+}
+
+// No-op outside Lambda. Function URLs use the HTTP API v2 payload format.
+builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
+
 // Add services to the container.
 builder.Services.AddDbContext<BudgetTrackerDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("BudgetTrackerConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("BudgetTrackerConnection")));
 
-// Data Protection — used by PlaidItemAccessor to encrypt access_tokens at rest.
-builder.Services.AddDataProtection();
+// Data Protection — used by PlaidItemAccessor to encrypt access_tokens at rest. Keys are persisted in the
+// database so every Lambda instance (and every cold start) shares one key ring.
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<BudgetTrackerDbContext>()
+    .SetApplicationName("BudgetTracker");
 
 // In-memory cache — PlaidAccessor caches webhook verification keys (JWK) to avoid a per-webhook
 // round-trip to Plaid (closes the webhook-verification timing oracle).
@@ -64,8 +83,13 @@ builder.Services.Scan(scan => scan
         .AsImplementedInterfaces()
         .WithScopedLifetime());
 
-// Background sweep — periodic backup re-sync of all active Plaid items (BUD-6).
-builder.Services.AddHostedService<PlaidSyncSweepService>();
+// Background sweep — periodic backup re-sync of all active Plaid items (BUD-6). Lambda freezes the process
+// between requests, so a timer-driven hosted service cannot run there; the client triggers
+// POST /api/plaid/sync?staleAfterHours= instead.
+if (!isLambda)
+{
+    builder.Services.AddHostedService<PlaidSyncSweepService>();
+}
 
 // Serialize enums as names rather than ordinals so API consumers get e.g. "Ahead", not 0.
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -109,7 +133,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// Function URLs are HTTPS-only and terminate TLS before the function, so redirection there is meaningless.
+if (!isLambda)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

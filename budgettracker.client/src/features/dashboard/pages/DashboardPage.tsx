@@ -3,6 +3,7 @@ import { PageHeader } from '../../../shared/components/ui';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { useUser } from '../../user/hooks/useUser';
+import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
 import DashboardLoadingState from '../components/DashboardLoadingState';
 import DashboardErrorState from '../components/DashboardErrorState';
 import RangeSelector from '../components/RangeSelector';
@@ -43,6 +44,9 @@ const RECENT_ACTIVITY_ITEMS = 8;
 const DRILL_TRANSACTIONS = 10;
 
 const DashboardPage = () => {
+  // Background "sync if stale" on open; silent and non-blocking, refreshes the queries below when it lands.
+  useSyncOnOpen();
+
   const { isLoading: loadingUser, error: userError } = useUser();
   const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories();
   const { data: transactions = [], isLoading: loadingTransactions, error: transactionsError } = useTransactions();

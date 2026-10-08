@@ -1,37 +1,14 @@
-import { createContext, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Hub } from 'aws-amplify/utils';
 import {
   getCurrentUser,
   fetchAuthSession,
   signIn,
-  signUp,
-  confirmSignUp,
-  resendSignUpCode,
   resetPassword,
   confirmResetPassword,
   signOut,
 } from 'aws-amplify/auth';
-
-export type AuthUser = {
-  username: string;
-  email: string;
-};
-
-export type AuthContextType = {
-  user: AuthUser | null;
-  idToken: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
-  confirmSignUp: (email: string, code: string) => Promise<void>;
-  resendCode: (email: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<{ deliveryMedium: string }>;
-  confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<void>;
-  signOut: () => Promise<void>;
-};
-
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { AuthContext, type AuthContextType, type AuthUser } from './authContextValue';
 
 type AuthProviderProps = {
   children: ReactNode;
@@ -102,67 +79,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const handleSignUp = async (
-    email: string,
-    password: string,
-    firstName?: string,
-    lastName?: string
-  ) => {
-    try {
-      const attributes: Record<string, string> = {
-        email,
-      };
-
-      if (firstName) {
-        attributes.given_name = firstName;
-      }
-      if (lastName) {
-        attributes.family_name = lastName;
-      }
-
-      await signUp({
-        username: email,
-        password,
-        options: { userAttributes: attributes },
-      });
-    } catch (error) {
-      const err = error as Error;
-      if (err.message.includes('already exists')) {
-        throw new Error('User already exists. Please sign in or use a different email.');
-      }
-      throw new Error(err.message || 'Sign up failed');
-    }
-  };
-
-  const handleConfirmSignUp = async (email: string, code: string) => {
-    try {
-      await confirmSignUp({
-        username: email,
-        confirmationCode: code,
-      });
-    } catch (error) {
-      const err = error as Error;
-      if (err.message.includes('Attempt limit exceeded')) {
-        throw new Error('Too many failed attempts. Please request a new code.');
-      }
-      if (err.message.includes('Invalid verification code')) {
-        throw new Error('Invalid confirmation code. Please try again.');
-      }
-      throw new Error(err.message || 'Confirmation failed');
-    }
-  };
-
-  const handleResendCode = async (email: string) => {
-    try {
-      await resendSignUpCode({
-        username: email,
-      });
-    } catch (error) {
-      const err = error as Error;
-      throw new Error(err.message || 'Failed to resend code');
-    }
-  };
-
   const handleForgotPassword = async (email: string) => {
     try {
       const output = await resetPassword({
@@ -216,9 +132,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isAuthenticated: !!user && !!idToken,
     isLoading,
     signIn: handleSignIn,
-    signUp: handleSignUp,
-    confirmSignUp: handleConfirmSignUp,
-    resendCode: handleResendCode,
     forgotPassword: handleForgotPassword,
     confirmForgotPassword: handleConfirmForgotPassword,
     signOut: handleSignOut,

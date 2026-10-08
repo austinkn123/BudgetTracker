@@ -52,11 +52,11 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
 
             if (!string.IsNullOrWhiteSpace(filter.Search))
             {
-                var term = filter.Search.Trim();
-                // EF.Functions.Like keeps the match in SQL Server rather than pulling rows to compare.
+                var pattern = LikePattern.Contains(filter.Search.Trim());
+                // Postgres LIKE is case-sensitive; ILIKE keeps the old SQL Server (CI collation) behaviour in-database.
                 query = query.Where(t =>
-                    (t.Payee != null && EF.Functions.Like(t.Payee, $"%{term}%")) ||
-                    (t.Notes != null && EF.Functions.Like(t.Notes, $"%{term}%")));
+                    (t.Payee != null && EF.Functions.ILike(t.Payee, pattern, LikePattern.EscapeCharacter)) ||
+                    (t.Notes != null && EF.Functions.ILike(t.Notes, pattern, LikePattern.EscapeCharacter)));
             }
         }
 

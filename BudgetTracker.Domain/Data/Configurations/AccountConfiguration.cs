@@ -21,11 +21,13 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .IsRequired();
 
         builder.Property(a => a.CreatedAt)
-            .HasDefaultValueSql("GETDATE()");
+            .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
 
-        builder.HasIndex(a => new { a.UserId, a.Name })
-            .IsUnique()
-            .HasDatabaseName("UQ_Accounts_User_Name");
+        // Names are unique per user ignoring case. Postgres compares text case-sensitively and EF Core cannot model an
+        // expression index, so UQ_Accounts_User_Name on ("UserId", lower("Name")) is created with raw SQL in the
+        // InitialCreate migration. Re-add that SQL if the migration is ever regenerated (AccountNameUniquenessTests fails otherwise).
+        builder.HasIndex(a => a.UserId)
+            .HasDatabaseName("IX_Accounts_UserId");
 
         builder.HasMany(a => a.Transactions)
             .WithOne(t => t.Account)

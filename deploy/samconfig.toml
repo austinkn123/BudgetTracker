@@ -1,0 +1,10 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "budgettracker"
+region = "us-east-2"
+resolve_s3 = true
+s3_prefix = "budgettracker"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+parameter_overrides = "SsmParameterPath=\"/budgettracker\" AspNetCoreEnvironment=\"Production\""

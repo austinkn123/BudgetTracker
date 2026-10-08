@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 namespace BudgetTracker.Server.Managers;
 
 /// <summary>
-/// Orchestrates Plaid Link, token exchange, transaction sync, and replace/disconnect flows.
+/// Orchestrates Plaid Link, token exchange, transaction sync, and per-connection disconnect for users with many linked banks.
 /// Owns the Fetch → Compute → Persist sequencing; never decodes or stores raw access_tokens itself
 /// (encryption lives in <see cref="IPlaidItemAccessor"/>).
 /// </summary>
@@ -33,6 +33,9 @@ public class PlaidManager(
         "HISTORICAL_UPDATE",
         "INITIAL_UPDATE"
     ];
+
+    private const string AlreadyLinkedMessage = "This institution is already linked. Disconnect it first if you want to link it again.";
+    private const string ReconnectMessage = "A bank connection needs to be reconnected. Disconnect it and link it again.";
 
     private readonly PlaidOptions _options = options.Value;
 
@@ -79,6 +82,15 @@ public class PlaidManager(
             return Result<PlaidSyncSummary>.Failure("Could not link your bank. Please try again.");
         }
 
+        // Fetch + Compute — refuse a re-link of an active institution before any row is written,
+        // so the global unique index on PlaidAccountId is never what rejects it.
+        var activeItems = await itemAccessor.GetAllActiveByUserIdAsync(userId);
+        if (engine.IsAlreadyLinked(metadata.InstitutionId, plaidAccounts, activeItems))
+        {
+            await RevokeUnkeptItemAsync(accessToken, plaidItemId);
+            return Result<PlaidSyncSummary>.Failure(AlreadyLinkedMessage);
+        }
+
         // Compute — ensure a BudgetTracker account exists for each Plaid account
         var userAccounts = await accountAccessor.GetByUserIdAsync(userId);
         var allAccounts = userAccounts.ToList();
@@ -105,11 +117,11 @@ public class PlaidManager(
             });
         }
 
-        // Persist — atomic replace + snapshot of Plaid accounts
+        // Persist — add the new item (existing connections stay active) + snapshot of Plaid accounts
         int newPlaidItemId;
         try
         {
-            newPlaidItemId = await itemAccessor.ReplaceActiveAsync(
+            newPlaidItemId = await itemAccessor.AddAsync(
                 userId,
                 accessToken,
                 plaidItemId,
@@ -118,8 +130,10 @@ public class PlaidManager(
                 metadata.ConsentExpiresAt,
                 accountSnapshots);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Persisting new Plaid item {PlaidItemId} failed; revoking it at Plaid.", plaidItemId);
+            await RevokeUnkeptItemAsync(accessToken, plaidItemId);
             return Result<PlaidSyncSummary>.Failure("Could not save the new bank connection. Please try again.");
         }
 
@@ -128,49 +142,101 @@ public class PlaidManager(
     }
 
     /// <inheritdoc />
-    public async Task<Result<PlaidSyncSummary>> SyncAsync(int userId)
+    public async Task<Result<PlaidSyncSummary>> SyncAsync(int userId, int? staleAfterHours = null)
     {
-        var plaidItem = await itemAccessor.GetActiveByUserIdAsync(userId);
-        if (plaidItem is null)
-            return Result<PlaidSyncSummary>.Failure("No active bank connection to sync");
+        // Fetch
+        var items = await itemAccessor.GetAllActiveByUserIdAsync(userId);
 
-        return await SyncItemAsync(plaidItem);
+        // Compute
+        var now = DateTime.UtcNow;
+        var due = engine.SelectItemsDueForSync(items, now, staleAfterHours);
+        if (!due.IsSuccess)
+            return Result<PlaidSyncSummary>.Failure(due.Error!);
+
+        if (due.Value!.Count == 0)
+            return Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(0, 0, 0, now));
+
+        // Persist — each item syncs independently so one broken bank never blocks the others.
+        int inserted = 0, updated = 0, removed = 0;
+        DateTime? syncedAt = null;
+        string? firstError = null;
+
+        foreach (var item in due.Value)
+        {
+            Result<PlaidSyncSummary> result;
+            try
+            {
+                result = await SyncItemAsync(item);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "On-demand sync failed for PlaidItem {PlaidItemId}; continuing.", item.Id);
+                result = Result<PlaidSyncSummary>.Failure("Could not refresh transactions right now. Please try again.");
+            }
+
+            if (!result.IsSuccess)
+            {
+                firstError ??= result.Error;
+                continue;
+            }
+
+            inserted += result.Value!.Inserted;
+            updated += result.Value.Updated;
+            removed += result.Value.Removed;
+            syncedAt = result.Value.SyncedAt;
+        }
+
+        return syncedAt is DateTime completedAt
+            ? Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, completedAt))
+            : Result<PlaidSyncSummary>.Failure(firstError!);
     }
 
     /// <inheritdoc />
-    public async Task<Result<PlaidConnectionView>> GetConnectionAsync(int userId)
+    public async Task<IReadOnlyList<PlaidConnectionView>> GetConnectionsAsync(int userId)
     {
-        var plaidItem = await itemAccessor.GetActiveByUserIdAsync(userId);
-        if (plaidItem is null)
-            return Result<PlaidConnectionView>.Failure("No active bank connection");
+        var items = await itemAccessor.GetAllActiveByUserIdAsync(userId);
 
-        var view = new PlaidConnectionView(
-            plaidItem.Id,
-            plaidItem.InstitutionName,
-            plaidItem.LastSyncedAt,
-            plaidItem.Accounts.Select(a => new PlaidLinkedAccountView(a.PlaidAccountId, a.Name, a.Mask, a.AccountType)).ToList());
-
-        return Result<PlaidConnectionView>.Success(view);
+        return items
+            .Select(item => new PlaidConnectionView(
+                item.Id,
+                item.InstitutionName,
+                item.LastSyncedAt,
+                item.Accounts.Select(a => new PlaidLinkedAccountView(a.PlaidAccountId, a.Name, a.Mask, a.AccountType)).ToList()))
+            .ToList();
     }
 
     /// <inheritdoc />
-    public async Task<Result> DisconnectAsync(int userId)
+    public async Task<Result> DisconnectAsync(int userId, int plaidItemId)
     {
-        var accessToken = await itemAccessor.GetActiveAccessTokenAsync(userId);
-        if (accessToken is null)
-            return Result.Failure("No active bank connection to disconnect");
-
-        try
+        var lookup = await itemAccessor.GetActiveAccessTokenAsync(userId, plaidItemId);
+        switch (lookup.Status)
         {
-            await plaidAccessor.RemoveItemAsync(accessToken);
-        }
-        catch
-        {
-            // Best-effort: deactivate locally even if Plaid is unreachable.
+            case AccessTokenStatus.NotFound:
+                return Result.Failure("Bank connection not found");
+
+            case AccessTokenStatus.Undecryptable:
+                // Without the token Plaid cannot be told to stop billing; the user still needs to be able to unlink.
+                logger.LogWarning(
+                    "Access token for PlaidItem {PlaidItemId} cannot be decrypted; skipping Plaid /item/remove and deactivating locally.",
+                    plaidItemId);
+                break;
+
+            case AccessTokenStatus.Found:
+                try
+                {
+                    await plaidAccessor.RemoveItemAsync(lookup.AccessToken!);
+                }
+                catch (Exception ex)
+                {
+                    // Best-effort: deactivate locally even if Plaid is unreachable.
+                    logger.LogWarning(ex, "Plaid /item/remove failed for PlaidItem {PlaidItemId}; deactivating locally.", plaidItemId);
+                }
+                break;
         }
 
-        await itemAccessor.DeactivateActiveAsync(userId);
-        return Result.Success();
+        return await itemAccessor.DeactivateAsync(userId, plaidItemId)
+            ? Result.Success()
+            : Result.Failure("Bank connection not found");
     }
 
     /// <inheritdoc />
@@ -203,7 +269,14 @@ public class PlaidManager(
         if (item is null)
             return Result.Success();
 
-        var sync = await SyncItemAsync(item);
+        // An undecryptable token will not heal on a Plaid retry, so it is acknowledged rather than failed.
+        var lookup = await itemAccessor.GetAccessTokenByPlaidItemIdAsync(item.PlaidItemId);
+        if (lookup.Status == AccessTokenStatus.Undecryptable)
+            LogUndecryptableSkip(item.Id);
+        if (lookup.AccessToken is not { } accessToken)
+            return Result.Success();
+
+        var sync = await SyncItemWithTokenAsync(item, accessToken);
         return sync.IsSuccess ? Result.Success() : Result.Failure(sync.Error!);
     }
 
@@ -217,8 +290,10 @@ public class PlaidManager(
         {
             try
             {
-                var accessToken = await itemAccessor.GetAccessTokenByPlaidItemIdAsync(item.PlaidItemId);
-                if (accessToken is null)
+                var lookup = await itemAccessor.GetAccessTokenByPlaidItemIdAsync(item.PlaidItemId);
+                if (lookup.Status == AccessTokenStatus.Undecryptable)
+                    LogUndecryptableSkip(item.Id);
+                if (lookup.AccessToken is not { } accessToken)
                     continue;
 
                 // Register the webhook on pre-existing links (those created before WebhookUrl was set).
@@ -251,16 +326,46 @@ public class PlaidManager(
 
     /// <summary>
     /// Shared per-item sync: load the decrypted token (by Plaid item_id) and the user's accounts,
-    /// then delegate to <see cref="RunSyncAsync"/>. Used by on-demand sync, the webhook, and the sweep.
+    /// then delegate to <see cref="RunSyncAsync"/>. Used by on-demand sync.
     /// </summary>
     private async Task<Result<PlaidSyncSummary>> SyncItemAsync(PlaidItem item)
     {
-        var accessToken = await itemAccessor.GetAccessTokenByPlaidItemIdAsync(item.PlaidItemId);
-        if (accessToken is null)
+        var lookup = await itemAccessor.GetAccessTokenByPlaidItemIdAsync(item.PlaidItemId);
+        if (lookup.Status == AccessTokenStatus.Undecryptable)
+        {
+            LogUndecryptableSkip(item.Id);
+            return Result<PlaidSyncSummary>.Failure(ReconnectMessage);
+        }
+
+        if (lookup.AccessToken is not { } accessToken)
             return Result<PlaidSyncSummary>.Failure("No active bank connection to sync");
 
+        return await SyncItemWithTokenAsync(item, accessToken);
+    }
+
+    private async Task<Result<PlaidSyncSummary>> SyncItemWithTokenAsync(PlaidItem item, string accessToken)
+    {
         var userAccounts = await accountAccessor.GetByUserIdAsync(item.UserId);
         return await RunSyncAsync(item.UserId, item.Id, accessToken, item.SyncCursor, userAccounts, item.Accounts.ToList());
+    }
+
+    private void LogUndecryptableSkip(int plaidItemId) =>
+        logger.LogWarning("Access token for PlaidItem {PlaidItemId} cannot be decrypted; skipping sync until it is re-linked.", plaidItemId);
+
+    /// <summary>
+    /// Best-effort <c>/item/remove</c> for an item that was exchanged but will not be kept. The exchange already
+    /// created a billable Item at Plaid, so it must be revoked; a failure is logged and never surfaced to the user.
+    /// </summary>
+    private async Task RevokeUnkeptItemAsync(string accessToken, string plaidItemId)
+    {
+        try
+        {
+            await plaidAccessor.RemoveItemAsync(accessToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Plaid /item/remove failed for unkept Plaid item {PlaidItemId}; it may still be billed.", plaidItemId);
+        }
     }
 
     /// <summary>

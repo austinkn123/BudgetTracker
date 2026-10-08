@@ -16,32 +16,37 @@ export const plaidService = {
     return response.data;
   },
 
-  /** Exchange the public_token from a successful Link flow and trigger the initial sync. */
+  /**
+   * Exchange the public_token from a successful Link flow and trigger the initial sync.
+   * Always adds an institution; existing connections are left untouched.
+   */
   exchangePublicToken: async (publicToken: string): Promise<PlaidSyncSummary> => {
     const response = await api.post<PlaidSyncSummary>('/plaid/exchange-token', { publicToken });
     return response.data;
   },
 
-  /** Manual "Refresh" — re-pull transactions, dedupe by Plaid.transaction_id. */
-  sync: async (): Promise<PlaidSyncSummary> => {
-    const response = await api.post<PlaidSyncSummary>('/plaid/sync');
+  /**
+   * Re-pull transactions across every linked institution, deduped by Plaid.transaction_id.
+   * With `staleAfterHours`, only institutions last synced longer ago than that are pulled;
+   * without it, everything syncs (manual refresh).
+   */
+  sync: async (staleAfterHours?: number): Promise<PlaidSyncSummary> => {
+    const response = await api.post<PlaidSyncSummary>(
+      '/plaid/sync',
+      undefined,
+      staleAfterHours === undefined ? undefined : { params: { staleAfterHours } },
+    );
     return response.data;
   },
 
-  /** Returns the current active PlaidItem metadata, or null when nothing is linked. */
-  getConnection: async (): Promise<PlaidConnectionView | null> => {
-    try {
-      const response = await api.get<PlaidConnectionView>('/plaid/connection');
-      return response.data;
-    } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 404) return null;
-      throw err;
-    }
+  /** Every active linked institution. Empty array when nothing is linked. */
+  getConnections: async (): Promise<PlaidConnectionView[]> => {
+    const response = await api.get<PlaidConnectionView[]>('/plaid/connections');
+    return response.data;
   },
 
-  /** Revoke the active connection server-side and soft-delete the PlaidItem row. */
-  disconnect: async (): Promise<void> => {
-    await api.delete('/plaid/connection');
+  /** Revoke one institution server-side (Plaid /item/remove) and soft-delete its PlaidItem row. */
+  disconnect: async (plaidItemId: number): Promise<void> => {
+    await api.delete(`/plaid/connections/${plaidItemId}`);
   },
 };

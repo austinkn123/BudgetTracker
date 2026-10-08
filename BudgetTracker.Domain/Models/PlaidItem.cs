@@ -1,8 +1,8 @@
 namespace BudgetTracker.Domain.Models;
 
 /// <summary>
-/// Represents an active Plaid "Item" — the link between a BudgetTracker user and a single financial institution.
-/// One active row per user is enforced at the DB layer; soft-delete (<see cref="IsActive"/>) keeps history for audit.
+/// Represents a Plaid "Item" — the link between a BudgetTracker user and a single financial institution.
+/// A user may have many active items (one per linked bank); soft-delete (<see cref="IsActive"/>) keeps history for audit.
 /// </summary>
 public class PlaidItem
 {

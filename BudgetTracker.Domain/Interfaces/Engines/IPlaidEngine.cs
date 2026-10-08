@@ -1,3 +1,4 @@
+using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Models;
 using BudgetTracker.Domain.Plaid;
 
@@ -35,4 +36,26 @@ public interface IPlaidEngine
     /// Build the default BudgetTracker <see cref="Account"/> for a newly-linked Plaid account (used when none exists).
     /// </summary>
     Account BuildBudgetTrackerAccount(PlaidAccountDto plaidAccount, string institutionName, int userId);
+
+    /// <summary>
+    /// Pick the items a sync run should refresh. With no threshold every item is due; otherwise only items
+    /// never synced, or last synced strictly more than <paramref name="staleAfterHours"/> hours before <paramref name="now"/>.
+    /// </summary>
+    /// <param name="items">The user's active Plaid items.</param>
+    /// <param name="now">Current time (UTC) supplied by the caller so the rule stays deterministic.</param>
+    /// <param name="staleAfterHours">Staleness threshold in hours, or null to select every item.</param>
+    /// <returns>The due items in input order, or a failure when the threshold is negative.</returns>
+    Result<IReadOnlyList<PlaidItem>> SelectItemsDueForSync(IEnumerable<PlaidItem> items, DateTime now, int? staleAfterHours);
+
+    /// <summary>
+    /// Decide whether a just-exchanged Plaid item duplicates one of the user's active connections.
+    /// An incoming item is a duplicate when any of its accounts shares a Plaid <c>account_id</c> with an active item,
+    /// or when an active item at the same institution has an account with the same mask and name.
+    /// A second login at the same institution with different accounts is not a duplicate.
+    /// </summary>
+    /// <param name="institutionId">Plaid institution id of the incoming item.</param>
+    /// <param name="incomingAccounts">Accounts returned for the incoming item.</param>
+    /// <param name="activeItems">The user's active items, with their account snapshots. Any item with IsActive false is ignored.</param>
+    /// <returns>True when the incoming item is already linked.</returns>
+    bool IsAlreadyLinked(string institutionId, IReadOnlyList<PlaidAccountDto> incomingAccounts, IEnumerable<PlaidItem> activeItems);
 }
