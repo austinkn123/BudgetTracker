@@ -60,7 +60,7 @@ const LinkedAccountCard = () => {
   })();
 
   return (
-    <Card title="Linked Bank" contentClassName="flex flex-col gap-3">
+    <Card title="Linked bank" contentClassName="flex flex-col gap-3">
       {isLoadingConnection ? (
         <div className="flex items-center gap-2 text-ink-muted">
           <Spinner size={16} />

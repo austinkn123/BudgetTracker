@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan, BudgetPlanEntry, Category } from '../../../shared/types/api';
 import type { PlanLineFormData } from '../../../shared/validation/planLineSchema';
+import { errorMessage } from '../../../shared/utils/errorMessage';
 
 const emptyForm = (defaultCategoryId: number): PlanLineFormData => ({
   categoryId: defaultCategoryId,
@@ -66,7 +67,7 @@ export const useBudgetPlanForm = (
     },
     onError: (error: Error) => {
       setStatusMessage(null);
-      setStatusError(`Unable to update budget plan: ${error.message}`);
+      setStatusError(errorMessage(error, "Couldn't update the plan line. Please try again."));
     },
   });
 

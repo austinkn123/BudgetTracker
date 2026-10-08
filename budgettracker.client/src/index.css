@@ -64,22 +64,23 @@
     @apply bg-success-dark;
   }
 
+  /* Net-outflow days stay neutral: money leaving is fact, not failure (design.md §1). */
   .day-neg {
-    @apply border border-error/[0.32] bg-error/[0.14];
+    @apply border border-ink/[0.14] bg-ink/[0.05];
   }
   .day-neg button {
-    @apply font-semibold text-error-dark;
+    @apply font-semibold text-ink;
   }
   .day-neg:hover {
-    @apply bg-error/[0.22];
+    @apply bg-ink/[0.1];
   }
   .day-neg[data-selected='true'] {
-    @apply border-error bg-error;
+    @apply border-ink bg-ink;
   }
   .day-neg[data-selected='true'] button {
-    @apply text-white;
+    @apply text-surface;
   }
   .day-neg[data-selected='true']:hover {
-    @apply bg-error-dark;
+    @apply bg-ink/90;
   }
 }

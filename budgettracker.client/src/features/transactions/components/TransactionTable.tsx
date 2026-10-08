@@ -3,6 +3,7 @@ import { format, startOfDay, startOfMonth } from 'date-fns';
 import { Badge, Calendar, Separator } from '../../../shared/components/ui';
 import type { Category, Transaction } from '../../../shared/types/api';
 import type { TransactionDaySummary } from '../utils/transactionGroups';
+import { currencyPrecise, signedAmount } from '../../../shared/utils/format';
 
 type TransactionTableProps = {
   categories: Category[];
@@ -73,16 +74,16 @@ const TransactionTable = ({
               <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
                 Income
               </span>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-success-dark">
-                ${selectedIncomeTotal.toFixed(2)}
+              <p className="mt-0.5 text-sm numeric font-semibold text-success-dark">
+                {currencyPrecise.format(selectedIncomeTotal)}
               </p>
             </div>
             <div className="px-3 py-2.5">
               <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
                 Outflow
               </span>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-ink">
-                ${selectedOutflowTotal.toFixed(2)}
+              <p className="mt-0.5 text-sm numeric font-semibold text-ink">
+                {currencyPrecise.format(selectedOutflowTotal)}
               </p>
             </div>
             <div className="px-3 py-2.5">
@@ -92,11 +93,11 @@ const TransactionTable = ({
               <p
                 className={
                   selectedNetTotal >= 0
-                    ? 'mt-0.5 text-sm font-semibold tabular-nums text-success-dark'
-                    : 'mt-0.5 text-sm font-semibold tabular-nums text-error'
+                    ? 'numeric mt-0.5 text-sm font-semibold text-success-dark'
+                    : 'numeric mt-0.5 text-sm font-semibold text-ink'
                 }
               >
-                {selectedNetTotal >= 0 ? '+' : '−'}${Math.abs(selectedNetTotal).toFixed(2)}
+                {signedAmount(selectedNetTotal, selectedNetTotal >= 0)}
               </p>
             </div>
           </div>
@@ -153,11 +154,11 @@ const TransactionTable = ({
                       <span
                         className={
                           isInflow
-                            ? 'whitespace-nowrap text-sm font-semibold tabular-nums text-success-dark'
-                            : 'whitespace-nowrap text-sm font-semibold tabular-nums text-ink'
+                            ? 'numeric whitespace-nowrap text-sm font-semibold text-success-dark'
+                            : 'numeric whitespace-nowrap text-sm font-semibold text-ink'
                         }
                       >
-                        {sign}${Math.abs(transaction.amount).toFixed(2)}
+                        {sign}{currencyPrecise.format(Math.abs(transaction.amount))}
                       </span>
                     </button>
                   </li>

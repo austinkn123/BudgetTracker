@@ -1,6 +1,6 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Badge, Button } from '../../shared/components/ui';
+import { Badge, Button, ConfirmModal } from '../../shared/components/ui';
 import { useBudgetPlans } from './hooks/useBudgetPlans';
 import { useBudgetPlanForm } from './hooks/useBudgetPlanForm';
 import { useBudgetPlanManagement } from './hooks/useBudgetPlanManagement';
@@ -46,14 +46,7 @@ const BudgetPlansSection = ({
     setStatusError,
   );
 
-  const handleDeletePlan = useCallback((planId: number) => {
-    const confirmed = window.confirm('Delete this budget plan and all of its lines?');
-    if (!confirmed) {
-      return;
-    }
-
-    void planManagement.deletePlan(planId);
-  }, [planManagement]);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   if (isLoading) return null;
 
@@ -61,9 +54,9 @@ const BudgetPlansSection = ({
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-ink">Budget Plans</h2>
+          <h2 className="text-base font-semibold text-ink">Your plans</h2>
           <p className="text-sm text-ink-muted">
-            Create, edit, switch, and maintain multiple monthly plans.
+            Only the active plan drives the dashboard and the month's pacing.
           </p>
         </div>
 
@@ -71,10 +64,10 @@ const BudgetPlansSection = ({
           {planManagement.activePlan ? (
             <Badge color="success" label={`Active: ${planManagement.activePlan.name}`} />
           ) : (
-            <Badge label="No Active Plan" />
+            <Badge label="No active plan" />
           )}
           <Button startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
-            Add Plan
+            Add plan
           </Button>
         </div>
       </div>
@@ -91,7 +84,7 @@ const BudgetPlansSection = ({
               onEditLine={lineForm.openForEdit}
               onSwitchActive={(planId) => void planManagement.switchActivePlan(planId)}
               onEditPlan={planManagement.openForEdit}
-              onDeletePlan={(selectedPlan) => handleDeletePlan(selectedPlan.id)}
+              onDeletePlan={(selectedPlan) => setPendingDeleteId(selectedPlan.id)}
             />
           ))
         ) : (
@@ -107,6 +100,21 @@ const BudgetPlansSection = ({
         onClose={planManagement.closeDialog}
         onSave={planManagement.savePlan}
         onDelete={() => planManagement.deletePlan()}
+      />
+
+      <ConfirmModal
+        open={pendingDeleteId !== null}
+        title="Delete budget plan?"
+        message="This removes the plan and all of its lines. This can't be undone."
+        confirmLabel="Delete plan"
+        destructive
+        isPending={planManagement.isSaving}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => {
+          const planId = pendingDeleteId;
+          setPendingDeleteId(null);
+          if (planId !== null) void planManagement.deletePlan(planId);
+        }}
       />
 
       <PlanLineDialog

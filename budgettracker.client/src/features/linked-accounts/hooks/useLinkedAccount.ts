@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { plaidService } from '../../../shared/services/plaid.service';
 import type { PlaidConnectionView, PlaidSyncSummary } from '../../../shared/types/api';
+import { errorMessage as messageFor } from '../../../shared/utils/errorMessage';
 
 /**
  * Manages the full bank-link lifecycle: fetch link token on demand, exchange,
@@ -36,13 +37,6 @@ const CONNECTION_QUERY_KEY = ['plaid', 'connection'] as const;
 /** Poll cadence so server-side auto-sync (webhook + background) surfaces without a manual Refresh (BUD-6). */
 const CONNECTION_REFETCH_INTERVAL_MS = 60_000;
 
-const extractMessage = (err: unknown, fallback: string): string => {
-  const responseError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-  if (responseError) return responseError;
-  const message = (err as { message?: string })?.message;
-  return message ?? fallback;
-};
-
 export const useLinkedAccount = (): UseLinkedAccountResult => {
   const queryClient = useQueryClient();
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -64,7 +58,7 @@ export const useLinkedAccount = (): UseLinkedAccountResult => {
       setErrorMessage(null);
     },
     onError: (err) => {
-      setErrorMessage(extractMessage(err, 'Could not start bank link. Please try again.'));
+      setErrorMessage(messageFor(err, "Couldn't start bank link. Please try again."));
     },
   });
 
@@ -77,7 +71,7 @@ export const useLinkedAccount = (): UseLinkedAccountResult => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
     onError: (err) => {
-      setErrorMessage(extractMessage(err, 'Could not finish linking your bank. Please try again.'));
+      setErrorMessage(messageFor(err, "Couldn't finish linking your bank. Please try again."));
     },
   });
 
@@ -90,7 +84,7 @@ export const useLinkedAccount = (): UseLinkedAccountResult => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
     onError: (err) => {
-      setErrorMessage(extractMessage(err, 'Could not refresh transactions. Please try again.'));
+      setErrorMessage(messageFor(err, "Couldn't refresh transactions. Please try again."));
     },
   });
 
@@ -102,7 +96,7 @@ export const useLinkedAccount = (): UseLinkedAccountResult => {
       void queryClient.invalidateQueries({ queryKey: CONNECTION_QUERY_KEY });
     },
     onError: (err) => {
-      setErrorMessage(extractMessage(err, 'Could not disconnect your bank. Please try again.'));
+      setErrorMessage(messageFor(err, "Couldn't disconnect your bank. Please try again."));
     },
   });
 

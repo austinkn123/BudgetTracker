@@ -5,6 +5,7 @@ import { Badge, Button, Card, Table } from '../../../shared/components/ui';
 import type { TableColumn } from '../../../shared/components/ui';
 import { cn } from '../../../shared/utils/cn';
 import type { BudgetPlan, BudgetPlanEntry } from '../../../shared/types/api';
+import { currencyPrecise } from '../../../shared/utils/format';
 
 type BudgetPlanCardProps = {
   plan: BudgetPlan;
@@ -19,7 +20,7 @@ type BudgetPlanCardProps = {
 
 const TILE_ACCENT = {
   success: 'bg-success',
-  error: 'bg-ink/25',
+  neutral: 'bg-ink/25',
   primary: 'bg-primary',
 } as const;
 
@@ -47,11 +48,11 @@ const SummaryTile = ({
       </span>
       <p
         className={cn(
-          'mt-0.5 text-lg font-semibold tabular-nums tracking-[-0.02em]',
+          'numeric mt-0.5 text-lg font-semibold',
           signed ? (value >= 0 ? 'text-success-dark' : 'text-error') : 'text-ink',
         )}
       >
-        ${value.toFixed(2)}
+        {currencyPrecise.format(value)}
       </p>
     </div>
   </div>
@@ -100,7 +101,7 @@ const BudgetPlanCard = ({
         render: (entry) => (
           <Badge
             label={entry.lineType}
-            color={entry.lineType === 'Income' ? 'success' : 'error'}
+            color={entry.lineType === 'Income' ? 'success' : 'neutral'}
             variant="outline"
           />
         ),
@@ -112,14 +113,16 @@ const BudgetPlanCard = ({
         header: 'Amount',
         align: 'right',
         render: (entry) => (
-          <span className="text-sm font-semibold text-ink">${entry.amount.toFixed(2)}</span>
+          <span className="numeric text-sm font-semibold text-ink">{currencyPrecise.format(entry.amount)}</span>
         ),
       },
       {
         key: 'monthlyEquivalent',
-        header: 'Monthly Eq.',
+        header: 'Per month',
         align: 'right',
-        render: (entry) => `$${entry.monthlyEquivalent.toFixed(2)}`,
+        render: (entry) => (
+          <span className="numeric">{currencyPrecise.format(entry.monthlyEquivalent)}</span>
+        ),
       },
     ],
     [categoryNameById],
@@ -167,9 +170,9 @@ const BudgetPlanCard = ({
       }
     >
       <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <SummaryTile label="Monthly Income" value={monthlyIncome} tone="success" />
-        <SummaryTile label="Monthly Expenses" value={monthlyExpenses} tone="error" />
-        <SummaryTile label="Monthly Net" value={monthlyNet} tone="primary" signed />
+        <SummaryTile label="Monthly income" value={monthlyIncome} tone="success" />
+        <SummaryTile label="Monthly expenses" value={monthlyExpenses} tone="neutral" />
+        <SummaryTile label="Monthly net" value={monthlyNet} tone="primary" signed />
       </div>
 
       <Table

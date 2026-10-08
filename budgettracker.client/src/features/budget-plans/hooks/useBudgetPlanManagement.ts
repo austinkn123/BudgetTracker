@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan } from '../../../shared/types/api';
 import type { BudgetPlanFormData } from '../../../shared/validation/budgetPlanSchema';
+import { errorMessage } from '../../../shared/utils/errorMessage';
 
 const defaultValues: BudgetPlanFormData = {
   name: '',
@@ -121,7 +122,7 @@ export const useBudgetPlanManagement = (
     },
     onError: (error: Error) => {
       setStatusMessage(null);
-      setStatusError(`Unable to save budget plan: ${error.message}`);
+      setStatusError(errorMessage(error, "Couldn't save the plan. Please try again."));
     },
   });
 
@@ -153,7 +154,7 @@ export const useBudgetPlanManagement = (
     },
     onError: (error: Error) => {
       setStatusMessage(null);
-      setStatusError(`Unable to delete budget plan: ${error.message}`);
+      setStatusError(errorMessage(error, "Couldn't delete the plan. Please try again."));
     },
   });
 
@@ -189,7 +190,7 @@ export const useBudgetPlanManagement = (
     },
     onError: (error: Error) => {
       setStatusMessage(null);
-      setStatusError(`Unable to switch active plan: ${error.message}`);
+      setStatusError(errorMessage(error, "Couldn't switch the active plan. Please try again."));
     },
   });
 

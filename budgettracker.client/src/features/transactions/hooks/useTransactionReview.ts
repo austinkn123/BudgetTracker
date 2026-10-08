@@ -58,7 +58,7 @@ export const useTransactionReview = (
     },
     onError: () => {
       setStatusMessage(null);
-      setStatusError('Could not update the category. Please try again.');
+      setStatusError("Couldn't update the category. Please try again.");
     },
   });
 
@@ -72,7 +72,7 @@ export const useTransactionReview = (
     },
     onError: () => {
       setStatusMessage(null);
-      setStatusError('Could not save the note. Please try again.');
+      setStatusError("Couldn't save the note. Please try again.");
     },
   });
 

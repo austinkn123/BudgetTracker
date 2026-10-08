@@ -174,7 +174,7 @@ const TransactionList = ({
                 <td
                   className={cn(
                     'numeric whitespace-nowrap px-3 py-2.5 text-right align-middle font-semibold',
-                    inflow ? 'text-success-dark' : 'text-error-dark',
+                    inflow ? 'text-success-dark' : 'text-ink',
                   )}
                 >
                   {signedAmount(transaction.amount, inflow)}

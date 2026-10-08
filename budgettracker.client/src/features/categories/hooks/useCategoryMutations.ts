@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { categoryService } from '../../../shared/services/category.service';
 import type { Category } from '../../../shared/types/api';
+import { errorMessage } from '../../../shared/utils/errorMessage';
 
 type StatusCallback = (message: string | null) => void;
 
@@ -24,7 +25,7 @@ export const useCategoryMutations = ({
     },
     onError: (error: Error) => {
       setStatusMessage(null);
-      setStatusError(`Unable to create category: ${error.message}`);
+      setStatusError(errorMessage(error, "Couldn't create the category. Please try again."));
     },
   });
 
@@ -37,7 +38,7 @@ export const useCategoryMutations = ({
     },
     onError: (error: Error) => {
       setStatusMessage(null);
-      setStatusError(`Unable to update category: ${error.message}`);
+      setStatusError(errorMessage(error, "Couldn't update the category. Please try again."));
     },
   });
 
@@ -50,7 +51,7 @@ export const useCategoryMutations = ({
     },
     onError: (error: Error) => {
       setStatusMessage(null);
-      setStatusError(`Unable to delete category: ${error.message}`);
+      setStatusError(errorMessage(error, "Couldn't delete the category. Please try again."));
     },
   });
 
