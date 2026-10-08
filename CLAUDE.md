@@ -38,6 +38,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - Jira project: **BUD** on `austinkn123.atlassian.net` — check for existing issues before creating new ones, and link completed work to its ticket when relevant.
 - **Jira access via MCP**: The Atlassian MCP server is configured in `.mcp.json` and provides direct Jira access. When asked about any BUD ticket, **ALWAYS call the Atlassian MCP tools** — never say "I can't connect to Jira" without first attempting the call. Common tools: `mcp__atlassian__getIssue` (fetch a specific ticket), `mcp__atlassian__searchIssues` (JQL search), `mcp__atlassian__getAccessibleAtlassianResources` (list resources). If the call fails, report the actual error returned by the tool, not a pre-emptive refusal.
 - Local database: **SQL Server LocalDB** — `Server=(localdb)\MSSQLLocalDB;Database=BudgetTracker;Trusted_Connection=True;TrustServerCertificate=True;` — use the `mssql` MCP server to inspect schema, run queries, and verify migrations directly.
+- **Cloud sessions** (`CLAUDE_CODE_REMOTE=true`): `.claude/hooks/session-start.sh` provisions .NET, `dotnet-ef`, PowerShell (for the guard hooks), npm deps, and a SQL Server 2022 Docker container (`budgettracker-sql`) with migrations applied. `ConnectionStrings__BudgetTrackerConnection` points the app at it. The `mssql` MCP server does not work there (LocalDB is Windows-only) — use `sqlcmd -d BudgetTracker -Q "..."` instead. The DB starts empty each session.
 
 ## Agent Roster
 
