@@ -52,7 +52,7 @@ const TransactionRows = ({
 
   if (transactions.length === 0) {
     return (
-      <p className="px-4 py-6 text-center text-sm text-ink-muted">No transactions here.</p>
+      <p className="px-4 py-6 text-center text-sm text-ink-muted">No transactions match this view.</p>
     );
   }
 

@@ -254,7 +254,8 @@ export const shadowTokens = {
 
 /** Motion: 120ms color, 160ms transform, 240ms overlays. */
 export const motionTokens = {
-  duration: { 120: '120ms', 160: '160ms', 240: '240ms' },
+  // 700 is for data drawing itself in (bars, rings) once per load, never for chrome.
+  duration: { 120: '120ms', 160: '160ms', 240: '240ms', 700: '700ms' },
   easing: {
     'out-soft': 'cubic-bezier(0.16, 1, 0.3, 1)',
     'in-soft': 'cubic-bezier(0.4, 0, 1, 1)',

@@ -36,7 +36,7 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
   }, [categories]);
 
   return (
-    <Card title="Recent Activity" subtitle={items.length > 0 ? `Last ${items.length}` : undefined} fullHeight>
+    <Card title="Recent activity" subtitle={items.length > 0 ? `Last ${items.length}` : undefined} fullHeight>
       {items.length === 0 ? (
         <div className="flex min-h-[160px] flex-col items-center justify-center gap-1 text-center">
           <p className="text-sm font-medium text-ink">No transactions yet</p>

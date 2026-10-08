@@ -149,11 +149,11 @@ const BudgetPlanCard = ({
               onClick={() => onSwitchActive(plan.id)}
               disabled={isSwitchingPlan}
             >
-              Set Active
+              Set active
             </Button>
           )}
           <Button size="sm" variant="ghost" startIcon={<Plus size={16} />} onClick={() => onAddLine(plan.id)}>
-            Add Entry
+            Add line
           </Button>
           <Button size="sm" variant="ghost" startIcon={<Pencil size={16} />} onClick={() => onEditPlan(plan)}>
             Edit
@@ -180,7 +180,7 @@ const BudgetPlanCard = ({
         rows={sortedEntries}
         rowKey={(entry) => entry.id}
         onRowClick={(entry) => onEditLine(plan.id, entry)}
-        emptyMessage='No plan entries — click "Add Entry" to get started'
+        emptyMessage='No lines yet. Add one for each thing you expect to spend on or earn each month.'
         ariaLabel={`${plan.name} plan entries`}
       />
     </Card>

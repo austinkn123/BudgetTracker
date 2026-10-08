@@ -35,7 +35,7 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
 
   if (cards.length === 0) {
     return (
-      <Card title="Category Drill-Down">
+      <Card title="By category">
         <p className="text-sm text-ink-muted">
           Add expense line items to your plan to drill into category performance.
         </p>
@@ -45,7 +45,7 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
 
   return (
     <Card
-      title="Category Drill-Down"
+      title="By category"
       subtitle={`${cards.length} categories`}
       contentClassName="p-0"
     >
@@ -164,7 +164,7 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
                     <td colSpan={6} className="px-6 py-3">
                       {data.transactions.length === 0 ? (
                         <span className="text-xs text-ink-muted">
-                          No transactions in this range
+                          No transactions in this range.
                         </span>
                       ) : (
                         <ul className="flex flex-col gap-1.5">

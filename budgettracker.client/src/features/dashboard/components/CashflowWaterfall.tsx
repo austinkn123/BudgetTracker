@@ -116,18 +116,18 @@ const CashflowWaterfall = ({ bars: items }: CashflowWaterfallProps) => {
   if (!rows) {
     return (
       <Card
-        title="Cashflow Waterfall"
+        title="From income to what's left"
         fullHeight
         contentClassName="flex min-h-[320px] items-center justify-center"
       >
-        <p className="text-sm text-ink-muted">No transactions yet this plan month</p>
+        <p className="text-sm text-ink-muted">Nothing has landed in this plan month yet.</p>
       </Card>
     );
   }
 
   return (
     <Card
-      title="Cashflow Waterfall"
+      title="From income to what's left"
       actions={
         // Hidden on narrow screens: the legend would crowd the title out.
         <div className="hidden flex-wrap items-center gap-3 sm:flex">

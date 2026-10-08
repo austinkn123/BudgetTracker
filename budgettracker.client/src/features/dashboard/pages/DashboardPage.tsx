@@ -173,7 +173,7 @@ const DashboardPage = () => {
               Tracking against <span className="font-semibold text-ink">{hero.plan.name}</span>
             </>
           ) : (
-            'Your financial position at a glance'
+            'Choose an active plan to see this month against it.'
           )
         }
         actions={<RangeSelector value={range} onChange={setRange} />}

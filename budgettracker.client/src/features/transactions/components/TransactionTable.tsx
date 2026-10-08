@@ -56,7 +56,7 @@ const TransactionTable = ({
         <div className="flex flex-col gap-5">
           <div>
             <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-ink-muted">
-              Selected Day
+              Selected day
             </span>
             <h3 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink">
               {format(selectedDate, 'PPPP')}

@@ -20,7 +20,7 @@ const WhereItWent = ({ rows }: WhereItWentProps) => {
 
   return (
     <Card
-      title="Where It Went"
+      title="Where it went"
       subtitle={total > 0 ? `${currency.format(total)} total` : undefined}
       fullHeight
     >

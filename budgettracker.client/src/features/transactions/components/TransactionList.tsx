@@ -163,8 +163,8 @@ const TransactionList = ({
                         </>
                       ) : (
                         <span>
-                          Plaid says {formatPlaidCategory(transaction.plaidCategoryPrimary)} — map it
-                          on a category to auto-assign
+                          Your bank calls this {formatPlaidCategory(transaction.plaidCategoryPrimary)}. Map that
+                          to a category in Budget Plans to assign these automatically.
                         </span>
                       )}
                     </div>

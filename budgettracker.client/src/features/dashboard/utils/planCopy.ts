@@ -19,6 +19,6 @@ export const getStatusHeadline = (
   if (pacingDelta <= -0.05) return `Comfortably ahead in ${monthName}`;
   if (pacingDelta < 0.05) return `Right on the trail for ${monthName}`;
   if (pacingDelta < 0.15) return `A little brisk in ${monthName}`;
-  if (pacingDelta < 0.3) return `Tightening up needed in ${monthName}`;
+  if (pacingDelta < 0.3) return `Drifting off the trail in ${monthName}`;
   return `Off the trail in ${monthName}`;
 };

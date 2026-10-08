@@ -18,7 +18,7 @@ const currency = new Intl.NumberFormat('en-US', {
 const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
   if (rows.length === 0 || rows.every((r) => r.planned === 0 && r.actual === 0)) {
     return (
-      <Card title="Bucket Breakdown" fullHeight contentClassName="flex min-h-[200px] items-center justify-center">
+      <Card title="By bucket" fullHeight contentClassName="flex min-h-[200px] items-center justify-center">
         <p className="text-sm text-ink-muted">No bucket data for this plan yet</p>
       </Card>
     );
@@ -27,7 +27,7 @@ const BucketBreakdown = ({ rows }: BucketBreakdownProps) => {
   const maxValue = rows.reduce((m, r) => Math.max(m, r.planned, r.actual), 0);
 
   return (
-    <Card title="Bucket Breakdown" subtitle="Planned versus actual by bucket" fullHeight>
+    <Card title="By bucket" subtitle="Planned versus actual by bucket" fullHeight>
       <ul className="flex flex-col gap-6">
         {rows.map((row) => {
           const baseWidth = maxValue > 0 ? (Math.min(row.planned, row.actual) / maxValue) * 100 : 0;

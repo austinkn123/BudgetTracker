@@ -19,8 +19,8 @@ describe('getStatusHeadline', () => {
     [0.049, 'Right on the trail for June'],
     [0.05, 'A little brisk in June'],
     [0.149, 'A little brisk in June'],
-    [0.15, 'Tightening up needed in June'],
-    [0.299, 'Tightening up needed in June'],
+    [0.15, 'Drifting off the trail in June'],
+    [0.299, 'Drifting off the trail in June'],
     [0.3, 'Off the trail in June'],
     [1, 'Off the trail in June'],
   ])('maps pacingDelta %s to its band', (pacingDelta, expected) => {

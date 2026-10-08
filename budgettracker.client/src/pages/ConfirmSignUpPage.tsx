@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Wallet } from 'lucide-react';
-import { Alert, Button, Card, Input } from '../shared/components/ui';
+import { Alert, Button, Input } from '../shared/components/ui';
+import AuthLayout from './AuthLayout';
 import { useAuth } from '../auth/useAuth';
 import { confirmSignUpSchema, type ConfirmSignUpFormData } from '../shared/validation/auth';
 
@@ -45,10 +45,11 @@ const ConfirmSignUpPage = () => {
 
     try {
       await confirmSignUp(email, values.code);
-      setSuccess('Email confirmed! Redirecting to sign in...');
+      setSuccess('Email verified. Taking you to sign in…');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Confirmation failed. Please try again.';
+      const message =
+        err instanceof Error ? err.message : "Couldn't verify your email. Please try again.";
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -67,9 +68,10 @@ const ConfirmSignUpPage = () => {
 
     try {
       await resendCode(email);
-      setSuccess(`Confirmation code resent to ${email}`);
+      setSuccess(`We sent a new code to ${email}.`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to resend code. Please try again.';
+      const message =
+        err instanceof Error ? err.message : "Couldn't send a new code. Please try again.";
       setError(message);
     } finally {
       setIsResending(false);
@@ -77,67 +79,46 @@ const ConfirmSignUpPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-grey-900 p-4 dark:bg-background">
-      <div className="w-full max-w-[400px]">
-        <div className="mb-6 flex items-center justify-center gap-2.5">
-          <span className="flex text-primary-light">
-            <Wallet size={24} />
-          </span>
-          <span className="text-[17px] font-semibold tracking-[-0.01em] text-white">
-            BudgetTracker
-          </span>
+    <AuthLayout
+      title="Verify your email"
+      description={
+        email ? `We sent a code to ${email}.` : 'Enter the code from your verification email.'
+      }
+    >
+      {error && <Alert severity="error" message={error} />}
+      {success && <Alert severity="success" message={success} />}
+
+      <form onSubmit={onSubmit}>
+        <div className="flex flex-col gap-5">
+          <Input
+            control={control}
+            name="code"
+            label="Confirmation code"
+            placeholder="000000"
+            maxLength={6}
+            pattern="[0-9]*"
+            autoComplete="one-time-code"
+            disabled={isSubmitting}
+          />
+
+          <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
+            {isSubmitting ? 'Verifying…' : 'Verify email'}
+          </Button>
         </div>
-        <Card padding="lg">
-        <div className="flex flex-col gap-6">
-          <div>
-            <h1 className="mb-1.5 text-[22px] font-semibold tracking-[-0.02em] text-ink">Verify Email</h1>
-            <p className="text-sm text-ink-muted">
-              {email ? `We sent a code to ${email}` : 'Enter the confirmation code'}
-            </p>
-          </div>
+      </form>
 
-          {error && <Alert severity="error" message={error} />}
-          {success && <Alert severity="success" message={success} />}
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" fullWidth onClick={handleResendCode} loading={isResending}>
+          {isResending ? 'Resending…' : "Didn't get a code? Send another"}
+        </Button>
 
-          <form onSubmit={onSubmit}>
-            <div className="flex flex-col gap-5">
-              <Input
-                control={control}
-                name="code"
-                label="Confirmation Code"
-                placeholder="000000"
-                maxLength={6}
-                pattern="[0-9]*"
-                autoComplete="one-time-code"
-                disabled={isSubmitting}
-              />
-
-              <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
-                {isSubmitting ? 'Confirming...' : 'Confirm'}
-              </Button>
-            </div>
-          </form>
-
-          <div className="flex flex-col gap-3">
-            <Button
-              variant="ghost"
-              fullWidth
-              onClick={handleResendCode}
-              loading={isResending}
-            >
-              {isResending ? 'Resending...' : "Didn't receive a code? Resend"}
-            </Button>
-
-            <p className="text-center text-sm text-ink-muted">
-              <Link to="/signup" className="font-semibold text-primary hover:text-primary-dark">
-                Back to Sign Up
-              </Link>
-            </p>
-          </div>
-        </div>
-        </Card>
+        <p className="text-center text-sm text-ink-muted">
+          <Link to="/signup" className="font-semibold text-primary hover:text-primary-dark">
+            Back to sign up
+          </Link>
+        </p>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 
