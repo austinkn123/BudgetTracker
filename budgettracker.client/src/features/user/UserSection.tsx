@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { User as UserIcon } from 'lucide-react';
-import Card from '../../shared/components/ui/Card';
+import { Card, Skeleton } from '../../shared/components/ui';
 import { useUser } from './hooks/useUser';
 
 type UserSectionProps = {
@@ -19,25 +19,39 @@ const Field = ({ label, value }: { label: string; value: string }) => (
 const UserSection = ({ isLoading }: UserSectionProps) => {
   const { data: user } = useUser();
 
-  if (isLoading) return null;
+  const title = (
+    <span className="flex items-center gap-2">
+      <UserIcon size={18} className="text-primary" />
+      Account
+    </span>
+  );
+
+  if (isLoading) {
+    return (
+      <Card title={title}>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          {[0, 1].map((i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton width={64} height={10} />
+              <Skeleton width={180} height={14} />
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  }
 
   return (
-    <Card
-      title={
-        <span className="flex items-center gap-2">
-          <UserIcon size={18} className="text-primary" />
-          User Information
-        </span>
-      }
-    >
+    <Card title={title}>
       {user ? (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-          <Field label="User ID" value={String(user.id)} />
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Field label="Email" value={user.email} />
-          <Field label="Created" value={format(new Date(user.createdAt), 'PPP')} />
+          <Field label="Member since" value={format(new Date(user.createdAt), 'PPP')} />
         </div>
       ) : (
-        <p className="text-sm italic text-ink-muted">No user data found</p>
+        <p className="text-sm text-ink-muted">
+          We couldn't load your account details. Refresh the page to try again.
+        </p>
       )}
     </Card>
   );

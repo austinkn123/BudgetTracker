@@ -24,14 +24,18 @@ const DashboardErrorState = ({
     <div className="space-y-8">
       <Alert
         severity="error"
-        title="Unable to load your dashboard"
+        title="Couldn't load your dashboard"
         message="We couldn't reach the API. Check that the server and database are running."
       >
-        {failures.map(({ label, error }) => (
-          <span key={label} className="mt-2 block text-xs">
-            {label}: {String(error)}
-          </span>
-        ))}
+        {/* Raw errors stay behind a disclosure: useful when the API is down locally, but not copy. */}
+        <details className="mt-2 text-xs">
+          <summary className="cursor-pointer font-semibold">Technical details</summary>
+          {failures.map(({ label, error }) => (
+            <span key={label} className="mt-1 block">
+              {label}: {String(error)}
+            </span>
+          ))}
+        </details>
       </Alert>
     </div>
   );

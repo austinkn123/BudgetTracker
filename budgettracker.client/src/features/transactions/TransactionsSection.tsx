@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { endOfMonth, isSameMonth, startOfDay, startOfMonth } from 'date-fns';
-import { Button, Card, InlineSelect, ToggleGroup } from '../../shared/components/ui';
+import { Button, Card, InlineSelect, Skeleton, ToggleGroup } from '../../shared/components/ui';
 import { useTransactions } from './hooks/useTransactions';
 import { useTransactionReview } from './hooks/useTransactionReview';
 import { useCategories } from '../categories/hooks/useCategories';
@@ -161,7 +161,25 @@ const TransactionsSection = ({
     isBusy: review.isBusy,
   };
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-5" aria-busy>
+        <Skeleton width={240} height={36} className="rounded-md" />
+        <Card padding="none">
+          <div className="divide-y divide-border-subtle">
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3">
+                <Skeleton width={56} height={12} />
+                <Skeleton width={`${30 + ((i * 13) % 25)}%`} height={12} />
+                <Skeleton width={110} height={24} className="ml-auto rounded-md" />
+                <Skeleton width={72} height={12} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">

@@ -11,6 +11,7 @@ import {
   Modal,
   ModalActions,
   Select,
+  Skeleton,
   Tooltip,
   type BadgeColor,
 } from '../../shared/components/ui';
@@ -106,7 +107,24 @@ const CategoriesSection = ({
     return map;
   }, [categories, transactions, budgetPlans]);
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <Card title="Categories">
+        <div className="space-y-3">
+          {[5, 3].map((count, group) => (
+            <div key={group} className="space-y-2">
+              <Skeleton width={72} height={10} />
+              <div className="flex flex-wrap gap-1">
+                {Array.from({ length: count }, (_, i) => (
+                  <Skeleton key={i} width={72 + ((i * 23) % 48)} height={24} className="rounded-full" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  }
 
   const openAddDialog = () => {
     setEditingCategoryId(null);
@@ -189,7 +207,10 @@ const CategoriesSection = ({
     >
       <>
         {categories.length === 0 ? (
-          <p className="text-body italic text-ink-muted">No categories found</p>
+          <p className="text-sm text-ink-muted">
+            No categories yet. Add one for each kind of spending you want to see in your plan, like
+            groceries or the mortgage.
+          </p>
         ) : (
           <div className="space-y-3">
             {GROUPS.map((group) => {

@@ -7,12 +7,23 @@ import { Card, Skeleton } from '../../../shared/components/ui';
 const DashboardLoadingState = () => (
   <div className="space-y-8">
     {/* Header */}
-    <div className="flex flex-col gap-4 rounded-md border border-border bg-surface px-5 py-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="space-y-2">
         <Skeleton width={140} height={28} />
         <Skeleton width={220} height={14} />
       </div>
       <Skeleton width={260} height={36} className="rounded-full" />
+    </div>
+
+    {/* Stat strip */}
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-border-subtle lg:grid-cols-4">
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className="space-y-2 bg-background px-5 py-4">
+          <Skeleton width={64} height={10} />
+          <Skeleton width={110} height={26} />
+          <Skeleton width={90} height={10} />
+        </div>
+      ))}
     </div>
 
     {/* Hero */}

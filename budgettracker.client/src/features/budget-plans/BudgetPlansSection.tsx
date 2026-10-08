@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Badge, Button, ConfirmModal } from '../../shared/components/ui';
+import { Badge, Button, Card, ConfirmModal, Skeleton } from '../../shared/components/ui';
 import { useBudgetPlans } from './hooks/useBudgetPlans';
 import { useBudgetPlanForm } from './hooks/useBudgetPlanForm';
 import { useBudgetPlanManagement } from './hooks/useBudgetPlanManagement';
@@ -48,7 +48,29 @@ const BudgetPlansSection = ({
 
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <div className="space-y-4" aria-busy>
+        <div className="space-y-2">
+          <Skeleton width={120} height={18} />
+          <Skeleton width={280} height={12} />
+        </div>
+        <Card>
+          <Skeleton width={180} height={18} />
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} height={64} className="rounded-lg" />
+            ))}
+          </div>
+          <div className="mt-4 space-y-2">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} height={14} />
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -88,7 +110,20 @@ const BudgetPlansSection = ({
             />
           ))
         ) : (
-          <p className="text-body italic text-ink-muted">No budget plans found</p>
+          <Card>
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink">No plans yet</p>
+                <p className="mt-1 text-sm text-ink-muted">
+                  A plan is your take-home pay split into the lines you expect to spend on. The
+                  dashboard measures every month against it.
+                </p>
+              </div>
+              <Button startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
+                Add plan
+              </Button>
+            </div>
+          </Card>
         )}
       </div>
 

@@ -20,6 +20,19 @@
     @apply bg-background text-body text-ink antialiased;
   }
 
+  /* One global gate (design.md §7): under reduced motion every keyframe and transition
+     collapses to an instant change. Per-component motion-reduce: classes stay valid. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   @media print {
     body {
       print-color-adjust: exact;
