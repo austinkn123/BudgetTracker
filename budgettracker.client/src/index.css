@@ -20,6 +20,19 @@
     @apply bg-background text-body text-ink antialiased;
   }
 
+  /* One global gate (design.md §7): under reduced motion every keyframe and transition
+     collapses to an instant change. Per-component motion-reduce: classes stay valid. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   @media print {
     body {
       print-color-adjust: exact;
@@ -35,6 +48,17 @@
     font-variant-numeric: tabular-nums lining-nums;
     letter-spacing: -0.022em;
   }
+
+  /* Page entrance: direct children rise in, one after another, so the eye lands on the page
+     header first and reads downward. Once per mount; reduced motion collapses it. */
+  .stagger-in > * {
+    @apply animate-rise-in;
+  }
+  .stagger-in > :nth-child(2) { animation-delay: 40ms; }
+  .stagger-in > :nth-child(3) { animation-delay: 80ms; }
+  .stagger-in > :nth-child(4) { animation-delay: 120ms; }
+  .stagger-in > :nth-child(5) { animation-delay: 160ms; }
+  .stagger-in > :nth-child(n + 6) { animation-delay: 200ms; }
 
   /* The one focus treatment, applied to every interactive element. Uses
      native :focus-visible — keyboard only, no mouse-click rings. */
@@ -64,22 +88,23 @@
     @apply bg-success-dark;
   }
 
+  /* Net-outflow days stay neutral: money leaving is fact, not failure (design.md §1). */
   .day-neg {
-    @apply border border-error/[0.32] bg-error/[0.14];
+    @apply border border-ink/[0.14] bg-ink/[0.05];
   }
   .day-neg button {
-    @apply font-semibold text-error-dark;
+    @apply font-semibold text-ink;
   }
   .day-neg:hover {
-    @apply bg-error/[0.22];
+    @apply bg-ink/[0.1];
   }
   .day-neg[data-selected='true'] {
-    @apply border-error bg-error;
+    @apply border-ink bg-ink;
   }
   .day-neg[data-selected='true'] button {
-    @apply text-white;
+    @apply text-surface;
   }
   .day-neg[data-selected='true']:hover {
-    @apply bg-error-dark;
+    @apply bg-ink/90;
   }
 }

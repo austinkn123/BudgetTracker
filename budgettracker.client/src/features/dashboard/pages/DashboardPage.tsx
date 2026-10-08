@@ -27,13 +27,7 @@ import {
   selectTopSpend,
   selectWaterfall,
 } from '../utils/selectors';
-
-const money = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
+import { currency } from '../../../shared/utils/format';
 
 // How much of the server's analysis this particular screen chooses to show.
 const TREND_MONTHS = 3;
@@ -121,24 +115,28 @@ const DashboardPage = () => {
     return [
       {
         label: 'Spent',
-        value: money.format(pacing.actualExpenses),
-        detail: `of ${money.format(pacing.plannedExpenses)} planned`,
+        value: pacing.actualExpenses,
+        format: currency.format,
+        detail: `of ${currency.format(pacing.plannedExpenses)} planned`,
       },
       {
         label: pacing.remaining >= 0 ? 'Remaining' : 'Over plan',
-        value: money.format(Math.abs(pacing.remaining)),
+        value: Math.abs(pacing.remaining),
+        format: currency.format,
         tone: pacing.remaining >= 0 ? 'positive' : 'negative',
         detail: pacing.remaining >= 0 ? 'still available' : 'above the plan',
       },
       {
         label: 'Projected',
-        value: money.format(pacing.projectedEnd),
+        value: pacing.projectedEnd,
+        format: currency.format,
         tone: pacing.projectedEnd > pacing.plannedExpenses ? 'negative' : 'positive',
         detail: 'at the current pace',
       },
       {
         label: 'Days left',
-        value: String(daysLeft),
+        value: daysLeft,
+        format: (n: number) => String(Math.round(n)),
         detail: `of ${pacing.daysInMonth} in the plan month`,
       },
     ];
@@ -168,7 +166,7 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="stagger-in space-y-8">
       <PageHeader
         title="Dashboard"
         description={
@@ -177,7 +175,7 @@ const DashboardPage = () => {
               Tracking against <span className="font-semibold text-ink">{hero.plan.name}</span>
             </>
           ) : (
-            'Your financial position at a glance'
+            'Choose an active plan to see this month against it.'
           )
         }
         actions={<RangeSelector value={range} onChange={setRange} />}
@@ -200,22 +198,32 @@ const DashboardPage = () => {
         <PlanStoryHeroEmpty />
       )}
 
-      {/* Cashflow waterfall + Where it went */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <CashflowWaterfall bars={waterfall} />
+      {planMonth ? (
+        <>
+          {/* Cashflow waterfall + Where it went */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <CashflowWaterfall bars={waterfall} />
+            </div>
+            <WhereItWent rows={topSpend} />
+          </div>
+
+          <CategoryDrillGrid cards={categoryCards} />
+
+          {/* Bucket breakdown + recent activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <BucketBreakdown rows={planMonth.byBucket} />
+            <RecentActivityFeed items={recentActivity} categories={categories} />
+          </div>
+        </>
+      ) : (
+        // Without a plan there is nothing to measure against: the waterfall, drill grid and
+        // buckets would only be empty boxes. Spending and activity still stand on their own.
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <WhereItWent rows={topSpend} />
+          <RecentActivityFeed items={recentActivity} categories={categories} />
         </div>
-        <WhereItWent rows={topSpend} />
-      </div>
-
-      {/* Category drill grid */}
-      {planMonth && <CategoryDrillGrid cards={categoryCards} />}
-
-      {/* Bucket breakdown + recent activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <BucketBreakdown rows={planMonth?.byBucket ?? []} />
-        <RecentActivityFeed items={recentActivity} categories={categories} />
-      </div>
+      )}
     </div>
   );
 };

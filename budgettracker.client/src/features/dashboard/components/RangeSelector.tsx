@@ -7,7 +7,7 @@ interface RangeSelectorProps {
 }
 
 const OPTIONS = [
-  { value: 'month', label: 'This Month' },
+  { value: 'month', label: 'This month' },
   { value: '3m', label: '3M' },
   { value: 'ytd', label: 'YTD' },
   { value: 'all', label: 'All' },

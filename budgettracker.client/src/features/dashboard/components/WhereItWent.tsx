@@ -1,18 +1,12 @@
 import Card from '../../../shared/components/ui/Card';
 import type { SpendSlice } from '../utils/selectors';
 import { chartPalette, semanticColors } from '../utils/chartTheme';
+import { currency } from '../../../shared/utils/format';
 
 interface WhereItWentProps {
   /** Window-scoped expense totals, already ranked with a trailing "Other". */
   rows: SpendSlice[];
 }
-
-const currency = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
 
 const WhereItWent = ({ rows }: WhereItWentProps) => {
   const max = rows.reduce((m, r) => Math.max(m, r.value), 0);
@@ -20,7 +14,7 @@ const WhereItWent = ({ rows }: WhereItWentProps) => {
 
   return (
     <Card
-      title="Where It Went"
+      title="Where it went"
       subtitle={total > 0 ? `${currency.format(total)} total` : undefined}
       fullHeight
     >
@@ -51,18 +45,18 @@ const WhereItWent = ({ rows }: WhereItWentProps) => {
                     <p className="truncate text-[13px] font-medium text-ink" title={row.label}>
                       {row.label}
                     </p>
-                    <span className="shrink-0 text-[13px] font-semibold tabular-nums text-ink">
+                    <span className="shrink-0 text-[13px] font-semibold numeric text-ink">
                       {currency.format(row.value)}
                     </span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2">
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-border-subtle">
                       <div
-                        className="h-full rounded-full transition-all duration-240 ease-out-soft"
-                        style={{ width: `${pct}%`, backgroundColor: color }}
+                        className="h-full origin-left animate-grow-x rounded-full transition-all duration-240 ease-out-soft"
+                        style={{ width: `${pct}%`, backgroundColor: color, animationDelay: `${idx * 40}ms` }}
                       />
                     </div>
-                    <span className="w-8 shrink-0 text-right text-2xs tabular-nums text-ink-muted">
+                    <span className="w-8 shrink-0 text-right text-2xs numeric text-ink-muted">
                       {share}%
                     </span>
                   </div>

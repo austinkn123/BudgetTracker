@@ -6,6 +6,7 @@ import { withAlpha } from '../../../shared/theme/tokens';
 import type { Category, Transaction } from '../../../shared/types/api';
 import { categoryLabel } from '../utils/selectors';
 import { chartPalette, semanticColors } from '../utils/chartTheme';
+import { currencyPrecise } from '../../../shared/utils/format';
 
 interface RecentActivityFeedProps {
   /** Window-scoped transactions, already sorted newest-first and capped. */
@@ -13,12 +14,6 @@ interface RecentActivityFeedProps {
   /** Full category list — drives names and the stable palette-by-index dot colors. */
   categories: Category[];
 }
-
-const currency = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-});
 
 const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
   const categoryNames = useMemo(
@@ -36,7 +31,7 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
   }, [categories]);
 
   return (
-    <Card title="Recent Activity" subtitle={items.length > 0 ? `Last ${items.length}` : undefined} fullHeight>
+    <Card title="Recent activity" subtitle={items.length > 0 ? `Last ${items.length}` : undefined} fullHeight>
       {items.length === 0 ? (
         <div className="flex min-h-[160px] flex-col items-center justify-center gap-1 text-center">
           <p className="text-sm font-medium text-ink">No transactions yet</p>
@@ -73,12 +68,12 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
 
                 <span
                   className={cn(
-                    'shrink-0 whitespace-nowrap text-[13px] font-semibold tabular-nums',
+                    'shrink-0 whitespace-nowrap text-[13px] font-semibold numeric',
                     isIncome ? 'text-success-dark' : 'text-ink',
                   )}
                 >
                   {isIncome ? '+' : '−'}
-                  {currency.format(Math.abs(t.amount))}
+                  {currencyPrecise.format(Math.abs(t.amount))}
                 </span>
               </li>
             );

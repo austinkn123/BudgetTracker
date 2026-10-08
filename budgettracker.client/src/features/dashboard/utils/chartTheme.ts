@@ -77,6 +77,7 @@ export const buildGradient = (
  * against light cards is what gives the dashboard a focal point.
  */
 export const heroSurface: { background: string; border: string } = {
-  background: `linear-gradient(135deg, ${colorTokens.grey[900]} 0%, ${colorTokens.grey[800]} 55%, ${withAlpha(colorTokens.primary.dark, 0.85)} 100%)`,
+  // Navy depth only. The old purple tail read as the generic AI-gradient hero.
+  background: `linear-gradient(135deg, ${colorTokens.grey[900]} 0%, ${colorTokens.grey[800]} 100%)`,
   border: 'transparent',
 };

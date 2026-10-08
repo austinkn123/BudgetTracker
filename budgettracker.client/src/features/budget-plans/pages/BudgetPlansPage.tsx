@@ -15,21 +15,21 @@ const BudgetPlansPage = () => {
   const isLoading = loadingPlans || loadingCategories;
 
   return (
-    <div className="space-y-6">
+    <div className="stagger-in space-y-6">
       <PageHeader
         title="Budget Plans"
-        description="Create and manage your monthly budget plans"
+        description="What you intend to spend each month, and the categories it is measured in."
       />
 
       <StatusBanner statusMessage={statusMessage} statusError={statusError} />
 
-      <CategoriesSection
+      <BudgetPlansSection
         isLoading={isLoading}
         setStatusMessage={setStatusMessage}
         setStatusError={setStatusError}
       />
 
-      <BudgetPlansSection
+      <CategoriesSection
         isLoading={isLoading}
         setStatusMessage={setStatusMessage}
         setStatusError={setStatusError}

@@ -28,7 +28,7 @@ const AppearanceSection = () => {
         />
         {preference === 'system' && (
           <span className="text-[13px] text-ink-muted">
-            Following your system setting — currently {theme}.
+            Following your system setting, currently {theme}.
           </span>
         )}
       </div>

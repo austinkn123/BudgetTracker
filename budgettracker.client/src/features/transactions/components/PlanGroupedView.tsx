@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Badge, Card, Collapsible, Progress } from '../../../shared/components/ui';
 import type { Category } from '../../../shared/types/api';
-import { currency } from '../../../shared/utils/format';
+import { currency, overAmount } from '../../../shared/utils/format';
 import { cssVar } from '../../../shared/theme/tokens';
 import { cn } from '../../../shared/utils/cn';
 import type { BucketGroup, CategoryGroup, PlanGrouping, SpendStatus } from '../utils/planGrouping';
@@ -37,7 +37,7 @@ const STATUS_BAR: Record<SpendStatus, string> = {
 
 const BUCKET_BLURB: Record<BucketGroup['bucket'], string> = {
   Core: 'Committed spending you have signed up for.',
-  Buffer: 'Flex spending. Anything unplanned or uncategorised lands here too.',
+  Buffer: 'Flex spending. Anything unplanned or uncategorized lands here too.',
 };
 
 /**
@@ -73,7 +73,7 @@ const PlanGroupedView = ({
               <div>
                 <h3 className="text-sm font-semibold text-ink">Needs a category</h3>
                 <p className="mt-0.5 text-xs text-ink-muted">
-                  These are missing from every figure above until you categorise them.
+                  These are missing from every figure above until you categorize them.
                 </p>
               </div>
               <span className="numeric text-sm font-semibold text-ink">
@@ -180,7 +180,7 @@ const CategoryRow = ({ category, ...rowProps }: CategoryRowProps) => {
               />
               {category.overBy > 0 && (
                 <Badge
-                  label={`${currency.format(category.overBy)} over`}
+                  label={`${overAmount(category.overBy)} over`}
                   color={status === 'over' ? 'error' : 'warning'}
                   variant="soft"
                 />

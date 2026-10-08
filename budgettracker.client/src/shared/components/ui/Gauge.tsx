@@ -65,7 +65,7 @@ const Gauge = ({ value, size = 200, valueColor, trackColor, textColor }: GaugePr
           strokeLinecap="round"
           pathLength={100}
           strokeDasharray={`${clamped} 100`}
-          className="transition-all duration-240 ease-out-soft"
+          className="animate-draw-arc transition-all duration-240 ease-out-soft"
         />
       )}
       <text
@@ -78,7 +78,7 @@ const Gauge = ({ value, size = 200, valueColor, trackColor, textColor }: GaugePr
           fontSize: size * 0.24,
           fontWeight: 600,
           letterSpacing: '-0.03em',
-          fontVariantNumeric: 'tabular-nums',
+          fontVariantNumeric: 'tabular-nums lining-nums',
         }}
       >
         {Math.round(clamped)}%

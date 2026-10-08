@@ -13,7 +13,7 @@ const TransactionsPage = () => {
     <div className="space-y-6">
       <PageHeader
         title="Transactions"
-        description="Review what your bank imported and give each transaction a category"
+        description="Review what your bank imported and give each transaction a category."
       />
 
       <StatusBanner statusMessage={statusMessage} statusError={statusError} />

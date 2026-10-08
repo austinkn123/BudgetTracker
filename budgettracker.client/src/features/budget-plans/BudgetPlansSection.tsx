@@ -1,6 +1,6 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Badge, Button } from '../../shared/components/ui';
+import { Badge, Button, Card, ConfirmModal, Skeleton } from '../../shared/components/ui';
 import { useBudgetPlans } from './hooks/useBudgetPlans';
 import { useBudgetPlanForm } from './hooks/useBudgetPlanForm';
 import { useBudgetPlanManagement } from './hooks/useBudgetPlanManagement';
@@ -46,37 +46,55 @@ const BudgetPlansSection = ({
     setStatusError,
   );
 
-  const handleDeletePlan = useCallback((planId: number) => {
-    const confirmed = window.confirm('Delete this budget plan and all of its lines?');
-    if (!confirmed) {
-      return;
-    }
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-    void planManagement.deletePlan(planId);
-  }, [planManagement]);
-
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <div className="space-y-4" aria-busy>
+        <div className="space-y-2">
+          <Skeleton width={120} height={18} />
+          <Skeleton width={280} height={12} />
+        </div>
+        <Card>
+          <Skeleton width={180} height={18} />
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} height={64} className="rounded-lg" />
+            ))}
+          </div>
+          <div className="mt-4 space-y-2">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} height={14} />
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-ink">Budget Plans</h2>
+          <h2 className="text-base font-semibold text-ink">Your plans</h2>
           <p className="text-sm text-ink-muted">
-            Create, edit, switch, and maintain multiple monthly plans.
+            Only the active plan drives the dashboard and the month's pacing.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {planManagement.activePlan ? (
-            <Badge color="success" label={`Active: ${planManagement.activePlan.name}`} />
-          ) : (
-            <Badge label="No Active Plan" />
-          )}
-          <Button startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
-            Add Plan
-          </Button>
-        </div>
+        {/* With no plans yet, the empty state below owns the one Add plan action. */}
+        {budgetPlans.length > 0 && (
+          <div className="flex items-center gap-2">
+            {planManagement.activePlan ? (
+              <Badge color="success" label={`Active: ${planManagement.activePlan.name}`} />
+            ) : (
+              <Badge label="No active plan" />
+            )}
+            <Button startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
+              Add plan
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -91,11 +109,24 @@ const BudgetPlansSection = ({
               onEditLine={lineForm.openForEdit}
               onSwitchActive={(planId) => void planManagement.switchActivePlan(planId)}
               onEditPlan={planManagement.openForEdit}
-              onDeletePlan={(selectedPlan) => handleDeletePlan(selectedPlan.id)}
+              onDeletePlan={(selectedPlan) => setPendingDeleteId(selectedPlan.id)}
             />
           ))
         ) : (
-          <p className="text-body italic text-ink-muted">No budget plans found</p>
+          <Card>
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink">No plans yet</p>
+                <p className="mt-1 text-sm text-ink-muted">
+                  A plan is your take-home pay split into the lines you expect to spend on. The
+                  dashboard measures every month against it.
+                </p>
+              </div>
+              <Button startIcon={<Plus size={16} />} onClick={planManagement.openForAdd}>
+                Add plan
+              </Button>
+            </div>
+          </Card>
         )}
       </div>
 
@@ -107,6 +138,21 @@ const BudgetPlansSection = ({
         onClose={planManagement.closeDialog}
         onSave={planManagement.savePlan}
         onDelete={() => planManagement.deletePlan()}
+      />
+
+      <ConfirmModal
+        open={pendingDeleteId !== null}
+        title="Delete budget plan?"
+        message="This removes the plan and all of its lines. This can't be undone."
+        confirmLabel="Delete plan"
+        destructive
+        isPending={planManagement.isSaving}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => {
+          const planId = pendingDeleteId;
+          setPendingDeleteId(null);
+          if (planId !== null) void planManagement.deletePlan(planId);
+        }}
       />
 
       <PlanLineDialog

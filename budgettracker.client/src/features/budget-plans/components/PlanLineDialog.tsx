@@ -75,7 +75,7 @@ const PlanLineDialog = ({
     <Modal
       open={open}
       onClose={onClose}
-      title={mode === 'add' ? 'Add Plan Line' : 'Edit Plan Line'}
+      title={mode === 'add' ? 'Add plan line' : 'Edit plan line'}
       maxWidth="sm"
       disableBackdropClose={isSaving}
       actions={
@@ -113,7 +113,7 @@ const PlanLineDialog = ({
 
       <Input control={control} name="notes" label="Notes" multiline rows={2} />
 
-      <Checkbox control={control} name="isStressFactor" label="Stress Factor" />
+      <Checkbox control={control} name="isStressFactor" label="Stress factor" />
     </Modal>
   );
 };

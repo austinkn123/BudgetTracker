@@ -11,7 +11,9 @@ import {
   Modal,
   ModalActions,
   Select,
+  Skeleton,
   Tooltip,
+  type BadgeColor,
 } from '../../shared/components/ui';
 import type { Category } from '../../shared/types/api';
 import { PLAID_CATEGORY_OPTIONS } from '../../shared/constants/plaidCategories';
@@ -27,9 +29,9 @@ type CategoriesSectionProps = {
   setStatusError: (message: string | null) => void;
 };
 
-const GROUPS: { label: string; type: string; color: 'success' | 'error' | 'info' }[] = [
+const GROUPS: { label: string; type: string; color: BadgeColor }[] = [
   { label: 'Income', type: 'Income', color: 'success' },
-  { label: 'Expense', type: 'Expense', color: 'error' },
+  { label: 'Expense', type: 'Expense', color: 'neutral' },
   { label: 'Both', type: 'Both', color: 'info' },
 ];
 
@@ -105,7 +107,24 @@ const CategoriesSection = ({
     return map;
   }, [categories, transactions, budgetPlans]);
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <Card title="Categories">
+        <div className="space-y-3">
+          {[5, 3].map((count, group) => (
+            <div key={group} className="space-y-2">
+              <Skeleton width={72} height={10} />
+              <div className="flex flex-wrap gap-1">
+                {Array.from({ length: count }, (_, i) => (
+                  <Skeleton key={i} width={72 + ((i * 23) % 48)} height={24} className="rounded-full" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  }
 
   const openAddDialog = () => {
     setEditingCategoryId(null);
@@ -182,13 +201,16 @@ const CategoriesSection = ({
       title="Categories"
       actions={
         <Button size="sm" onClick={openAddDialog}>
-          Add Category
+          Add category
         </Button>
       }
     >
       <>
         {categories.length === 0 ? (
-          <p className="text-body italic text-ink-muted">No categories found</p>
+          <p className="text-sm text-ink-muted">
+            No categories yet. Add one for each kind of spending you want to see in your plan, like
+            groceries or the mortgage.
+          </p>
         ) : (
           <div className="space-y-3">
             {GROUPS.map((group) => {
@@ -229,7 +251,7 @@ const CategoriesSection = ({
       <Modal
         open={dialogOpen}
         onClose={closeDialog}
-        title={dialogMode === 'add' ? 'Add Category' : 'Edit Category'}
+        title={dialogMode === 'add' ? 'Add category' : 'Edit category'}
         maxWidth="xs"
         disableBackdropClose={isSaving}
         actions={
@@ -251,7 +273,7 @@ const CategoriesSection = ({
         <Select
           control={control}
           name="plaidCategoryPrimary"
-          label="Auto-categorise imports as"
+          label="Auto-categorize imports as"
           options={PLAID_CATEGORY_OPTIONS}
           emptyOptionLabel="No automatic mapping"
           helperText="Imported transactions Plaid tags with this category are assigned here automatically."
@@ -260,13 +282,13 @@ const CategoriesSection = ({
 
       <ConfirmModal
         open={deleteTarget !== null}
-        title="Delete Category"
+        title="Delete category?"
         message={
           deleteTarget ? (
             <>
               Delete <strong>{deleteTarget.name}</strong>? It is used in{' '}
               {getUsage(deleteTarget.id).transactions} transactions and{' '}
-              {getUsage(deleteTarget.id).planEntries} budget plan entries. This cannot be undone.
+              {getUsage(deleteTarget.id).planEntries} budget plan entries. This can't be undone.
             </>
           ) : (
             ''

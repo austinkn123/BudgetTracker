@@ -61,16 +61,16 @@ const BudgetPlanDialog = ({
       <Modal
         open={open}
         onClose={onClose}
-        title={mode === 'add' ? 'Add Budget Plan' : 'Edit Budget Plan'}
+        title={mode === 'add' ? 'Add budget plan' : 'Edit budget plan'}
         maxWidth="sm"
         disableBackdropClose={isSaving}
         actions={
           <ModalActions
             onCancel={onClose}
             onConfirm={() => void submit()}
-            confirmLabel={mode === 'add' ? 'Create Plan' : 'Save Changes'}
+            confirmLabel={mode === 'add' ? 'Create plan' : 'Save changes'}
             onDelete={mode === 'edit' && onDelete ? () => setConfirmDelete(true) : undefined}
-            deleteLabel="Delete Plan"
+            deleteLabel="Delete plan"
             isPending={isSaving}
           />
         }
@@ -79,15 +79,15 @@ const BudgetPlanDialog = ({
           <Input
             control={control}
             name="name"
-            label="Plan Name"
+            label="Plan name"
             required
             className="sm:col-span-2"
           />
-          <Input control={control} name="planMonth" label="Plan Month" type="month" required />
+          <Input control={control} name="planMonth" label="Plan month" type="month" required />
           <Input
             control={control}
             name="netIncomeMonthly"
-            label="Net Monthly Income"
+            label="Net monthly income"
             type="number"
             valueAs="number"
             min={0}
@@ -102,8 +102,8 @@ const BudgetPlanDialog = ({
       <ConfirmModal
         open={confirmDelete}
         title="Delete budget plan?"
-        message="This removes the plan and all of its lines. This cannot be undone."
-        confirmLabel="Delete Plan"
+        message="This removes the plan and all of its lines. This can't be undone."
+        confirmLabel="Delete plan"
         destructive
         isPending={isSaving}
         onCancel={() => setConfirmDelete(false)}

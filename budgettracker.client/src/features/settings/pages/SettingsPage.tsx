@@ -8,8 +8,8 @@ const SettingsPage = () => {
   const { isLoading: loadingUser } = useUser();
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Settings" description="Your account information" />
+    <div className="stagger-in space-y-6">
+      <PageHeader title="Settings" description="Your account, how the app looks, and your linked bank." />
 
       <UserSection isLoading={loadingUser} />
 

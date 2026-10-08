@@ -56,7 +56,7 @@ const Table = <TRow,>({
 
   return (
     <div className={cn('-mx-6 overflow-x-auto', className)}>
-      <table aria-label={ariaLabel} className="w-full border-collapse text-sm tabular-nums">
+      <table aria-label={ariaLabel} className="w-full border-collapse text-sm numeric">
         <thead>
           <tr className="bg-background/60">
             {columns.map((column) => (
