@@ -41,12 +41,12 @@ const Modal = ({
 }: ModalProps) => (
   <RadixDialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
     <RadixDialog.Portal>
-      <RadixDialog.Overlay className="fixed inset-0 z-40 bg-grey-900/50 backdrop-blur-[2px] animate-fade-in" />
+      <RadixDialog.Overlay className="fixed inset-0 z-40 bg-grey-900/50 backdrop-blur-[2px] animate-fade-in data-[state=closed]:animate-fade-out" />
       <RadixDialog.Content
         onPointerDownOutside={(event) => disableBackdropClose && event.preventDefault()}
         onEscapeKeyDown={(event) => disableBackdropClose && event.preventDefault()}
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-4rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-surface shadow-lg ring-1 ring-ink/10 animate-zoom-in',
+          'fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-4rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-surface shadow-lg ring-1 ring-ink/10 animate-zoom-in data-[state=closed]:animate-zoom-out',
           fullWidth && 'w-[calc(100vw-2rem)]',
           MAX_WIDTH_CLASSES[maxWidth],
         )}

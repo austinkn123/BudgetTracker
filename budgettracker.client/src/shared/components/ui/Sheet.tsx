@@ -20,7 +20,7 @@ export interface SheetProps {
 const Sheet = ({ open, onClose, title, width = 240, className, children }: SheetProps) => (
   <RadixDialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
     <RadixDialog.Portal>
-      <RadixDialog.Overlay className="fixed inset-0 z-40 bg-ink/40 animate-fade-in" />
+      <RadixDialog.Overlay className="fixed inset-0 z-40 bg-ink/40 animate-fade-in data-[state=closed]:animate-fade-out" />
       <RadixDialog.Content
         className={cn(
           'fixed inset-y-0 left-0 z-50 shadow-lg data-[state=closed]:animate-slide-out-left data-[state=open]:animate-slide-in-left',

@@ -60,7 +60,7 @@ const Alert = ({
     <div
       role="alert"
       className={cn(
-        'flex items-start gap-3 rounded-md border px-4 py-3 text-sm',
+        'flex animate-rise-in items-start gap-3 rounded-md border px-4 py-3 text-sm',
         variant === 'standard' ? styles.standard : styles.outlined,
         className,
       )}

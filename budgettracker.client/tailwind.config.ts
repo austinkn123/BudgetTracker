@@ -3,6 +3,7 @@ import defaultTheme from 'tailwindcss/defaultTheme';
 import plugin from 'tailwindcss/plugin';
 import {
   colorTokens,
+  cssVar,
   darkColorTokens,
   fontSizeTokens,
   hexToChannels,
@@ -116,9 +117,15 @@ export default {
       keyframes: {
         'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
         'fade-out': { from: { opacity: '1' }, to: { opacity: '0' } },
+        // `scale`, not `transform`: the dialog centres itself with translate, which a
+        // transform keyframe would overwrite mid-animation.
         'zoom-in': {
-          from: { opacity: '0', transform: 'scale(0.97)' },
-          to: { opacity: '1', transform: 'scale(1)' },
+          from: { opacity: '0', scale: '0.97' },
+          to: { opacity: '1', scale: '1' },
+        },
+        'zoom-out': {
+          from: { opacity: '1', scale: '1' },
+          to: { opacity: '0', scale: '0.97' },
         },
         'slide-in-left': {
           from: { transform: 'translateX(-100%)' },
@@ -146,11 +153,31 @@ export default {
           from: { opacity: '0', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // Directional content swap (month stepping): enters from the side it came from.
+        'slide-in-left-sm': {
+          from: { opacity: '0', transform: 'translateX(-12px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        'slide-in-right-sm': {
+          from: { opacity: '0', transform: 'translateX(12px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        // Icon swap (theme toggle): the new glyph turns in.
+        'turn-in': {
+          from: { opacity: '0', transform: 'rotate(-90deg) scale(0.6)' },
+          to: { opacity: '1', transform: 'rotate(0) scale(1)' },
+        },
+        // Write confirmation: a row washes success-subtle, then settles back.
+        'flash-success': {
+          from: { backgroundColor: cssVar('success-subtle') },
+          to: { backgroundColor: 'transparent' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1)',
         'fade-out': 'fade-out 160ms cubic-bezier(0.4, 0, 1, 1)',
         'zoom-in': 'zoom-in 240ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'zoom-out': 'zoom-out 160ms cubic-bezier(0.4, 0, 1, 1)',
         'slide-in-left': 'slide-in-left 240ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-out-left': 'slide-out-left 160ms cubic-bezier(0.4, 0, 1, 1)',
         'collapse-down': 'collapse-down 240ms cubic-bezier(0.16, 1, 0.3, 1)',
@@ -159,6 +186,10 @@ export default {
         'grow-y': 'grow-y 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
         'draw-arc': 'draw-arc 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
         'rise-in': 'rise-in 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+        'slide-in-left-sm': 'slide-in-left-sm 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+        'slide-in-right-sm': 'slide-in-right-sm 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+        'turn-in': 'turn-in 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+        'flash-success': 'flash-success 700ms cubic-bezier(0.16, 1, 0.3, 1)',
       },
     },
   },

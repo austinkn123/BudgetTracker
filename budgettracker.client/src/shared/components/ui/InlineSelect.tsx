@@ -72,7 +72,7 @@ const InlineSelect = <TValue extends string | number = string>({
       <RadixSelect.Content
         position="popper"
         sideOffset={4}
-        className="z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-md border border-border bg-surface p-1 shadow-md animate-fade-in"
+        className="z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-md border border-border bg-surface p-1 shadow-md animate-fade-in data-[state=closed]:animate-fade-out"
       >
         <RadixSelect.Viewport>
           {emptyOptionLabel !== undefined && (

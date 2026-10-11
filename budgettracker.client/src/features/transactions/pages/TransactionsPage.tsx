@@ -10,7 +10,7 @@ const TransactionsPage = () => {
   const [statusError, setStatusError] = useState<string | null>(null);
 
   return (
-    <div className="space-y-6">
+    <div className="stagger-in space-y-6">
       <PageHeader
         title="Transactions"
         description="Review what your bank imported and give each transaction a category."

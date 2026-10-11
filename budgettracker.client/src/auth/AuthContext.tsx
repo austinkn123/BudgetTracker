@@ -57,9 +57,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const handleSignIn = async (email: string, password: string) => {
     try {
-      const output = await signIn({
-        username: email,
-        password,
+      const credentials = { username: email, password };
+      const output = await signIn(credentials).catch(async (error: Error) => {
+        // A stale session still in Amplify's storage blocks signIn; clear it and retry once.
+        if (error.name !== 'UserAlreadyAuthenticatedException') throw error;
+        await signOut();
+        return signIn(credentials);
       });
 
       if (output.isSignedIn) {

@@ -117,6 +117,15 @@ const TransactionRow = ({
     if (!editingNote) setNoteDraft(transaction.notes ?? '');
   }, [transaction.notes, editingNote]);
 
+  // Confirm a category write on the row itself. Counted during render (not keyed on the id) so
+  // the first paint never flashes; each change bumps the key and replays the wash.
+  const [seenCategoryId, setSeenCategoryId] = useState(transaction.categoryId);
+  const [categoryFlashes, setCategoryFlashes] = useState(0);
+  if (transaction.categoryId !== seenCategoryId) {
+    setSeenCategoryId(transaction.categoryId);
+    setCategoryFlashes((n) => n + 1);
+  }
+
   const inflow = isInflowTransaction(transaction);
 
   const commitNote = () => {
@@ -129,10 +138,17 @@ const TransactionRow = ({
   return (
     <li
       className={cn(
-        'flex items-start gap-3 px-4 py-3 transition-colors duration-120',
+        'relative isolate flex items-start gap-3 px-4 py-3 transition-colors duration-120',
         selected ? 'bg-primary-subtle/40' : 'hover:bg-background',
       )}
     >
+      {categoryFlashes > 0 && (
+        <span
+          key={categoryFlashes}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 animate-flash-success"
+        />
+      )}
       <div className="pt-0.5">
         <InlineCheckbox
           checked={selected}

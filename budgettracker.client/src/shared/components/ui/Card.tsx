@@ -95,7 +95,7 @@ const Card = ({
         variant === 'elevated' && 'bg-surface shadow-md ring-1 ring-ink/[0.04]',
         variant === 'plain' && 'bg-transparent',
         fullHeight && 'h-full',
-        onClick && 'transition-shadow duration-160 ease-out-soft hover:shadow-md',
+        onClick && 'transition-[box-shadow,transform] duration-160 ease-out-soft hover:-translate-y-px hover:shadow-md',
         className,
       )}
     >

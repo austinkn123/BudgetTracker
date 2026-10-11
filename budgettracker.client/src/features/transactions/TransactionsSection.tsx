@@ -44,6 +44,8 @@ const TransactionsSection = ({
   const [search, setSearch] = useState('');
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  // Which way the last month step went, so the results slide in from that side.
+  const [monthStep, setMonthStep] = useState<'next' | 'prev' | null>(null);
 
   const monthStart = useMemo(() => startOfMonth(month), [month]);
   const monthEnd = useMemo(() => endOfMonth(month), [month]);
@@ -147,6 +149,7 @@ const TransactionsSection = ({
   );
 
   const handleMonthChange = (next: Date) => {
+    if (!isSameMonth(next, month)) setMonthStep(next > month ? 'next' : 'prev');
     setMonth(next);
     // Keep the calendar's selection inside the month being reviewed.
     setSelectedDate(isSameMonth(next, new Date()) ? startOfDay(new Date()) : next);
@@ -187,7 +190,10 @@ const TransactionsSection = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ToggleGroup
           value={view}
-          onChange={setView}
+          onChange={(next) => {
+            setMonthStep(null);
+            setView(next);
+          }}
           options={VIEW_OPTIONS}
           ariaLabel="Transactions view"
         />
@@ -197,6 +203,7 @@ const TransactionsSection = ({
             size="sm"
             onClick={() => {
               setStatus(status === 'uncategorized' ? 'all' : 'uncategorized');
+              setMonthStep(null);
               setView('list');
             }}
           >
@@ -212,7 +219,7 @@ const TransactionsSection = ({
       />
 
       {review.selectedIds.size > 0 && (
-        <Card padding="sm">
+        <Card padding="sm" className="animate-rise-in">
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm font-medium text-ink">
               {review.selectedIds.size} selected
@@ -238,52 +245,65 @@ const TransactionsSection = ({
         </Card>
       )}
 
-      {view === 'plan' && <PlanGroupedView grouping={grouping} {...rowProps} />}
+      {/* Remounts per view (crossfade) and per month (directional slide). The calendar keeps its
+          mount across months: its own month buttons live inside it and would lose focus. */}
+      <div
+        key={view === 'calendar' ? view : `${view}-${monthStart.getTime()}`}
+        className={
+          view === 'calendar' || monthStep === null
+            ? 'animate-fade-in'
+            : monthStep === 'next'
+              ? 'animate-slide-in-right-sm'
+              : 'animate-slide-in-left-sm'
+        }
+      >
+        {view === 'plan' && <PlanGroupedView grouping={grouping} {...rowProps} />}
 
-      {view === 'list' && (
-        <div className="flex flex-col gap-4">
-          <TransactionFilters
-            status={status}
-            onStatusChange={setStatus}
-            search={search}
-            onSearchChange={setSearch}
-            uncategorizedCount={uncategorizedCount}
-          />
+        {view === 'list' && (
+          <div className="flex flex-col gap-4">
+            <TransactionFilters
+              status={status}
+              onStatusChange={setStatus}
+              search={search}
+              onSearchChange={setSearch}
+              uncategorizedCount={uncategorizedCount}
+            />
+            <Card padding="none">
+              <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+                <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                  {listTransactions.length}{' '}
+                  {listTransactions.length === 1 ? 'transaction' : 'transactions'}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => review.toggleAll(review.selectedIds.size !== listTransactions.length)}
+                >
+                  {review.selectedIds.size === listTransactions.length && listTransactions.length > 0
+                    ? 'Deselect all'
+                    : 'Select all'}
+                </Button>
+              </div>
+              <TransactionRows transactions={listTransactions} {...rowProps} />
+            </Card>
+          </div>
+        )}
+
+        {view === 'calendar' && (
           <Card padding="none">
-            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-              <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                {listTransactions.length}{' '}
-                {listTransactions.length === 1 ? 'transaction' : 'transactions'}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => review.toggleAll(review.selectedIds.size !== listTransactions.length)}
-              >
-                {review.selectedIds.size === listTransactions.length && listTransactions.length > 0
-                  ? 'Deselect all'
-                  : 'Select all'}
-              </Button>
-            </div>
-            <TransactionRows transactions={listTransactions} {...rowProps} />
+            <TransactionTable
+              categories={categories}
+              daySummaries={daySummaries}
+              selectedDate={selectedDate}
+              selectedDaySummary={selectedDaySummary}
+              maskByPlaidAccountId={maskByPlaidAccountId}
+              onDateChange={setSelectedDate}
+              onMonthChange={(next) => handleMonthChange(startOfMonth(next))}
+              onRowClick={() => undefined}
+            />
           </Card>
-        </div>
-      )}
-
-      {view === 'calendar' && (
-        <Card padding="none">
-          <TransactionTable
-            categories={categories}
-            daySummaries={daySummaries}
-            selectedDate={selectedDate}
-            selectedDaySummary={selectedDaySummary}
-            maskByPlaidAccountId={maskByPlaidAccountId}
-            onDateChange={setSelectedDate}
-            onMonthChange={(next) => handleMonthChange(startOfMonth(next))}
-            onRowClick={() => undefined}
-          />
-        </Card>
-      )}
+        )}
+      </div>
     </div>
   );
 };

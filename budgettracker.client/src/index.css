@@ -25,12 +25,22 @@
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
-    *::after {
+    *::after,
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+
+  /* The theme toggle's page crossfade (document.startViewTransition) on the enter curve. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: theme('transitionDuration.240');
+    animation-timing-function: theme('transitionTimingFunction.out-soft');
   }
 
   @media print {

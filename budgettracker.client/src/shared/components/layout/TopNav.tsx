@@ -1,9 +1,11 @@
-import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useState, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { LogOut, Menu, Moon, Sun, User, Wallet } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../../features/user/hooks/useUser';
 import { useSignOut } from '../../hooks/useSignOut';
+import { useSlidingIndicator } from '../../hooks/useSlidingIndicator';
 import { useTheme } from '../../theme/useTheme';
 import { Skeleton, Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -61,6 +63,21 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
   const { user: cognitoUser } = useAuth();
   const { signOut, isSigningOut } = useSignOut();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { pathname } = useLocation();
+  const { containerRef: linksRef, rect: activeRect } = useSlidingIndicator<HTMLUListElement>(
+    '[aria-current="page"]',
+    pathname,
+  );
+  // Only animate the Sun/Moon swap after a click, not on first paint.
+  const [themeToggled, setThemeToggled] = useState(false);
+
+  const handleThemeToggle = () => {
+    setThemeToggled(true);
+    // Native crossfade of the whole page where supported; a plain swap elsewhere.
+    // flushSync so the `.dark` class lands inside the transition's update callback.
+    if (!document.startViewTransition) return toggleTheme();
+    document.startViewTransition(() => flushSync(toggleTheme));
+  };
 
   // useUser() is the reliable source: the Cognito email is empty after a page
   // refresh because getCurrentUser() does not repopulate signInDetails.
@@ -119,11 +136,26 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
         {/* Desktop links — centred in the contracted pill, left-aligned beside
             the wordmark when expanded. */}
         <ul
+          ref={linksRef}
           className={cn(
-            'hidden flex-1 items-center gap-0.5 lg:flex',
+            'relative isolate hidden flex-1 items-center gap-0.5 lg:flex',
             compact ? 'justify-center' : 'justify-start',
           )}
         >
+          {/* One pill slides to the active link; it never teleports. Re-measured
+              as the bar contracts, so it tracks the morph too. */}
+          {activeRect && (
+            <li
+              aria-hidden
+              className="absolute left-0 top-0 -z-10 rounded-full bg-white/[0.12] transition-[transform,width,height] duration-240 ease-out-soft motion-reduce:transition-none"
+              // Measured geometry: runtime pixel values no utility class can express.
+              style={{
+                transform: `translate(${activeRect.left}px, ${activeRect.top}px)`,
+                width: activeRect.width,
+                height: activeRect.height,
+              }}
+            />
+          )}
           {NAV_ITEMS.map((item) => (
             <li key={item.path}>
               <CompactTip compact={compact} label={item.label}>
@@ -136,7 +168,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
                       'outline-none focus-visible:ring-2 focus-visible:ring-primary-light/60',
                       compact ? 'px-2' : 'px-3.5',
                       isActive
-                        ? 'bg-white/[0.12] text-white'
+                        ? 'text-white'
                         : 'text-white/55 hover:bg-white/[0.06] hover:text-white/90',
                     )
                   }
@@ -167,14 +199,16 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
           <Tooltip title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}>
             <button
               type="button"
-              onClick={toggleTheme}
+              onClick={handleThemeToggle}
               aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               className={cn(
                 'focus-ring inline-flex items-center justify-center rounded-full text-white/45 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white/90 motion-reduce:transition-none',
                 compact ? 'h-8 w-8' : 'h-9 w-9',
               )}
             >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              <span key={theme} className={cn('flex', themeToggled && 'animate-turn-in')}>
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </span>
             </button>
           </Tooltip>
 

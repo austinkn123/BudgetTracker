@@ -181,9 +181,13 @@ modal one row at a time is the failure mode this page was rebuilt to remove.
 | Duration | Use |
 |---|---|
 | `120ms` | colour and hover — the workhorse |
-| `160ms` | transforms, and every *exit* |
-| `240ms` | overlays, and every *enter* (`animate-rise-in` for sections) |
-| `700ms` | data drawing itself in (`animate-grow-x` on bars, `animate-draw-arc` on the gauge, `useCountUp` on headline figures), once per load, never chrome |
+| `160ms` | transforms, and every *exit* (`animate-fade-out`, `animate-zoom-out` on `data-[state=closed]` overlays) |
+| `240ms` | overlays, and every *enter* (`animate-rise-in` for sections and pop-in UI, `animate-slide-in-left-sm` / `-right-sm` for month steps, `animate-turn-in` for icon swaps, sliding selection indicators) |
+| `700ms` | data drawing itself in (`animate-grow-x` on bars, `animate-draw-arc` on the gauge, `useCountUp` on headline figures), once per load, never chrome; and `animate-flash-success`, a row confirming a write |
+
+**Selection indicators slide; they never teleport.** The active nav link and segmented controls
+share one indicator that moves between items (`useSlidingIndicator`), rather than each item
+painting its own background.
 
 Page roots carry `.stagger-in`: their direct children rise in 40ms apart, so the eye lands on the
 header and reads down. Draw-in and entrance animations use `backwards` fill, so nothing keeps a
