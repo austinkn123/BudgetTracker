@@ -311,6 +311,11 @@ namespace BudgetTracker.Domain.Migrations
                     b.Property<DateTime?>("LastSyncedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<bool>("NeedsReconnect")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("PlaidItemId")
                         .IsRequired()
                         .HasMaxLength(100)

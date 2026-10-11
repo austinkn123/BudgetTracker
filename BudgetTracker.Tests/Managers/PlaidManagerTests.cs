@@ -1,3 +1,4 @@
+using System.Net;
 using BudgetTracker.Domain.Engines;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Engines;
@@ -56,7 +57,7 @@ public class PlaidManagerTests
     public async Task CreateLinkToken_DelegatesToAccessorWithCognitoSub()
     {
         var expected = new PlaidLinkTokenResult("link-sandbox-abc", DateTime.UtcNow.AddHours(4));
-        _plaidAccessor.Setup(a => a.CreateLinkTokenAsync("cognito-sub-123", It.IsAny<CancellationToken>()))
+        _plaidAccessor.Setup(a => a.CreateLinkTokenAsync("cognito-sub-123", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
 
         var result = await BuildSut().CreateLinkTokenAsync(userId: 1, cognitoSub: "cognito-sub-123");
@@ -69,7 +70,7 @@ public class PlaidManagerTests
     [Fact]
     public async Task CreateLinkToken_AccessorThrows_ReturnsPlainLanguageFailure()
     {
-        _plaidAccessor.Setup(a => a.CreateLinkTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _plaidAccessor.Setup(a => a.CreateLinkTokenAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("network down"));
 
         var result = await BuildSut().CreateLinkTokenAsync(userId: 1, cognitoSub: "cognito-sub-123");
@@ -77,6 +78,79 @@ public class PlaidManagerTests
         Assert.False(result.IsSuccess);
         Assert.NotNull(result.Error);
         Assert.DoesNotContain("network down", result.Error!); // sanitize internal details
+    }
+
+    // ── CreateUpdateLinkTokenAsync ──────────────────────────────────────────
+
+    private const string LoginRequiredMessage = "A bank needs you to sign in again. Open Settings and click Reconnect.";
+    private const string ReconnectMessage = "A bank connection needs to be reconnected. Disconnect it and link it again.";
+
+    private static PlaidApiException PlaidError(string errorCode) =>
+        new(errorCode, $"Plaid API error (status 400): {errorCode} — details", HttpStatusCode.BadRequest);
+
+    [Fact]
+    public async Task CreateUpdateLinkToken_PassesTheItemsAccessTokenToPlaid()
+    {
+        var expected = new PlaidLinkTokenResult("link-sandbox-update", DateTime.UtcNow.AddHours(4));
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _plaidAccessor.Setup(a => a.CreateLinkTokenAsync("cognito-sub-123", "access-token-xyz", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        var result = await BuildSut().CreateUpdateLinkTokenAsync(userId: 5, cognitoSub: "cognito-sub-123", plaidItemId: 11);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task CreateUpdateLinkToken_ItemUnknownInactiveOrOwnedByAnotherUser_ReturnsNotFoundWithoutCallingPlaid()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 99)).ReturnsAsync(AccessTokenLookup.NotFound);
+
+        var result = await BuildSut().CreateUpdateLinkTokenAsync(userId: 5, cognitoSub: "cognito-sub-123", plaidItemId: 99);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Bank connection not found", result.Error);
+        _plaidAccessor.Verify(a => a.CreateLinkTokenAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateUpdateLinkToken_TokenUndecryptable_ReturnsRelinkMessageWithoutCallingPlaid()
+    {
+        // Update mode needs the access_token; one the key ring can't read can only be fixed by relinking.
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Undecryptable);
+
+        var result = await BuildSut().CreateUpdateLinkTokenAsync(userId: 5, cognitoSub: "cognito-sub-123", plaidItemId: 11);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ReconnectMessage, result.Error);
+        _plaidAccessor.Verify(a => a.CreateLinkTokenAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateUpdateLinkToken_PlaidThrows_ReturnsPlainLanguageFailure()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _plaidAccessor.Setup(a => a.CreateLinkTokenAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(PlaidError("INVALID_ACCESS_TOKEN"));
+
+        var result = await BuildSut().CreateUpdateLinkTokenAsync(userId: 5, cognitoSub: "cognito-sub-123", plaidItemId: 11);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Unable to start bank link right now. Please try again in a moment.", result.Error);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreateUpdateLinkToken_MissingCognitoSub_ReturnsFailureWithoutLookup(string? cognitoSub)
+    {
+        var result = await BuildSut().CreateUpdateLinkTokenAsync(userId: 5, cognitoSub: cognitoSub!, plaidItemId: 11);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Authenticated user identity is missing", result.Error);
+        _itemAccessor.Verify(a => a.GetActiveAccessTokenAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
     }
 
     // ── ExchangePublicTokenAsync ────────────────────────────────────────────
@@ -654,6 +728,41 @@ public class PlaidManagerTests
         Assert.Equal("Could not refresh transactions right now. Please try again.", result.Error);
     }
 
+    /// <summary>Arranges item 1's sync so the Plaid call throws <paramref name="error"/>.</summary>
+    private void ArrangeItemSyncThrows(Exception error)
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([SyncableItem(1, lastSyncedAt: null)]);
+        _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("item-1")).ReturnsAsync(AccessTokenLookup.Found("token-1"));
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(5)).ReturnsAsync(new List<Account>());
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("token-1", "c-1", It.IsAny<CancellationToken>())).ThrowsAsync(error);
+    }
+
+    [Fact]
+    public async Task Should_FlagItemAndReturnLoginRequiredMessage_When_PlaidReportsItemLoginRequired()
+    {
+        ArrangeItemSyncThrows(PlaidError("ITEM_LOGIN_REQUIRED"));
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(1, true)).Returns(Task.CompletedTask);
+
+        var result = await BuildSut().SyncAsync(userId: 5);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(LoginRequiredMessage, result.Error);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(1, true), Times.Once);
+        _itemAccessor.Verify(a => a.UpdateSyncStateAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Should_ReturnGenericMessageWithoutFlagging_When_PlaidFailsWithAnotherErrorCode()
+    {
+        ArrangeItemSyncThrows(PlaidError("INSTITUTION_DOWN"));
+
+        var result = await BuildSut().SyncAsync(userId: 5);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Could not refresh transactions right now. Please try again.", result.Error);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(It.IsAny<int>(), It.IsAny<bool>()), Times.Never);
+    }
+
     // ── GetConnectionsAsync ─────────────────────────────────────────────────
 
     [Fact]
@@ -796,6 +905,19 @@ public class PlaidManagerTests
         Assert.Equal("wf-sav", Assert.Single(result[1].Accounts).PlaidAccountId);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetConnections_MapsNeedsReconnect(bool needsReconnect)
+    {
+        var plaidItem = new PlaidItem { Id = 11, UserId = 5, InstitutionName = "Chase", NeedsReconnect = needsReconnect, Accounts = [] };
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([plaidItem]);
+
+        var result = await BuildSut().GetConnectionsAsync(userId: 5);
+
+        Assert.Equal(needsReconnect, Assert.Single(result).NeedsReconnect);
+    }
+
     // ── DisconnectAsync (by id) ─────────────────────────────────────────────
 
     [Fact]
@@ -896,7 +1018,36 @@ public class PlaidManagerTests
         Assert.Equal("Bank connection not found", result.Error);
     }
 
-    // ── HandleTransactionsWebhookAsync ──────────────────────────────────────
+    // ── MarkReconnectedAsync ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task MarkReconnected_OwnedActiveItem_ClearsFlag()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([ChaseItem()]);
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(11, false)).Returns(Task.CompletedTask);
+
+        var result = await BuildSut().MarkReconnectedAsync(userId: 5, plaidItemId: 11);
+
+        Assert.True(result.IsSuccess);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(11, false), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(5, 99)] // unknown or inactive id: absent from the user's active items
+    [InlineData(6, 11)] // item 11 belongs to user 5
+    public async Task MarkReconnected_ItemUnknownInactiveOrOwnedByAnotherUser_ReturnsNotFoundWithoutWriting(int userId, int plaidItemId)
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([ChaseItem()]);
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(6)).ReturnsAsync([]);
+
+        var result = await BuildSut().MarkReconnectedAsync(userId, plaidItemId);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Bank connection not found", result.Error);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(It.IsAny<int>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    // ── HandleWebhookAsync ──────────────────────────────────────
 
     private const string ValidJwt = "header.payload.signature";
     private static readonly PlaidJwkDto TestJwk = new("EC", "P-256", "x", "y", "kid-1", "sig", "ES256");
@@ -946,7 +1097,7 @@ public class PlaidManagerTests
         ArrangeVerifiedWebhook(body);
         ArrangeSyncForItem("plaid-item-1", ItemFor("plaid-item-1"));
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.True(result.IsSuccess);
         _itemAccessor.Verify(a => a.GetByPlaidItemIdAsync("plaid-item-1"), Times.Once);
@@ -963,7 +1114,7 @@ public class PlaidManagerTests
             .ReturnsAsync(TestJwk);
         _webhookEngine.Setup(e => e.VerifyWebhook(ValidJwt, TestJwk, body)).Returns(false);
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         // Silent reject: neutral success, but NO item lookup and NO sync.
         Assert.True(result.IsSuccess);
@@ -977,7 +1128,7 @@ public class PlaidManagerTests
         var body = """{"webhook_type":"TRANSACTIONS","webhook_code":"SYNC_UPDATES_AVAILABLE","item_id":"plaid-item-1"}""";
         _webhookEngine.Setup(e => e.ExtractKeyId(ValidJwt)).Returns((string?)null);
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.True(result.IsSuccess);
         _plaidAccessor.Verify(a => a.GetWebhookVerificationKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -990,7 +1141,7 @@ public class PlaidManagerTests
         var body = """{"webhook_type":"ITEM","webhook_code":"ERROR","item_id":"plaid-item-1"}""";
         ArrangeVerifiedWebhook(body);
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.True(result.IsSuccess);
         _itemAccessor.Verify(a => a.GetByPlaidItemIdAsync(It.IsAny<string>()), Times.Never);
@@ -1002,7 +1153,7 @@ public class PlaidManagerTests
         var body = """{"webhook_type":"TRANSACTIONS","webhook_code":"RECURRING_TRANSACTIONS_UPDATE","item_id":"plaid-item-1"}""";
         ArrangeVerifiedWebhook(body);
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.True(result.IsSuccess);
         _itemAccessor.Verify(a => a.GetByPlaidItemIdAsync(It.IsAny<string>()), Times.Never);
@@ -1017,7 +1168,7 @@ public class PlaidManagerTests
         _itemAccessor.Setup(a => a.GetByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(ItemFor("plaid-item-1"));
         _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(AccessTokenLookup.Undecryptable);
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.True(result.IsSuccess);
         VerifyWarningLogged(Times.Once());
@@ -1032,10 +1183,129 @@ public class PlaidManagerTests
         ArrangeVerifiedWebhook(body);
         _itemAccessor.Setup(a => a.GetByPlaidItemIdAsync("ghost-item")).ReturnsAsync((PlaidItem?)null);
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.True(result.IsSuccess);
         _plaidAccessor.Verify(a => a.SyncTransactionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ── Webhook — ITEM login events ─────────────────────────────────────────
+
+    [Theory]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"ERROR","item_id":"plaid-item-1","error":{"error_code":"ITEM_LOGIN_REQUIRED"}}""")]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"PENDING_DISCONNECT","item_id":"plaid-item-1"}""")]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"PENDING_EXPIRATION","item_id":"plaid-item-1","consent_expiration_time":"2026-11-01T00:00:00Z"}""")]
+    public async Task Webhook_ItemLoginBrokenOrExpiring_FlagsItemWithoutSyncing(string body)
+    {
+        ArrangeVerifiedWebhook(body);
+        _itemAccessor.Setup(a => a.GetByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(ItemFor("plaid-item-1"));
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(11, true)).Returns(Task.CompletedTask);
+
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
+
+        Assert.True(result.IsSuccess);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(11, true), Times.Once);
+        _plaidAccessor.Verify(a => a.SyncTransactionsAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Webhook_ItemLoginRepaired_ClearsFlag()
+    {
+        var body = """{"webhook_type":"ITEM","webhook_code":"LOGIN_REPAIRED","item_id":"plaid-item-1"}""";
+        ArrangeVerifiedWebhook(body);
+        _itemAccessor.Setup(a => a.GetByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(ItemFor("plaid-item-1"));
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(11, false)).Returns(Task.CompletedTask);
+
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
+
+        Assert.True(result.IsSuccess);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(11, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task Webhook_PendingExpirationFlag_SurvivesASubsequentSuccessfulSync()
+    {
+        // Regression: PENDING_EXPIRATION arrives once, while the login still works, so the next sync succeeds.
+        // That success must not clear the warning; only LOGIN_REPAIRED or MarkReconnected may.
+        var body = """{"webhook_type":"ITEM","webhook_code":"PENDING_EXPIRATION","item_id":"plaid-item-1"}""";
+        var item = ItemFor("plaid-item-1");
+        ArrangeVerifiedWebhook(body);
+        ArrangeSyncForItem("plaid-item-1", item);
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(11, true)).Returns(Task.CompletedTask);
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([item]);
+        var sut = BuildSut();
+
+        await sut.HandleWebhookAsync(ValidJwt, body);
+        var sync = await sut.SyncAsync(userId: 5);
+
+        Assert.True(sync.IsSuccess);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(11, true), Times.Once);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(It.IsAny<int>(), false), Times.Never);
+    }
+
+    [Fact]
+    public async Task Webhook_TransactionsSyncHitsItemLoginRequired_FlagsItem()
+    {
+        var body = """{"webhook_type":"TRANSACTIONS","webhook_code":"SYNC_UPDATES_AVAILABLE","item_id":"plaid-item-1"}""";
+        ArrangeVerifiedWebhook(body);
+        _itemAccessor.Setup(a => a.GetByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(ItemFor("plaid-item-1"));
+        _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(5)).ReturnsAsync(new List<Account>());
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(PlaidError("ITEM_LOGIN_REQUIRED"));
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(11, true)).Returns(Task.CompletedTask);
+
+        await BuildSut().HandleWebhookAsync(ValidJwt, body);
+
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(11, true), Times.Once);
+        _itemAccessor.Verify(a => a.UpdateSyncStateAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"ERROR","item_id":"plaid-item-1","error":{"error_code":"INSTITUTION_DOWN"}}""")]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"ERROR","item_id":"plaid-item-1","error":null}""")]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"WEBHOOK_UPDATE_ACKNOWLEDGED","item_id":"plaid-item-1"}""")]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"NEW_ACCOUNTS_AVAILABLE","item_id":"plaid-item-1"}""")]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"LOGIN_REPAIRED"}""")]
+    [InlineData("""{"webhook_type":7,"webhook_code":"LOGIN_REPAIRED","item_id":"plaid-item-1"}""")]
+    [InlineData("""[]""")]
+    [InlineData("""not json""")]
+    public async Task Webhook_OtherItemCodeOrMalformedBody_IgnoredWithoutLookup(string body)
+    {
+        ArrangeVerifiedWebhook(body);
+
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
+
+        Assert.True(result.IsSuccess);
+        _itemAccessor.Verify(a => a.GetByPlaidItemIdAsync(It.IsAny<string>()), Times.Never);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(It.IsAny<int>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Webhook_ItemEventForUnknownItem_NoOpSuccess()
+    {
+        var body = """{"webhook_type":"ITEM","webhook_code":"PENDING_DISCONNECT","item_id":"ghost-item"}""";
+        ArrangeVerifiedWebhook(body);
+        _itemAccessor.Setup(a => a.GetByPlaidItemIdAsync("ghost-item")).ReturnsAsync((PlaidItem?)null);
+
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
+
+        Assert.True(result.IsSuccess);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(It.IsAny<int>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Webhook_ItemEventWithInvalidVerification_IgnoredWithoutFlagging()
+    {
+        var body = """{"webhook_type":"ITEM","webhook_code":"PENDING_DISCONNECT","item_id":"plaid-item-1"}""";
+        _webhookEngine.Setup(e => e.ExtractKeyId(ValidJwt)).Returns("kid-1");
+        _plaidAccessor.Setup(a => a.GetWebhookVerificationKeyAsync("kid-1", It.IsAny<CancellationToken>())).ReturnsAsync(TestJwk);
+        _webhookEngine.Setup(e => e.VerifyWebhook(ValidJwt, TestJwk, body)).Returns(false);
+
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
+
+        Assert.True(result.IsSuccess);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(It.IsAny<int>(), It.IsAny<bool>()), Times.Never);
     }
 
     // ── SweepAllAsync ───────────────────────────────────────────────────────
@@ -1081,6 +1351,28 @@ public class PlaidManagerTests
 
         Assert.True(result.IsSuccess);
         _plaidAccessor.Verify(a => a.SyncTransactionsAsync("token-2", "c-good", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Sweep_ItemLoginRequired_FlagsItemAndContinuesWithOthers()
+    {
+        // The sweep's per-item catch-all would swallow a strict-mock MockException, so the flag write is verified explicitly.
+        var locked = new PlaidItem { Id = 1, UserId = 10, PlaidItemId = "item-locked", SyncCursor = "c-locked", Accounts = [] };
+        var good = new PlaidItem { Id = 2, UserId = 20, PlaidItemId = "item-good", SyncCursor = "c-good", Accounts = [] };
+        _itemAccessor.Setup(a => a.GetAllActiveAsync()).ReturnsAsync([locked, good]);
+        _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("item-locked")).ReturnsAsync(AccessTokenLookup.Found("token-1"));
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(10)).ReturnsAsync(new List<Account>());
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("token-1", "c-locked", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(PlaidError("ITEM_LOGIN_REQUIRED"));
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(1, true)).Returns(Task.CompletedTask);
+        ArrangeSweepSyncForItem(good);
+
+        var result = await BuildSut().SweepAllAsync();
+
+        Assert.True(result.IsSuccess);
+        _itemAccessor.Verify(a => a.SetNeedsReconnectAsync(1, true), Times.Once);
+        _itemAccessor.Verify(a => a.UpdateSyncStateAsync(1, It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+        _itemAccessor.Verify(a => a.UpdateSyncStateAsync(2, "next", It.IsAny<DateTime>()), Times.Once);
     }
 
     [Fact]
@@ -1141,7 +1433,7 @@ public class PlaidManagerTests
         _plaidAccessor.Setup(a => a.GetWebhookVerificationKeyAsync("kid-1", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Plaid key endpoint down"));
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         // A transient JWK-fetch failure must not throw and must not verify/sync — neutral success.
         Assert.True(result.IsSuccess);
@@ -1160,7 +1452,7 @@ public class PlaidManagerTests
         ArrangeVerifiedWebhook(body);
         ArrangeSyncForItem("plaid-item-1", ItemFor("plaid-item-1"));
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.True(result.IsSuccess);
         _plaidAccessor.Verify(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()), Times.Once);
@@ -1179,7 +1471,7 @@ public class PlaidManagerTests
         _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Plaid sync down"));
 
-        var result = await BuildSut().HandleTransactionsWebhookAsync(ValidJwt, body);
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.False(result.IsSuccess);
         Assert.NotNull(result.Error);
@@ -1200,7 +1492,7 @@ public class PlaidManagerTests
         ArrangeSyncForItem("plaid-item-1", ItemFor("plaid-item-1"));
 
         var sut = BuildSutWithRealWebhookEngine();
-        var result = await sut.HandleTransactionsWebhookAsync(jwt, body);
+        var result = await sut.HandleWebhookAsync(jwt, body);
 
         Assert.True(result.IsSuccess);
         _plaidAccessor.Verify(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()), Times.Once);

@@ -19,6 +19,12 @@ public class PlaidOptions
     /// </summary>
     public string WebhookUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// OAuth redirect URI (the app's <c>/plaid-oauth</c> page; must also be allowed in the Plaid Dashboard).
+    /// Empty means "no redirect" — sent on link-token create only when non-empty, so Link falls back to its popup.
+    /// </summary>
+    public string RedirectUri { get; set; } = string.Empty;
+
     /// <summary>Interval (hours) for the backup sweep that re-syncs all active items. Default 6.</summary>
     public int SweepIntervalHours { get; set; } = 6;
 }

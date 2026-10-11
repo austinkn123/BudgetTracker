@@ -7,6 +7,7 @@ export const CHASE: PlaidConnectionView = {
   plaidItemId: 7,
   institutionName: 'Chase',
   lastSyncedAt: '2026-09-27T12:00:00Z',
+  needsReconnect: false,
   accounts: [{ plaidAccountId: 'acc-chase-1', name: 'Checking', mask: '1234', accountType: 'depository' }],
 };
 
@@ -14,6 +15,7 @@ export const ALLY: PlaidConnectionView = {
   plaidItemId: 42,
   institutionName: 'Ally Bank',
   lastSyncedAt: null,
+  needsReconnect: false,
   accounts: [{ plaidAccountId: 'acc-ally-1', name: 'Savings', mask: null, accountType: 'depository' }],
 };
 

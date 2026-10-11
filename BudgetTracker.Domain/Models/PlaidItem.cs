@@ -24,6 +24,13 @@ public class PlaidItem
     public bool IsActive { get; set; } = true;
     public DateTime? ConsentExpiresAt { get; set; }
     public DateTime? LastSyncedAt { get; set; }
+
+    /// <summary>
+    /// True while the bank needs, or will soon need, the user to sign in again (update-mode Link). Set by
+    /// <c>ITEM_LOGIN_REQUIRED</c> and the <c>PENDING_*</c> webhooks; cleared only by <c>LOGIN_REPAIRED</c> or the client's
+    /// reconnected call, never by a successful sync.
+    /// </summary>
+    public bool NeedsReconnect { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public User User { get; set; } = null!;

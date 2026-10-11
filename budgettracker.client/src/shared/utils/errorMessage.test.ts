@@ -8,6 +8,12 @@ describe('errorMessage', () => {
     );
   });
 
+  it("falls back to a ProblemDetails body's detail", () => {
+    expect(errorMessage({ response: { data: { title: 'Bad Gateway', detail: 'Link it again.' } } }, 'Fallback.')).toBe(
+      'Link it again.',
+    );
+  });
+
   it('never leaks exception text', () => {
     expect(errorMessage(new Error('Request failed with status code 500'), 'Fallback.')).toBe('Fallback.');
   });

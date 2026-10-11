@@ -17,6 +17,25 @@ export const plaidService = {
   },
 
   /**
+   * Link token for update mode on one institution, so the person can sign in to their bank
+   * again. Finishing update mode needs no exchange: the existing access token keeps working.
+   */
+  createReconnectLinkToken: async (plaidItemId: number): Promise<PlaidLinkTokenResponse> => {
+    const response = await api.post<PlaidLinkTokenResponse>(
+      `/plaid/connections/${plaidItemId}/link-token`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Finish update mode: clear the connection's needs-sign-in flag. A sync does not clear it,
+   * because a pending-expiration warning must survive syncs that still work.
+   */
+  markReconnected: async (plaidItemId: number): Promise<void> => {
+    await api.post(`/plaid/connections/${plaidItemId}/reconnected`);
+  },
+
+  /**
    * Exchange the public_token from a successful Link flow and trigger the initial sync.
    * Always adds an institution; existing connections are left untouched.
    */

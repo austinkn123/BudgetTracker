@@ -98,7 +98,7 @@ describe('useSyncOnOpen', () => {
     expect(keys).toContainEqual(['budget-analysis']);
   });
 
-  it('swallows a sync error without retrying or rendering an error', async () => {
+  it('swallows a sync error without retrying or rendering an error, but refreshes connections', async () => {
     syncMock.mockRejectedValue(new Error('Plaid is down'));
     // Client default says "retry 3 times"; the hook must override it with retry: false.
     const retryingClient = new QueryClient({
@@ -124,7 +124,8 @@ describe('useSyncOnOpen', () => {
     });
 
     expect(syncMock).toHaveBeenCalledTimes(1);
-    expect(invalidate).not.toHaveBeenCalled();
+    // A sync that hit ITEM_LOGIN_REQUIRED flagged the bank server-side; refetch so it shows.
+    await waitFor(() => expect(invalidatedKeys(invalidate)).toEqual([PLAID_CONNECTIONS_QUERY_KEY]));
     expect(screen.getByText('Dashboard content')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });

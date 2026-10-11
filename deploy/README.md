@@ -53,7 +53,7 @@ aws ssm put-parameter --region $REGION --type String --overwrite \
   --name /budgettracker/Cognito/ClientId --value "<app-client-id>"
 ```
 
-Don't create `/budgettracker/Plaid/WebhookUrl` yet. The URL won't exist until step 5.
+Don't create `/budgettracker/Plaid/WebhookUrl` or `/budgettracker/Plaid/RedirectUri` yet. Neither URL exists until step 5.
 
 ## 2. Create the schema in Neon
 
@@ -95,30 +95,94 @@ The stack output `FunctionUrl` is the app's public address, for example `https:/
 
 ## 5. After the first deploy
 
-1. **Plaid webhook.** Point Plaid at the function, then deploy again or wait for the next cold start. SSM is read once per cold start:
+1. **Plaid webhook and OAuth redirect.** Point Plaid at the function, then deploy again or wait for the next cold
+   start. SSM is read once per cold start. `<FunctionUrl>` already ends in `/`:
 
    ```bash
    aws ssm put-parameter --region us-east-2 --type String --overwrite \
      --name /budgettracker/Plaid/WebhookUrl --value "<FunctionUrl>api/plaid/webhook"
+   aws ssm put-parameter --region us-east-2 --type String --overwrite \
+     --name /budgettracker/Plaid/RedirectUri --value "<FunctionUrl>plaid-oauth"
    aws lambda update-function-configuration --region us-east-2 --function-name budgettracker \
-     --description "webhook url set $(date +%s)"   # forces fresh instances
+     --description "plaid urls set $(date +%s)"   # forces fresh instances
    ```
 
    New links register the webhook automatically. Links made before this point don't: without the hosted sweep,
    nothing calls `/item/webhook/update` for them on Lambda, so relink those banks (or rely on `/sync`).
+
+   If `RedirectUri` is empty or unset, `redirect_uri` is left out of link tokens. OAuth banks (Chase, BofA) still
+   work on desktop through a popup. The redirect is the fallback for phones and in-app browsers that block popups.
 2. **Cognito.** If the client uses the Hosted UI or OAuth redirects, add the Function URL to the app client's
    callback and sign-out URLs. Direct SRP sign-in from the SPA needs no change.
-3. **Plaid dashboard.** For production, add the Function URL domain to Allowed redirect URIs, if you use OAuth
-   institutions.
+3. **Plaid dashboard.** Add `<FunctionUrl>plaid-oauth`, exactly as set in SSM, to Allowed redirect URIs. It must be
+   HTTPS with no `#`. To test locally on sandbox, also add `https://localhost:53608/plaid-oauth` and set
+   `Plaid:RedirectUri` to it in `BudgetTracker.Server/appsettings.Local.json`.
 4. **Smoke test.** Open `<FunctionUrl>`, sign in, link a sandbox bank (`user_good` / `pass_good`), then refresh.
+
+## Sign-up
+
+Self sign-up is off on pool `us-east-2_SNf5BlMBR` (since 2026-10-10). The Function URL is public, so with it on,
+a stranger could create an account and link banks billed to your Plaid account. Existing users still sign in.
+
+```powershell
+./deploy/cognito-signup.ps1           # disable: admin-created users only
+./deploy/cognito-signup.ps1 -Enable   # re-enable
+```
+
+`UpdateUserPool` resets every field you omit to its default, so the script backs the pool JSON up to `$env:TEMP`
+first and sends every setting back unchanged except `AllowAdminCreateUserOnly`. Use a current AWS CLI v2. An older
+one (2.18.10, for example) can't see newer fields such as `UserPoolTier` or `IssuerConfiguration`, so it can't send
+them back. Console alternative: Cognito → user pool → Sign-up → Self-service sign-up.
+
+Re-enabling also needs the client pages, which `6884d21` removed. Restore the two deleted pages:
+
+```bash
+git checkout 6884d21~1 -- budgettracker.client/src/pages/SignUpPage.tsx budgettracker.client/src/pages/ConfirmSignUpPage.tsx
+```
+
+The same commit also removed the `/signup` and `/confirm` routes from `App.tsx`, the "Sign up" link from
+`LoginPage.tsx`, `signUp`/`confirmSignUp`/`resendCode` from `auth/AuthContext.tsx` (the context type now lives in
+`auth/authContextValue.ts`), and `signUpSchema`/`confirmSignUpSchema` from `shared/validation/auth.ts`. Those files
+have changed since, so don't check them out from `6884d21~1`: you'd lose later work such as the `/plaid-oauth` route.
+Re-add those pieces by hand from `git show 6884d21 -- <path>`.
+
+## Going live (sandbox → real banks)
+
+1. **Plaid plan.** In the Plaid Dashboard, confirm Trial eligibility (teams created on or after 2026-04-15): 10 free
+   production Items, and removing an Item doesn't free its slot. Otherwise apply for Pay-as-you-go.
+2. **App profile.** Fill in Application display information and Company information. Some banks reject apps with
+   empty profiles. On Trial the security questionnaire isn't required, Chase included.
+3. **Production secret.** Copy it from the dashboard. It differs from the sandbox secret.
+4. **Switch environment.** Set these in SSM and force fresh instances (step 5). To link from your machine instead,
+   set the same `Plaid` keys in `BudgetTracker.Server/appsettings.Local.json`.
+
+   ```bash
+   aws ssm put-parameter --region us-east-2 --type String --overwrite \
+     --name /budgettracker/Plaid/Environment --value "production"
+   aws ssm put-parameter --region us-east-2 --type String --overwrite \
+     --name /budgettracker/Plaid/BaseUrl --value "https://production.plaid.com"
+   aws ssm put-parameter --region us-east-2 --type SecureString --overwrite \
+     --name /budgettracker/Plaid/Secret --value "<production-secret>"
+   ```
+5. **Relink.** Sandbox Items don't carry over.
+
+## Reconnecting a bank
+
+When a bank needs a new sign-in (`ITEM_LOGIN_REQUIRED` on sync, or a `PENDING_DISCONNECT` / `PENDING_EXPIRATION`
+webhook), its card in Settings shows "Needs sign-in" with a **Reconnect** button, and the dashboard shows a warning.
+Reconnect uses Plaid update mode, which keeps the same Item, so no new Trial slot is used. Unlinking and relinking
+would use one. In Development, `POST /api/plaid/sandbox/connections/{plaidItemId}/reset-login` forces the state on a
+sandbox Item for testing; the next sync flags it.
 
 ## Notes and caveats
 
 - **Stored Plaid tokens from before this change can't be decrypted.** The Data Protection key ring moved from the
   local machine store to the database. The fresh migration starts with no Plaid items anyway; relink banks after deploying.
 - **Data Protection keys sit in Postgres unencrypted** (no XML encryptor is configured). Anyone with database read
-  access plus the ciphertext can decrypt Plaid access tokens. Treat the Neon credentials accordingly.
-- `ASPNETCORE_ENVIRONMENT` is `Production`, so `POST /api/plaid/sandbox/seed` and the OpenAPI document return 404.
+  access plus the ciphertext can decrypt Plaid access tokens. A token alone can't call Plaid, though: every request
+  also needs the `client_id` and `secret`, which live in SSM, not the database. So a database-only leak exposes stored
+  transaction data but not live bank access. Still treat the Neon credentials as sensitive.
+- `ASPNETCORE_ENVIRONMENT` is `Production`, so the `/api/plaid/sandbox/*` routes and the OpenAPI document return 404.
 - `now()` column defaults use the database session time zone. Neon defaults to UTC. Application-written
   timestamps are always `DateTime.UtcNow`.
 - Cold start costs one `GetParametersByPath` call and the EF model build. If that hurts, raise memory, since CPU

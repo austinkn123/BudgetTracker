@@ -6,6 +6,8 @@ interface PlaidLinkLauncherProps {
   linkToken: string;
   onSuccess: (publicToken: string) => void;
   onExit: () => void;
+  /** The page URL after a bank's OAuth redirect; resumes the saved Link session (/plaid-oauth). */
+  receivedRedirectUri?: string;
 }
 
 /**
@@ -13,9 +15,15 @@ interface PlaidLinkLauncherProps {
  * as soon as <see cref="linkToken"/> becomes available and forwards the resulting
  * public_token (or exit) back to the parent.
  */
-const PlaidLinkLauncher = ({ linkToken, onSuccess, onExit }: PlaidLinkLauncherProps) => {
+const PlaidLinkLauncher = ({
+  linkToken,
+  onSuccess,
+  onExit,
+  receivedRedirectUri,
+}: PlaidLinkLauncherProps) => {
   const { open, ready } = usePlaidLink({
     token: linkToken,
+    receivedRedirectUri,
     onSuccess: (publicToken) => onSuccess(publicToken),
     onExit: () => onExit(),
   });

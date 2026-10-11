@@ -156,6 +156,17 @@ public class PlaidItemAccessor : IPlaidItemAccessor
     }
 
     /// <inheritdoc />
+    public async Task SetNeedsReconnectAsync(int plaidItemId, bool needsReconnect)
+    {
+        var item = await _context.PlaidItems.FirstOrDefaultAsync(p => p.Id == plaidItemId);
+        if (item is null)
+            return;
+
+        item.NeedsReconnect = needsReconnect;
+        await _context.SaveChangesAsync();
+    }
+
+    /// <inheritdoc />
     public async Task<bool> DeactivateAsync(int userId, int plaidItemId)
     {
         var item = await _context.PlaidItems

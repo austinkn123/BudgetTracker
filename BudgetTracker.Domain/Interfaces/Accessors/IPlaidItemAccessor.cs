@@ -51,8 +51,15 @@ public interface IPlaidItemAccessor
         DateTime? consentExpiresAt,
         IReadOnlyList<PlaidAccount> accounts);
 
-    /// <summary>Updates the sync cursor and last-synced timestamp after a successful sync.</summary>
+    /// <summary>
+    /// Updates the sync cursor and last-synced timestamp after a successful sync. Leaves
+    /// <see cref="PlaidItem.NeedsReconnect"/> alone: <c>PENDING_EXPIRATION</c>/<c>PENDING_DISCONNECT</c> flag a login
+    /// that still works, so a successful sync does not mean the warning is resolved.
+    /// </summary>
     Task UpdateSyncStateAsync(int plaidItemId, string nextCursor, DateTime lastSyncedAt);
+
+    /// <summary>Sets <see cref="PlaidItem.NeedsReconnect"/> on the item with the given row id. No-op when it does not exist.</summary>
+    Task SetNeedsReconnectAsync(int plaidItemId, bool needsReconnect);
 
     /// <summary>
     /// Soft-deletes one of the user's active PlaidItems (IsActive = false). Returns false when the item does not

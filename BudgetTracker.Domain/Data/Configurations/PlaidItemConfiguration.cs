@@ -38,6 +38,9 @@ public class PlaidItemConfiguration : IEntityTypeConfiguration<PlaidItem>
         builder.Property(p => p.IsActive)
             .HasDefaultValue(true);
 
+        builder.Property(p => p.NeedsReconnect)
+            .HasDefaultValue(false);
+
         builder.Property(p => p.ConsentExpiresAt)
             .HasColumnType("timestamp without time zone");
 

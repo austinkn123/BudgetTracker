@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,14 +12,26 @@ vi.mock('../../../shared/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
 }));
 
-// Plaid Link is a third-party iframe; stand in a button that completes the flow on click.
+// Plaid Link is a third-party iframe; stand in a button that completes the flow on click. Like
+// react-plaid-link 4.x, it keeps the onSuccess it was mounted with (the real one freezes it when
+// the token is set), so a handler that only becomes right on a later render fails here too.
 vi.mock('./PlaidLinkLauncher', () => ({
-  default: ({ onSuccess }: { onSuccess: (publicToken: string) => void }) => (
-    <button type="button" onClick={() => onSuccess('public-sandbox-token')}>
-      Finish Plaid Link
-    </button>
-  ),
+  default: function PlaidLinkLauncherMock({
+    onSuccess,
+  }: {
+    onSuccess: (publicToken: string) => void;
+  }) {
+    const [captured] = useState(() => onSuccess);
+    return (
+      <button type="button" onClick={() => captured('public-sandbox-token')}>
+        Finish Plaid Link
+      </button>
+    );
+  },
 }));
+
+const LOGIN_REQUIRED_MESSAGE =
+  'A bank needs you to sign in again. Open Settings and click Reconnect.';
 
 const apiMock = vi.mocked(api, { deep: true });
 
@@ -49,6 +62,55 @@ describe('LinkedAccountsSection', () => {
     expect(screen.getByRole('button', { name: 'Disconnect Chase' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disconnect Ally Bank' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Connect a bank' })).not.toBeInTheDocument();
+  });
+
+  it('flags a bank that needs sign-in, and Reconnect re-syncs it without exchanging', async () => {
+    const user = userEvent.setup();
+    apiMock.get.mockResolvedValue({ data: [{ ...CHASE, needsReconnect: true }, ALLY] });
+    apiMock.post.mockImplementation(async (url: string) => {
+      if (url === `/plaid/connections/${CHASE.plaidItemId}/link-token`) {
+        return { data: { linkToken: 'link-update-token', expiration: '' } };
+      }
+      return { data: { inserted: 0, updated: 0, removed: 0, syncedAt: '2026-10-10T12:00:00Z' } };
+    });
+
+    renderSection();
+
+    const list = await screen.findByRole('list', { name: 'Linked institutions' });
+    const [chase, ally] = within(list).getAllByRole('listitem');
+    expect(within(chase).getByText('Needs sign-in')).toBeInTheDocument();
+    expect(within(chase).queryByText('Active')).not.toBeInTheDocument();
+    expect(within(chase).getByText(/Syncing is paused until you sign in again\./)).toBeInTheDocument();
+    expect(within(ally).getByText('Active')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reconnect Ally Bank' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reconnect Chase' }));
+    await user.click(await screen.findByRole('button', { name: 'Finish Plaid Link' }));
+
+    await waitFor(() =>
+      expect(apiMock.post.mock.calls.map(([url]) => url)).toEqual([
+        `/plaid/connections/${CHASE.plaidItemId}/link-token`,
+        `/plaid/connections/${CHASE.plaidItemId}/reconnected`,
+        '/plaid/sync',
+      ]),
+    );
+  });
+
+  it('refetches connections when Refresh all hits a bank that needs sign-in, so Reconnect shows', async () => {
+    const user = userEvent.setup();
+    // The failed sync flags Chase server-side; only a refetch can show it.
+    apiMock.get
+      .mockResolvedValueOnce({ data: [CHASE, ALLY] })
+      .mockResolvedValue({ data: [{ ...CHASE, needsReconnect: true }, ALLY] });
+    apiMock.post.mockRejectedValue(axiosBadRequest(LOGIN_REQUIRED_MESSAGE));
+
+    renderSection();
+
+    await user.click(await screen.findByRole('button', { name: 'Refresh all' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(LOGIN_REQUIRED_MESSAGE);
+    expect(await screen.findByRole('button', { name: 'Reconnect Chase' })).toBeInTheDocument();
+    expect(screen.getByText('Needs sign-in')).toBeInTheDocument();
   });
 
   it('shows "Connect a bank" when nothing is linked', async () => {

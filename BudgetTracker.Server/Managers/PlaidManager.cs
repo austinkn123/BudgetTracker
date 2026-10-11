@@ -34,27 +34,58 @@ public class PlaidManager(
         "INITIAL_UPDATE"
     ];
 
+    /// <summary>
+    /// ITEM webhook codes meaning the bank login has stopped (or is about to stop) working and needs update-mode Link.
+    /// <c>ERROR</c> qualifies only with <see cref="LoginRequiredErrorCode"/>, so it is matched separately.
+    /// </summary>
+    private static readonly HashSet<string> ReconnectItemCodes =
+    [
+        "PENDING_DISCONNECT",
+        "PENDING_EXPIRATION"
+    ];
+
+    private const string LoginRequiredErrorCode = "ITEM_LOGIN_REQUIRED";
+
     private const string AlreadyLinkedMessage = "This institution is already linked. Disconnect it first if you want to link it again.";
     private const string ReconnectMessage = "A bank connection needs to be reconnected. Disconnect it and link it again.";
+    private const string LoginRequiredMessage = "A bank needs you to sign in again. Open Settings and click Reconnect.";
+    private const string MissingIdentityMessage = "Authenticated user identity is missing";
+    private const string ConnectionNotFoundMessage = "Bank connection not found";
 
     private readonly PlaidOptions _options = options.Value;
+
+    /// <summary>What a verified webhook asks the manager to do.</summary>
+    private enum WebhookAction
+    {
+        None,
+        Sync,
+        FlagReconnect,
+        ClearReconnect
+    }
 
     /// <inheritdoc />
     public async Task<Result<PlaidLinkTokenResult>> CreateLinkTokenAsync(int userId, string cognitoSub)
     {
         if (string.IsNullOrWhiteSpace(cognitoSub))
-            return Result<PlaidLinkTokenResult>.Failure("Authenticated user identity is missing");
+            return Result<PlaidLinkTokenResult>.Failure(MissingIdentityMessage);
 
-        try
+        return await RequestLinkTokenAsync(cognitoSub, accessToken: null);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<PlaidLinkTokenResult>> CreateUpdateLinkTokenAsync(int userId, string cognitoSub, int plaidItemId)
+    {
+        if (string.IsNullOrWhiteSpace(cognitoSub))
+            return Result<PlaidLinkTokenResult>.Failure(MissingIdentityMessage);
+
+        var lookup = await itemAccessor.GetActiveAccessTokenAsync(userId, plaidItemId);
+        return lookup.Status switch
         {
-            var token = await plaidAccessor.CreateLinkTokenAsync(cognitoSub);
-            return Result<PlaidLinkTokenResult>.Success(token);
-        }
-        catch (Exception)
-        {
-            // Plain-language error per AC-9 — never echo upstream message (may contain secret/access_token).
-            return Result<PlaidLinkTokenResult>.Failure("Unable to start bank link right now. Please try again in a moment.");
-        }
+            AccessTokenStatus.NotFound => Result<PlaidLinkTokenResult>.Failure(ConnectionNotFoundMessage),
+            // Update mode needs the token itself; an unreadable one can only be fixed by relinking.
+            AccessTokenStatus.Undecryptable => Result<PlaidLinkTokenResult>.Failure(ReconnectMessage),
+            _ => await RequestLinkTokenAsync(cognitoSub, lookup.AccessToken)
+        };
     }
 
     /// <inheritdoc />
@@ -201,7 +232,8 @@ public class PlaidManager(
                 item.Id,
                 item.InstitutionName,
                 item.LastSyncedAt,
-                item.Accounts.Select(a => new PlaidLinkedAccountView(a.PlaidAccountId, a.Name, a.Mask, a.AccountType)).ToList()))
+                item.Accounts.Select(a => new PlaidLinkedAccountView(a.PlaidAccountId, a.Name, a.Mask, a.AccountType)).ToList(),
+                item.NeedsReconnect))
             .ToList();
     }
 
@@ -212,7 +244,7 @@ public class PlaidManager(
         switch (lookup.Status)
         {
             case AccessTokenStatus.NotFound:
-                return Result.Failure("Bank connection not found");
+                return Result.Failure(ConnectionNotFoundMessage);
 
             case AccessTokenStatus.Undecryptable:
                 // Without the token Plaid cannot be told to stop billing; the user still needs to be able to unlink.
@@ -236,11 +268,22 @@ public class PlaidManager(
 
         return await itemAccessor.DeactivateAsync(userId, plaidItemId)
             ? Result.Success()
-            : Result.Failure("Bank connection not found");
+            : Result.Failure(ConnectionNotFoundMessage);
     }
 
     /// <inheritdoc />
-    public async Task<Result> HandleTransactionsWebhookAsync(string plaidVerificationJwt, string rawBody)
+    public async Task<Result> MarkReconnectedAsync(int userId, int plaidItemId)
+    {
+        var items = await itemAccessor.GetAllActiveByUserIdAsync(userId);
+        if (items.All(i => i.Id != plaidItemId))
+            return Result.Failure(ConnectionNotFoundMessage);
+
+        await itemAccessor.SetNeedsReconnectAsync(plaidItemId, false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> HandleWebhookAsync(string plaidVerificationJwt, string rawBody)
     {
         // Verify — extract kid, fetch the matching JWK, verify signature + freshness + body hash.
         // ANY failure is a silent no-op success so the endpoint returns a neutral 200 that leaks nothing.
@@ -261,13 +304,20 @@ public class PlaidManager(
         if (!webhookEngine.VerifyWebhook(plaidVerificationJwt, jwk, rawBody))
             return Result.Success();
 
-        // Parse — act only on actionable TRANSACTIONS events; everything else is a no-op success.
-        if (!TryParseTransactionsWebhook(rawBody, out var itemId))
+        // Parse — act only on actionable TRANSACTIONS and ITEM login events; everything else is a no-op success.
+        var (itemId, action) = ParseWebhook(rawBody);
+        if (action == WebhookAction.None)
             return Result.Success();
 
         var item = await itemAccessor.GetByPlaidItemIdAsync(itemId);
         if (item is null)
             return Result.Success();
+
+        if (action != WebhookAction.Sync)
+        {
+            await itemAccessor.SetNeedsReconnectAsync(item.Id, action == WebhookAction.FlagReconnect);
+            return Result.Success();
+        }
 
         // An undecryptable token will not heal on a Plaid retry, so it is acknowledged rather than failed.
         var lookup = await itemAccessor.GetAccessTokenByPlaidItemIdAsync(item.PlaidItemId);
@@ -368,37 +418,63 @@ public class PlaidManager(
         }
     }
 
-    /// <summary>
-    /// Parse a webhook body, returning true (with the Plaid <paramref name="itemId"/>) only for an
-    /// actionable <c>TRANSACTIONS</c> event. Malformed JSON or a non-actionable event yields false.
-    /// </summary>
-    private static bool TryParseTransactionsWebhook(string rawBody, out string itemId)
+    /// <summary>Request a Link token from Plaid; with <paramref name="accessToken"/> it opens Link in update mode.</summary>
+    private async Task<Result<PlaidLinkTokenResult>> RequestLinkTokenAsync(string cognitoSub, string? accessToken)
     {
-        itemId = string.Empty;
+        try
+        {
+            var token = await plaidAccessor.CreateLinkTokenAsync(cognitoSub, accessToken);
+            return Result<PlaidLinkTokenResult>.Success(token);
+        }
+        catch (Exception)
+        {
+            // Plain-language error per AC-9 — never echo upstream message (may contain secret/access_token).
+            return Result<PlaidLinkTokenResult>.Failure("Unable to start bank link right now. Please try again in a moment.");
+        }
+    }
+
+    /// <summary>
+    /// Parse a webhook body into the Plaid <c>item_id</c> it concerns and the action it warrants: an actionable
+    /// <c>TRANSACTIONS</c> event syncs; an <c>ITEM</c> event reporting a broken or expiring login flags the item for
+    /// reconnect, and <c>LOGIN_REPAIRED</c> clears the flag. Malformed JSON or any other event yields
+    /// <see cref="WebhookAction.None"/>.
+    /// </summary>
+    private static (string ItemId, WebhookAction Action) ParseWebhook(string rawBody)
+    {
         try
         {
             using var doc = JsonDocument.Parse(rawBody);
             var root = doc.RootElement;
+            if (ReadString(root, "item_id") is not { } itemId)
+                return (string.Empty, WebhookAction.None);
 
-            if (!root.TryGetProperty("webhook_type", out var typeProp) || typeProp.GetString() != "TRANSACTIONS")
-                return false;
-
-            if (!root.TryGetProperty("webhook_code", out var codeProp) ||
-                codeProp.GetString() is not { } code ||
-                !ActionableTransactionCodes.Contains(code))
-                return false;
-
-            if (!root.TryGetProperty("item_id", out var itemProp) || itemProp.GetString() is not { } id)
-                return false;
-
-            itemId = id;
-            return true;
+            var action = (ReadString(root, "webhook_type"), ReadString(root, "webhook_code")) switch
+            {
+                ("TRANSACTIONS", { } code) when ActionableTransactionCodes.Contains(code) => WebhookAction.Sync,
+                ("ITEM", "ERROR") when root.TryGetProperty("error", out var error) &&
+                                       ReadString(error, "error_code") == LoginRequiredErrorCode => WebhookAction.FlagReconnect,
+                ("ITEM", { } code) when ReconnectItemCodes.Contains(code) => WebhookAction.FlagReconnect,
+                ("ITEM", "LOGIN_REPAIRED") => WebhookAction.ClearReconnect,
+                _ => WebhookAction.None
+            };
+            return (itemId, action);
         }
         catch (JsonException)
         {
-            return false;
+            return (string.Empty, WebhookAction.None);
         }
     }
+
+    /// <summary>
+    /// The string value of <paramref name="name"/>, or null when <paramref name="element"/> is not an object or the
+    /// property is missing or not a string — so an unexpected shape reads as "absent" instead of throwing.
+    /// </summary>
+    private static string? ReadString(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object &&
+        element.TryGetProperty(name, out var prop) &&
+        prop.ValueKind == JsonValueKind.String
+            ? prop.GetString()
+            : null;
 
     /// <summary>
     /// Shared sync routine: pull deltas, map via the engine, upsert by Plaid id, delete removed,
@@ -416,6 +492,12 @@ public class PlaidManager(
         try
         {
             syncResult = await plaidAccessor.SyncTransactionsAsync(accessToken, cursor);
+        }
+        catch (PlaidApiException ex) when (ex.ErrorCode == LoginRequiredErrorCode)
+        {
+            // The bank wants the user to sign in again; the flag makes the client offer update-mode Link (Reconnect).
+            await itemAccessor.SetNeedsReconnectAsync(plaidItemId, true);
+            return Result<PlaidSyncSummary>.Failure(LoginRequiredMessage);
         }
         catch (Exception)
         {

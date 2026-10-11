@@ -139,6 +139,33 @@ public class SandboxSeedManager(
         return seeded;
     }
 
+    /// <inheritdoc />
+    public async Task<Result> ResetLoginAsync(int userId, int plaidItemId, CancellationToken cancellationToken = default)
+    {
+        // Same hard guard as SeedAsync: forcing a login failure only makes sense against sandbox items.
+        if (!string.Equals(_options.Environment, "sandbox", StringComparison.OrdinalIgnoreCase))
+            return Result.Failure("Sandbox login reset is only available when Plaid is configured for sandbox.");
+
+        var lookup = await itemAccessor.GetActiveAccessTokenAsync(userId, plaidItemId);
+        if (lookup.Status == AccessTokenStatus.NotFound)
+            return Result.Failure("Bank connection not found");
+        if (lookup.Status == AccessTokenStatus.Undecryptable)
+            return Result.Failure("A bank connection needs to be reconnected. Disconnect it and link it again.");
+
+        try
+        {
+            // The NeedsReconnect flag is not set here: the next sync hits ITEM_LOGIN_REQUIRED and sets it,
+            // which exercises the real detection path.
+            await plaidAccessor.ResetSandboxLoginAsync(lookup.AccessToken!, cancellationToken);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Sandbox reset_login for PlaidItem {PlaidItemId} failed", plaidItemId);
+            return Result.Failure("Could not reset the sandbox login. Check the Plaid sandbox credentials.");
+        }
+    }
+
     private async Task<bool> NewItemWasPersistedAsync(int userId, IReadOnlyList<PlaidItem> activeBefore)
     {
         var knownIds = activeBefore.Select(i => i.Id).ToHashSet();

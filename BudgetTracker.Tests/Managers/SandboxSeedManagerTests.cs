@@ -290,4 +290,69 @@ public class SandboxSeedManagerTests
             It.IsAny<Exception?>(),
             It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once);
     }
+
+    // ── ResetLoginAsync ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ResetLogin_SandboxItemFound_ResetsItsLoginAtPlaid()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(UserId, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _plaidAccessor.Setup(a => a.ResetSandboxLoginAsync("access-token-xyz", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var result = await BuildSut().ResetLoginAsync(UserId, 11);
+
+        Assert.True(result.IsSuccess);
+        _plaidAccessor.Verify(a => a.ResetSandboxLoginAsync("access-token-xyz", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("production")]
+    [InlineData("development")]
+    [InlineData("")]
+    public async Task ResetLogin_NotSandbox_RefusesWithoutTouchingTheItem(string environment)
+    {
+        _options.Environment = environment;
+
+        var result = await BuildSut().ResetLoginAsync(UserId, 11);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Sandbox login reset is only available when Plaid is configured for sandbox.", result.Error);
+        _itemAccessor.Verify(a => a.GetActiveAccessTokenAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetLogin_ItemUnknownInactiveOrOwnedByAnotherUser_ReturnsNotFound()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(UserId, 99)).ReturnsAsync(AccessTokenLookup.NotFound);
+
+        var result = await BuildSut().ResetLoginAsync(UserId, 99);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Bank connection not found", result.Error);
+        _plaidAccessor.Verify(a => a.ResetSandboxLoginAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetLogin_TokenUndecryptable_ReturnsFailureWithoutCallingPlaid()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(UserId, 11)).ReturnsAsync(AccessTokenLookup.Undecryptable);
+
+        var result = await BuildSut().ResetLoginAsync(UserId, 11);
+
+        Assert.False(result.IsSuccess);
+        _plaidAccessor.Verify(a => a.ResetSandboxLoginAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetLogin_PlaidThrows_ReturnsFailureWithoutLeakingDetails()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(UserId, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _plaidAccessor.Setup(a => a.ResetSandboxLoginAsync("access-token-xyz", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Plaid API error (status 400): INVALID_PRODUCT"));
+
+        var result = await BuildSut().ResetLoginAsync(UserId, 11);
+
+        Assert.False(result.IsSuccess);
+        Assert.DoesNotContain("INVALID_PRODUCT", result.Error!);
+    }
 }

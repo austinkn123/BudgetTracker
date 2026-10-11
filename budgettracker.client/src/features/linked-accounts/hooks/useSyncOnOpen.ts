@@ -21,8 +21,10 @@ export const useSyncOnOpen = () => {
   const { mutate } = useMutation({
     mutationFn: () => plaidService.sync(STALE_AFTER_HOURS),
     retry: false,
+    // Settled, not just success: a sync that hits ITEM_LOGIN_REQUIRED flags the bank
+    // server-side, and the refetch is what puts the dashboard's sign-in alert up.
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: PLAID_CONNECTIONS_QUERY_KEY }),
     onSuccess: (summary) => {
-      void queryClient.invalidateQueries({ queryKey: PLAID_CONNECTIONS_QUERY_KEY });
       if (summary.inserted + summary.updated + summary.removed > 0) {
         void queryClient.invalidateQueries({ queryKey: ['transactions'] });
         void queryClient.invalidateQueries({ queryKey: ['budget-analysis'] });

@@ -44,6 +44,8 @@ export interface PlaidConnectionView {
   plaidItemId: number;
   institutionName: string;
   lastSyncedAt?: string | null;
+  /** The bank wants the person to sign in again; syncing is paused until they reconnect. */
+  needsReconnect: boolean;
   accounts: PlaidLinkedAccountView[];
 }
 

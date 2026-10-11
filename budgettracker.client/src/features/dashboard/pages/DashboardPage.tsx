@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
-import { PageHeader } from '../../../shared/components/ui';
+import { Link } from 'react-router-dom';
+import { Alert, PageHeader } from '../../../shared/components/ui';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { useUser } from '../../user/hooks/useUser';
 import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
+import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
 import DashboardLoadingState from '../components/DashboardLoadingState';
 import DashboardErrorState from '../components/DashboardErrorState';
 import RangeSelector from '../components/RangeSelector';
@@ -37,6 +39,8 @@ const DRIFTING_CATEGORIES = 3;
 const RECENT_ACTIVITY_ITEMS = 8;
 const DRILL_TRANSACTIONS = 10;
 
+const listFormat = new Intl.ListFormat('en-US', { type: 'conjunction' });
+
 const DashboardPage = () => {
   // Background "sync if stale" on open; silent and non-blocking, refreshes the queries below when it lands.
   useSyncOnOpen();
@@ -47,6 +51,13 @@ const DashboardPage = () => {
   const { range, setRange, start, end } = useDateRange();
   const { data: analysis, isLoading: loadingAnalysis, error: analysisError } =
     useBudgetAnalysis(start, end, TREND_MONTHS);
+  // Shared cache with Settings; never blocks the page.
+  const { data: connections = [] } = usePlaidConnections();
+
+  const needsSignIn = useMemo(
+    () => connections.filter((c) => c.needsReconnect).map((c) => c.institutionName),
+    [connections],
+  );
 
   const categoryNames = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
@@ -180,6 +191,22 @@ const DashboardPage = () => {
         }
         actions={<RangeSelector value={range} onChange={setRange} />}
       />
+
+      {/* Above the figures: a paused bank means every one of them may be missing recent activity. */}
+      {needsSignIn.length > 0 && (
+        <Alert
+          severity="warning"
+          title={`${listFormat.format(needsSignIn)} ${needsSignIn.length === 1 ? 'needs' : 'need'} you to sign in again`}
+        >
+          New transactions won't import until you do, so this page may be missing recent activity.{' '}
+          <Link
+            to="/settings"
+            className="focus-ring rounded-sm font-semibold underline underline-offset-2"
+          >
+            Reconnect in Settings
+          </Link>
+        </Alert>
+      )}
 
       {stats.length > 0 && <StatStrip stats={stats} />}
 

@@ -1,6 +1,7 @@
 using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
+using BudgetTracker.Domain.Plaid;
 using BudgetTracker.Server.Endpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -34,8 +35,8 @@ public class PlaidConnectionEndpointTests
     {
         IReadOnlyList<PlaidConnectionView> views =
         [
-            new(11, "Chase", null, []),
-            new(12, "Wells Fargo", new DateTime(2026, 9, 1), [new PlaidLinkedAccountView("wf-sav", "Savings", "9999", "depository")])
+            new(11, "Chase", null, [], false),
+            new(12, "Wells Fargo", new DateTime(2026, 9, 1), [new PlaidLinkedAccountView("wf-sav", "Savings", "9999", "depository")], true)
         ];
         _manager.Setup(m => m.GetConnectionsAsync(5)).ReturnsAsync(views);
 
@@ -79,6 +80,75 @@ public class PlaidConnectionEndpointTests
         var result = await PlaidEndpoints.DeleteConnectionAsync(99, _manager.Object, _currentUser.Object);
 
         Assert.Equal(StatusCodes.Status404NotFound, StatusOf(result));
+    }
+
+    // ── POST /connections/{plaidItemId}/link-token ──────────────────────────
+
+    [Fact]
+    public async Task CreateUpdateLinkToken_Success_ReturnsOkWithLinkTokenAndExpiration()
+    {
+        _currentUser.SetupGet(u => u.CognitoSub).Returns("sub-1");
+        var expiration = new DateTime(2026, 10, 10, 16, 0, 0, DateTimeKind.Utc);
+        _manager.Setup(m => m.CreateUpdateLinkTokenAsync(5, "sub-1", 11))
+            .ReturnsAsync(Result<PlaidLinkTokenResult>.Success(new PlaidLinkTokenResult("link-sandbox-update", expiration)));
+
+        var result = await PlaidEndpoints.CreateUpdateLinkTokenAsync(11, _manager.Object, _currentUser.Object);
+
+        // Same { linkToken, expiration } shape as POST /link-token, so the client launches Link the same way.
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        var body = Assert.IsAssignableFrom<IValueHttpResult>(result).Value!;
+        Assert.Equal("link-sandbox-update", body.GetType().GetProperty("linkToken")!.GetValue(body));
+        Assert.Equal(expiration, body.GetType().GetProperty("expiration")!.GetValue(body));
+    }
+
+    [Fact]
+    public async Task CreateUpdateLinkToken_NotFoundNotOwnedOrInactive_Returns404()
+    {
+        _currentUser.SetupGet(u => u.CognitoSub).Returns("sub-1");
+        _manager.Setup(m => m.CreateUpdateLinkTokenAsync(5, "sub-1", 99))
+            .ReturnsAsync(Result<PlaidLinkTokenResult>.Failure("Bank connection not found"));
+
+        var result = await PlaidEndpoints.CreateUpdateLinkTokenAsync(99, _manager.Object, _currentUser.Object);
+
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(result));
+    }
+
+    [Fact]
+    public async Task CreateUpdateLinkToken_PlaidFailure_Returns502ProblemWithDetail()
+    {
+        const string error = "Unable to start bank link right now. Please try again in a moment.";
+        _currentUser.SetupGet(u => u.CognitoSub).Returns("sub-1");
+        _manager.Setup(m => m.CreateUpdateLinkTokenAsync(5, "sub-1", 11))
+            .ReturnsAsync(Result<PlaidLinkTokenResult>.Failure(error));
+
+        var result = await PlaidEndpoints.CreateUpdateLinkTokenAsync(11, _manager.Object, _currentUser.Object);
+
+        Assert.Equal(StatusCodes.Status502BadGateway, StatusOf(result));
+        Assert.Equal(error, Assert.IsType<ProblemHttpResult>(result).ProblemDetails.Detail);
+    }
+
+    // ── POST /connections/{plaidItemId}/reconnected ─────────────────────────
+
+    [Fact]
+    public async Task MarkReconnected_Success_Returns204()
+    {
+        _manager.Setup(m => m.MarkReconnectedAsync(5, 11)).ReturnsAsync(Result.Success());
+
+        var result = await PlaidEndpoints.MarkReconnectedAsync(11, _manager.Object, _currentUser.Object);
+
+        Assert.Equal(StatusCodes.Status204NoContent, StatusOf(result));
+        _manager.Verify(m => m.MarkReconnectedAsync(5, 11), Times.Once);
+    }
+
+    [Fact]
+    public async Task MarkReconnected_NotFoundNotOwnedOrInactive_Returns404WithEmptyBody()
+    {
+        _manager.Setup(m => m.MarkReconnectedAsync(5, 99)).ReturnsAsync(Result.Failure("Bank connection not found"));
+
+        var result = await PlaidEndpoints.MarkReconnectedAsync(99, _manager.Object, _currentUser.Object);
+
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(result));
+        Assert.IsType<NotFound>(result);
     }
 
     // ── POST /sync?staleAfterHours= ─────────────────────────────────────────

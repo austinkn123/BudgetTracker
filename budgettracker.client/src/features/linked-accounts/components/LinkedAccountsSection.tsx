@@ -20,12 +20,14 @@ const LinkedAccountsSection = () => {
     isPreparingLink,
     isExchanging,
     isSyncing,
+    reconnectingItemId,
     disconnectingItemId,
     errorMessage,
     lastSync,
     prepareLink,
+    prepareReconnect,
     clearLinkToken,
-    exchangePublicToken,
+    handleLinkSuccess,
     refresh,
     disconnect,
     clearError,
@@ -33,7 +35,8 @@ const LinkedAccountsSection = () => {
 
   const [pendingDisconnect, setPendingDisconnect] = useState<PlaidConnectionView | null>(null);
 
-  const isLinking = isPreparingLink || isExchanging || linkToken !== null;
+  const isLinking =
+    isPreparingLink || isExchanging || linkToken !== null || reconnectingItemId !== null;
   const isBusy = isLinking || isSyncing || disconnectingItemId !== null;
 
   const handleConfirmDisconnect = async () => {
@@ -84,8 +87,10 @@ const LinkedAccountsSection = () => {
             <li key={connection.plaidItemId}>
               <LinkedAccountCard
                 connection={connection}
+                isReconnecting={reconnectingItemId === connection.plaidItemId}
                 isDisconnecting={disconnectingItemId === connection.plaidItemId}
                 disabled={isBusy}
+                onReconnect={prepareReconnect}
                 onDisconnect={setPendingDisconnect}
               />
             </li>
@@ -112,7 +117,7 @@ const LinkedAccountsSection = () => {
       {linkToken && (
         <PlaidLinkLauncher
           linkToken={linkToken}
-          onSuccess={exchangePublicToken}
+          onSuccess={handleLinkSuccess}
           onExit={clearLinkToken}
         />
       )}

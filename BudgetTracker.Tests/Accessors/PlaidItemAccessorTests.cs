@@ -29,7 +29,7 @@ public class PlaidItemAccessorTests : IDisposable
 
     private PlaidItemAccessor BuildSut() => new(_context, _currentKeyRing);
 
-    private async Task<PlaidItem> SeedItemAsync(IDataProtectionProvider keyRing, bool isActive = true)
+    private async Task<PlaidItem> SeedItemAsync(IDataProtectionProvider keyRing, bool isActive = true, bool needsReconnect = false)
     {
         var protector = keyRing.CreateProtector(PlaidItemAccessor.DataProtectionPurpose);
         var item = new PlaidItem
@@ -39,7 +39,8 @@ public class PlaidItemAccessorTests : IDisposable
             InstitutionId = "ins_3",
             InstitutionName = "Chase",
             AccessTokenEncrypted = protector.Protect("access-token-xyz"),
-            IsActive = isActive
+            IsActive = isActive,
+            NeedsReconnect = needsReconnect
         };
         _context.PlaidItems.Add(item);
         await _context.SaveChangesAsync();
@@ -143,5 +144,44 @@ public class PlaidItemAccessorTests : IDisposable
 
         Assert.False(await BuildSut().ReactivateAsync(UserId, item.Id));
         Assert.False(await BuildSut().ReactivateAsync(UserId, plaidItemId: 404));
+    }
+
+    private async Task<bool> StoredNeedsReconnectAsync(int id) =>
+        (await _context.PlaidItems.AsNoTracking().SingleAsync(p => p.Id == id)).NeedsReconnect;
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task SetNeedsReconnect_PersistsTheFlag(bool initial, bool requested)
+    {
+        var item = await SeedItemAsync(_currentKeyRing, needsReconnect: initial);
+
+        await BuildSut().SetNeedsReconnectAsync(item.Id, requested);
+
+        Assert.Equal(requested, await StoredNeedsReconnectAsync(item.Id));
+    }
+
+    [Fact]
+    public async Task SetNeedsReconnect_UnknownItem_DoesNotThrow()
+    {
+        await BuildSut().SetNeedsReconnectAsync(plaidItemId: 404, needsReconnect: true);
+
+        Assert.Empty(_context.PlaidItems);
+    }
+
+    [Fact]
+    public async Task UpdateSyncState_LeavesNeedsReconnectAlone()
+    {
+        // PENDING_EXPIRATION / PENDING_DISCONNECT flag an item while its login still works, and Plaid sends them once,
+        // so a successful sync must not clear the warning.
+        var item = await SeedItemAsync(_currentKeyRing, needsReconnect: true);
+        var syncedAt = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+
+        await BuildSut().UpdateSyncStateAsync(item.Id, "next-cursor", syncedAt);
+
+        var stored = await _context.PlaidItems.AsNoTracking().SingleAsync(p => p.Id == item.Id);
+        Assert.True(stored.NeedsReconnect);
+        Assert.Equal("next-cursor", stored.SyncCursor);
+        Assert.Equal(syncedAt, stored.LastSyncedAt);
     }
 }

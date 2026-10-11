@@ -19,4 +19,12 @@ public interface ISandboxSeedManager
     /// <param name="userId">Owner of the plan the seed is derived from.</param>
     /// <param name="months">How many whole months back from today to generate, inclusive of this one.</param>
     Task<Result<PlaidSyncSummary>> SeedAsync(int userId, int months, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Force one of the user's Sandbox items into <c>ITEM_LOGIN_REQUIRED</c>, so the reconnect flow can be exercised
+    /// end to end. Refused unless Plaid is configured for sandbox.
+    /// </summary>
+    /// <param name="userId">The owning user.</param>
+    /// <param name="plaidItemId">The PlaidItem row id.</param>
+    Task<Result> ResetLoginAsync(int userId, int plaidItemId, CancellationToken cancellationToken = default);
 }

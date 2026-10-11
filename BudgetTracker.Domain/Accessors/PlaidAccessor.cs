@@ -43,7 +43,7 @@ public class PlaidAccessor : IPlaidAccessor
     }
 
     /// <inheritdoc />
-    public async Task<PlaidLinkTokenResult> CreateLinkTokenAsync(string clientUserId, CancellationToken cancellationToken = default)
+    public async Task<PlaidLinkTokenResult> CreateLinkTokenAsync(string clientUserId, string? accessToken = null, CancellationToken cancellationToken = default)
     {
         var body = new
         {
@@ -53,10 +53,14 @@ public class PlaidAccessor : IPlaidAccessor
             country_codes = new[] { "US" },
             language = "en",
             user = new { client_user_id = clientUserId },
-            products = new[] { "transactions" },
+            // Update mode: access_token names the item to repair, and Plaid requires products to be absent.
+            access_token = accessToken,
+            products = accessToken is null ? new[] { "transactions" } : null,
             // Pass null (not "") when unset so JsonOptions.WhenWritingNull omits it entirely —
             // Plaid rejects an empty webhook string, and sandbox without a tunnel must still work.
-            webhook = string.IsNullOrWhiteSpace(_options.WebhookUrl) ? null : _options.WebhookUrl
+            webhook = string.IsNullOrWhiteSpace(_options.WebhookUrl) ? null : _options.WebhookUrl,
+            // Same idiom: Plaid rejects a redirect_uri that is not allow-listed in the Dashboard.
+            redirect_uri = string.IsNullOrWhiteSpace(_options.RedirectUri) ? null : _options.RedirectUri
         };
 
         var response = await PostAsync("/link/token/create", body, cancellationToken);
@@ -271,6 +275,19 @@ public class PlaidAccessor : IPlaidAccessor
         return jwk;
     }
 
+    /// <inheritdoc />
+    public async Task ResetSandboxLoginAsync(string accessToken, CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            client_id = _options.ClientId,
+            secret = _options.Secret,
+            access_token = accessToken
+        };
+
+        _ = await PostAsync("/sandbox/item/reset_login", body, cancellationToken);
+    }
+
     private static string? ReadString(JsonElement element, string propertyName) =>
         element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
             ? prop.GetString()
@@ -299,8 +316,10 @@ public class PlaidAccessor : IPlaidAccessor
                 // ignore — fall through with generic message
             }
 
-            throw new HttpRequestException(
-                $"Plaid API error (status {(int)response.StatusCode}): {errorCode ?? "unknown"} — {errorMessage ?? "no details"}");
+            throw new PlaidApiException(
+                errorCode,
+                $"Plaid API error (status {(int)response.StatusCode}): {errorCode ?? "unknown"} — {errorMessage ?? "no details"}",
+                response.StatusCode);
         }
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);

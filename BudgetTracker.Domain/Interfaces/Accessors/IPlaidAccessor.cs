@@ -7,8 +7,11 @@ namespace BudgetTracker.Domain.Interfaces.Accessors;
 /// </summary>
 public interface IPlaidAccessor
 {
-    /// <summary>Create a Link token for the given Cognito-sub user identity.</summary>
-    Task<PlaidLinkTokenResult> CreateLinkTokenAsync(string clientUserId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Create a Link token for the given Cognito-sub user identity. With <paramref name="accessToken"/> the token opens
+    /// Link in update mode, which repairs an existing item's login instead of creating a new item.
+    /// </summary>
+    Task<PlaidLinkTokenResult> CreateLinkTokenAsync(string clientUserId, string? accessToken = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Create a public_token directly against Plaid's Sandbox using a <c>user_custom</c>
@@ -42,4 +45,10 @@ public interface IPlaidAccessor
     /// JWT signature via <c>/webhook_verification_key/get</c>. Returns the raw JWK — no verification here.
     /// </summary>
     Task<PlaidJwkDto> GetWebhookVerificationKeyAsync(string keyId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Force a Sandbox item into <c>ITEM_LOGIN_REQUIRED</c> via <c>/sandbox/item/reset_login</c>, so the reconnect
+    /// path can be exercised. Sandbox-only; Plaid rejects this elsewhere.
+    /// </summary>
+    Task ResetSandboxLoginAsync(string accessToken, CancellationToken cancellationToken = default);
 }

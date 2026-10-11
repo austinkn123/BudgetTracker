@@ -45,7 +45,7 @@ public class PlaidWebhookEndpointTests
         const string jwt = "header.payload.signature";
         string? forwardedJwt = null;
         string? forwardedBody = null;
-        _manager.Setup(m => m.HandleTransactionsWebhookAsync(It.IsAny<string>(), It.IsAny<string>()))
+        _manager.Setup(m => m.HandleWebhookAsync(It.IsAny<string>(), It.IsAny<string>()))
             .Callback<string, string>((j, b) => { forwardedJwt = j; forwardedBody = b; })
             .ReturnsAsync(Result.Success());
         var request = BuildRequest(body, jwt);
@@ -55,7 +55,7 @@ public class PlaidWebhookEndpointTests
         AssertOk(result);
         Assert.Equal(jwt, forwardedJwt);
         Assert.Equal(body, forwardedBody); // verbatim — no re-serialization
-        _manager.Verify(m => m.HandleTransactionsWebhookAsync(jwt, body), Times.Once);
+        _manager.Verify(m => m.HandleWebhookAsync(jwt, body), Times.Once);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class PlaidWebhookEndpointTests
     {
         const string body = """{"webhook_type":"TRANSACTIONS"}""";
         string? forwardedJwt = null;
-        _manager.Setup(m => m.HandleTransactionsWebhookAsync(It.IsAny<string>(), body))
+        _manager.Setup(m => m.HandleWebhookAsync(It.IsAny<string>(), body))
             .Callback<string, string>((j, _) => forwardedJwt = j)
             .ReturnsAsync(Result.Success());
         var request = BuildRequest(body); // no header
@@ -80,7 +80,7 @@ public class PlaidWebhookEndpointTests
     {
         const string body = """{"webhook_type":"TRANSACTIONS"}""";
         string? forwardedJwt = null;
-        _manager.Setup(m => m.HandleTransactionsWebhookAsync(It.IsAny<string>(), body))
+        _manager.Setup(m => m.HandleWebhookAsync(It.IsAny<string>(), body))
             .Callback<string, string>((j, _) => forwardedJwt = j)
             .ReturnsAsync(Result.Success());
         // Two header values get comma-joined into a malformed JWT string.
@@ -97,7 +97,7 @@ public class PlaidWebhookEndpointTests
     public async Task Webhook_EmptyBody_Returns200AndForwardsEmptyBody()
     {
         string? forwardedBody = null;
-        _manager.Setup(m => m.HandleTransactionsWebhookAsync(It.IsAny<string>(), It.IsAny<string>()))
+        _manager.Setup(m => m.HandleWebhookAsync(It.IsAny<string>(), It.IsAny<string>()))
             .Callback<string, string>((_, b) => forwardedBody = b)
             .ReturnsAsync(Result.Success());
         var request = BuildRequest(string.Empty, "header.payload.sig");
