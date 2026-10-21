@@ -426,8 +426,10 @@ public class PlaidManager(
             var token = await plaidAccessor.CreateLinkTokenAsync(cognitoSub, accessToken);
             return Result<PlaidLinkTokenResult>.Success(token);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // PlaidApiException's message is sanitized (error_code/error_message only), so it is safe to log.
+            logger.LogWarning(ex, "Plaid /link/token/create failed (update mode: {IsUpdateMode}).", accessToken is not null);
             // Plain-language error per AC-9 — never echo upstream message (may contain secret/access_token).
             return Result<PlaidLinkTokenResult>.Failure("Unable to start bank link right now. Please try again in a moment.");
         }
@@ -504,7 +506,13 @@ public class PlaidManager(
             return Result<PlaidSyncSummary>.Failure("Could not refresh transactions right now. Please try again.");
         }
 
-        var changes = syncResult.Added.Concat(syncResult.Modified).ToList();
+        // Rows the engine rejects ($0) join Plaid's removals: never inserted when new, deleted when they
+        // modify a row already imported. Upserting them would trip CK_Transactions_NonZeroAmount and fail the batch.
+        var changesByImportable = syncResult.Added.Concat(syncResult.Modified).ToLookup(engine.IsImportable);
+        var changes = changesByImportable[true].ToList();
+        var idsToDelete = syncResult.RemovedTransactionIds
+            .Concat(changesByImportable[false].Select(t => t.TransactionId))
+            .ToList();
         var mapped = new List<Transaction>(changes.Count);
 
         // Plaid sends a suggested category on every transaction; resolving it here is what lets
@@ -534,9 +542,9 @@ public class PlaidManager(
 
         var (inserted, updated) = await transactionAccessor.UpsertImportedAsync(mapped);
         var removed = 0;
-        if (syncResult.RemovedTransactionIds.Count > 0)
+        if (idsToDelete.Count > 0)
         {
-            removed = await transactionAccessor.DeleteByPlaidTransactionIdsAsync(syncResult.RemovedTransactionIds);
+            removed = await transactionAccessor.DeleteByPlaidTransactionIdsAsync(idsToDelete);
         }
 
         var syncedAt = DateTime.UtcNow;

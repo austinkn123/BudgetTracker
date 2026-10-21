@@ -13,6 +13,7 @@
 
 # Claude Code local logs (auto-approval audit trail)
 .claude/logs/
+.claude/handoffs/
 
 # Local secrets — never commit
 appsettings.Local.json

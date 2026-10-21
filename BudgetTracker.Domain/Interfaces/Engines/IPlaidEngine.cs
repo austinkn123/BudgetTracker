@@ -20,6 +20,14 @@ public interface IPlaidEngine
     Transaction MapToBudgetTrackerTransaction(PlaidTransactionDto dto, int accountId, int? categoryId = null);
 
     /// <summary>
+    /// Whether a Plaid transaction can be kept as a BudgetTracker <see cref="Transaction"/>. A $0 row carries
+    /// nothing to budget (and a transaction must never be $0), so the caller treats it like a Plaid removal.
+    /// </summary>
+    /// <param name="dto">Plaid's raw transaction record, from <c>added</c> or <c>modified</c>.</param>
+    /// <returns>False when the amount is zero.</returns>
+    bool IsImportable(PlaidTransactionDto dto);
+
+    /// <summary>
     /// Resolve Plaid's suggested category (personal_finance_category.primary) to one of the user's
     /// categories, via the mapping stored on <see cref="Category.PlaidCategoryPrimary"/>.
     /// Returns null when Plaid sent no suggestion or the user has not mapped that value.

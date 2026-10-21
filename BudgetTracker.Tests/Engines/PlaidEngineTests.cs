@@ -199,18 +199,34 @@ public class PlaidEngineTests
         Assert.False(result.IsPending);
     }
 
-    // ── Boundary: zero amount cannot occur in Plaid practice, but guard anyway ─
+    // ── Boundary: zero amount ───────────────────────────────────────────────
 
     [Fact]
     public void Map_ZeroAmount_MapsToExpenseAndPreservesZero()
     {
-        // Defensive: Plaid will never emit zero, but if it does we don't want to crash —
-        // the downstream CK_Transactions_NonZeroAmount constraint will reject it loudly.
+        // Map itself doesn't crash on zero; sync filters $0 rows out via IsImportable before mapping,
+        // since CK_Transactions_NonZeroAmount would reject them.
         var dto = BuildPlaidDebit(amount: 0m);
 
         var result = _sut.MapToBudgetTrackerTransaction(dto, accountId: 7);
 
         Assert.Equal(0m, result.Amount);
+    }
+
+    // ── IsImportable: Plaid does send $0 rows (seen on a real Bank of America link) ─
+
+    [Fact]
+    public void IsImportable_ZeroAmount_ReturnsFalse()
+    {
+        Assert.False(_sut.IsImportable(BuildPlaidDebit(amount: 0m)));
+    }
+
+    [Theory]
+    [InlineData(0.01)]
+    [InlineData(-0.01)]
+    public void IsImportable_NonZeroAmount_ReturnsTrue(double amount)
+    {
+        Assert.True(_sut.IsImportable(BuildPlaidDebit(amount: (decimal)amount)));
     }
 
     // ── BuildBudgetTrackerAccount ───────────────────────────────────────────

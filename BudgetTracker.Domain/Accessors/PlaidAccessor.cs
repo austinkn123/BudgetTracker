@@ -56,6 +56,8 @@ public class PlaidAccessor : IPlaidAccessor
             // Update mode: access_token names the item to repair, and Plaid requires products to be absent.
             access_token = accessToken,
             products = accessToken is null ? new[] { "transactions" } : null,
+            // History depth is fixed when the item is linked and cannot be raised later, so request Plaid's max (730).
+            transactions = accessToken is null ? new { days_requested = 730 } : null,
             // Pass null (not "") when unset so JsonOptions.WhenWritingNull omits it entirely —
             // Plaid rejects an empty webhook string, and sandbox without a tunnel must still work.
             webhook = string.IsNullOrWhiteSpace(_options.WebhookUrl) ? null : _options.WebhookUrl,

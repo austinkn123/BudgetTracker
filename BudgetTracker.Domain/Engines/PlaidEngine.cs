@@ -37,6 +37,9 @@ public class PlaidEngine : IPlaidEngine
     }
 
     /// <inheritdoc />
+    public bool IsImportable(PlaidTransactionDto dto) => dto.Amount != 0;
+
+    /// <inheritdoc />
     public int? ResolveCategoryId(PlaidTransactionDto dto, IEnumerable<Category> userCategories)
     {
         if (string.IsNullOrWhiteSpace(dto.PersonalFinanceCategoryPrimary))

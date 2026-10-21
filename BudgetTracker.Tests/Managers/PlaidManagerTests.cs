@@ -80,6 +80,23 @@ public class PlaidManagerTests
         Assert.DoesNotContain("network down", result.Error!); // sanitize internal details
     }
 
+    [Fact]
+    public async Task CreateLinkToken_AccessorThrows_LogsWarningWithTheException()
+    {
+        var plaidError = new PlaidApiException("INVALID_FIELD", "Plaid API error (status 400): INVALID_FIELD — bad field", HttpStatusCode.BadRequest);
+        _plaidAccessor.Setup(a => a.CreateLinkTokenAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(plaidError);
+
+        await BuildSut().CreateLinkTokenAsync(userId: 1, cognitoSub: "cognito-sub-123");
+
+        _logger.Verify(l => l.Log(
+            LogLevel.Warning,
+            It.IsAny<EventId>(),
+            It.IsAny<It.IsAnyType>(),
+            plaidError,
+            It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once());
+    }
+
     // ── CreateUpdateLinkTokenAsync ──────────────────────────────────────────
 
     private const string LoginRequiredMessage = "A bank needs you to sign in again. Open Settings and click Reconnect.";
@@ -568,6 +585,58 @@ public class PlaidManagerTests
         Assert.Null(mapped.CategoryId);
         // The suggestion is still persisted so it can be surfaced and accepted later.
         Assert.Equal("FOOD_AND_DRINK", mapped.PlaidCategoryPrimary);
+    }
+
+    [Fact]
+    public async Task Sync_ZeroAmountTransactions_AreNotUpsertedAndAreDeleted()
+    {
+        const int userId = 5;
+        var plaidItem = new PlaidItem
+        {
+            Id = 11,
+            UserId = userId,
+            PlaidItemId = "plaid-item-1",
+            SyncCursor = "prev-cursor",
+            Accounts = [new PlaidAccount { Id = 1, PlaidAccountId = "plaid-acct-1", Name = "Plaid Checking", Mask = "0000" }]
+        };
+
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(userId)).ReturnsAsync([plaidItem]);
+        _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(new List<Account>
+        {
+            new() { Id = 77, UserId = userId, Name = "Chase - Plaid Checking (••0000)", AccountType = "depository" }
+        });
+
+        var normal = new PlaidTransactionDto("txn-normal", "plaid-acct-1", 12.75m, new DateTime(2026, 4, 7), "H-E-B", "H-E-B #123", false, null);
+        var zeroAdded = normal with { TransactionId = "txn-zero-added", Amount = 0m };
+        var zeroModified = normal with { TransactionId = "txn-zero-modified", Amount = 0m };
+
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidSyncResult(
+                Added: [zeroAdded, normal],
+                Modified: [zeroModified],
+                RemovedTransactionIds: [],
+                NextCursor: "next-cursor"));
+
+        List<Transaction>? upserted = null;
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(t => upserted = t.ToList())
+            .ReturnsAsync((1, 0));
+        List<string>? deleted = null;
+        // Only the modified row was ever imported; the new $0 id matches nothing, so 1 row is removed.
+        _txnAccessor.Setup(a => a.DeleteByPlaidTransactionIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .Callback<IEnumerable<string>>(ids => deleted = ids.ToList())
+            .ReturnsAsync(1);
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, "next-cursor", It.IsAny<DateTime>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await BuildSut().SyncAsync(userId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("txn-normal", Assert.Single(upserted!).PlaidTransactionId);
+        Assert.Equal(new[] { "txn-zero-added", "txn-zero-modified" }, deleted!.Order());
+        Assert.Equal(1, result.Value!.Removed);
+        _itemAccessor.Verify(a => a.UpdateSyncStateAsync(11, "next-cursor", It.IsAny<DateTime>()), Times.Once);
     }
 
     // ── SyncAsync — multiple items + staleness ─────────────────────────────

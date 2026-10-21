@@ -77,6 +77,29 @@ public class PlaidAccessorTests
         Assert.Equal("sub-1", handler.LastBody.GetProperty("user").GetProperty("client_user_id").GetString());
     }
 
+    [Fact]
+    public async Task CreateLinkToken_NewLink_RequestsMaxTransactionHistory()
+    {
+        // Plaid fixes the history window at link time (default 90 days), so a new link must ask for the max.
+        var handler = new CountingHandler(json: LinkTokenJson);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+
+        await BuildAccessor(handler, cache).CreateLinkTokenAsync("sub-1");
+
+        Assert.Equal(730, handler.LastBody.GetProperty("transactions").GetProperty("days_requested").GetInt32());
+    }
+
+    [Fact]
+    public async Task CreateLinkToken_UpdateMode_OmitsTransactions()
+    {
+        var handler = new CountingHandler(json: LinkTokenJson);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+
+        await BuildAccessor(handler, cache).CreateLinkTokenAsync("sub-1", accessToken: "access-token-xyz");
+
+        Assert.False(handler.LastBody.TryGetProperty("transactions", out _));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("access-token-xyz")]
