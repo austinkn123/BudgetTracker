@@ -6,7 +6,8 @@ export const categorySchema = z.object({
     .trim()
     .min(1, 'Category name is required')
     .max(100, 'Category name must be 100 characters or fewer'),
-  categoryType: z.enum(['Income', 'Expense', 'Both']),
+  /** Transfer: money moving between your own accounts or into investing; never counted as spending. */
+  categoryType: z.enum(['Income', 'Expense', 'Both', 'Transfer']),
   /**
    * Optional Plaid taxonomy mapping. '' means "no mapping" and is sent as an explicit empty
    * string so the server can tell "clear it" apart from "field not supplied" (which preserves).

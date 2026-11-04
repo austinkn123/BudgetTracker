@@ -38,7 +38,7 @@ export interface ButtonProps extends ForwardedProps {
   fullWidth?: boolean;
   startIcon?: ReactNode;
   endIcon?: ReactNode;
-  /** Render as another element, e.g. `component={RouterLink} to="/budget-plans"`. */
+  /** Render as another element, e.g. `component={RouterLink} to="/?tab=plan"`. */
   component?: ElementType;
   to?: string;
   className?: string;

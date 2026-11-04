@@ -53,4 +53,14 @@ public class CategoryEngineTests
     {
         Assert.Equal(_engine.ValidateNameIsUnique("Food", ["Food"]), _engine.DuplicateNameError("Food"));
     }
+
+    [Theory]
+    [InlineData("Transfer", true)]
+    [InlineData("Savings", false)]
+    public void Should_AcceptTransferCategoryType(string categoryType, bool valid)
+    {
+        var category = new BudgetTracker.Domain.Models.Category { UserId = 1, Name = "Webull", CategoryType = categoryType };
+
+        Assert.Equal(valid, _engine.ValidateCategory(category) is null);
+    }
 }

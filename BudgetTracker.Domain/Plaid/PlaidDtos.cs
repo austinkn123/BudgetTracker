@@ -12,7 +12,9 @@ public record PlaidAccountDto(
     string Name,
     string? Mask,
     string Type,
-    string? Subtype);
+    string? Subtype,
+    /// <summary>Plaid's cached <c>balances.current</c> (free; <c>/accounts/balance/get</c> is the billed real-time one).</summary>
+    decimal? CurrentBalance = null);
 
 /// <summary>Plaid item metadata returned by <c>/item/get</c>.</summary>
 public record PlaidItemMetadata(
@@ -37,7 +39,9 @@ public record PlaidSyncResult(
     IReadOnlyList<PlaidTransactionDto> Added,
     IReadOnlyList<PlaidTransactionDto> Modified,
     IReadOnlyList<string> RemovedTransactionIds,
-    string NextCursor);
+    string NextCursor,
+    /// <summary>The item's accounts with their cached balances, as <c>/transactions/sync</c> returns them.</summary>
+    IReadOnlyList<PlaidAccountDto>? Accounts = null);
 
 /// <summary>
 /// Raw JSON Web Key returned by <c>/webhook_verification_key/get</c>, used to verify the ES256

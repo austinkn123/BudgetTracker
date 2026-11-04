@@ -41,6 +41,7 @@ export const useTransactionReview = (
     // Every filtered slice is a separate cache entry, so invalidate the whole family.
     queryClient.invalidateQueries({ queryKey: ['transactions'] });
     queryClient.invalidateQueries({ queryKey: ['budget-analysis'] });
+    queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
   }, [queryClient]);
 
   const categorizeMutation = useMutation({
@@ -112,6 +113,12 @@ export const useTransactionReview = (
     [categorizeMutation, selectedIds, visibleIds],
   );
 
+  // For a set the user is looking at as one line (a payee group), so there is no selection to intersect.
+  const setCategoryForIds = useCallback(
+    (ids: number[], categoryId: number | null) => categorizeMutation.mutate({ ids, categoryId }),
+    [categorizeMutation],
+  );
+
   const setNotesFor = useCallback(
     (id: number, notes: string | null) => notesMutation.mutate({ id, notes }),
     [notesMutation],
@@ -127,6 +134,7 @@ export const useTransactionReview = (
       clearSelection,
       setCategoryFor,
       setCategoryForSelected,
+      setCategoryForIds,
       setNotesFor,
       isBusy,
     }),
@@ -137,6 +145,7 @@ export const useTransactionReview = (
       clearSelection,
       setCategoryFor,
       setCategoryForSelected,
+      setCategoryForIds,
       setNotesFor,
       isBusy,
     ],

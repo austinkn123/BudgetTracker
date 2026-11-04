@@ -18,5 +18,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     restoreMocks: true,
+    // A zone with DST, so date tests that cross a clock change really cross one on every machine.
+    env: { TZ: 'America/New_York' },
   },
 });

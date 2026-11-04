@@ -10,7 +10,7 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
     {
         builder.ToTable("Categories", t =>
         {
-            t.HasCheckConstraint("CK_Categories_CategoryType", "\"CategoryType\" IN ('Expense', 'Income', 'Both')");
+            t.HasCheckConstraint("CK_Categories_CategoryType", "\"CategoryType\" IN ('Expense', 'Income', 'Both', 'Transfer')");
         });
 
         builder.HasKey(c => c.Id);

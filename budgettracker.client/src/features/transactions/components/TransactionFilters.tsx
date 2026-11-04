@@ -1,5 +1,4 @@
-import { Search, X } from 'lucide-react';
-import { Badge, Button } from '../../../shared/components/ui';
+import { Badge, Button, SearchInput } from '../../../shared/components/ui';
 import { cn } from '../../../shared/utils/cn';
 
 import type { TransactionStatusFilter } from '../utils/transactionFilters';
@@ -35,30 +34,12 @@ const TransactionFilters = ({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative">
-        <Search
-          size={16}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
-        />
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search payee or notes…"
-          aria-label="Search transactions"
-          className="focus-ring h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[14px] text-ink shadow-xs transition-colors duration-120 hover:border-border-strong placeholder:text-ink-muted/60"
-        />
-        {search && (
-          <button
-            type="button"
-            onClick={() => onSearchChange('')}
-            aria-label="Clear search"
-            className="focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink"
-          >
-            <X size={14} />
-          </button>
-        )}
-      </div>
+      <SearchInput
+        value={search}
+        onChange={onSearchChange}
+        placeholder="Search payee or notes…"
+        ariaLabel="Search transactions"
+      />
 
       <div className="flex flex-wrap gap-2">
         {CHIPS.map((chip) => {

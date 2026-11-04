@@ -184,4 +184,27 @@ public class PlaidItemAccessorTests : IDisposable
         Assert.Equal("next-cursor", stored.SyncCursor);
         Assert.Equal(syncedAt, stored.LastSyncedAt);
     }
+
+    [Fact]
+    public async Task Should_StoreEachAccountsBalance_When_UpdateBalancesRuns()
+    {
+        var item = await SeedItemAsync(_currentKeyRing);
+        _context.PlaidAccounts.AddRange(
+            new PlaidAccount { PlaidItemId = item.Id, PlaidAccountId = "chk", Name = "Checking", AccountType = "depository", CurrentBalance = 1m },
+            new PlaidAccount { PlaidItemId = item.Id, PlaidAccountId = "card", Name = "Card", AccountType = "credit", CurrentBalance = 2m });
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+
+        await BuildSut().UpdateBalancesAsync(item.Id,
+        [
+            new PlaidAccountDto("chk", "Checking", null, "depository", "checking", 1500.25m),
+            new PlaidAccountDto("card", "Card", null, "credit", "credit card", null),
+            new PlaidAccountDto("not-ours", "Other", null, "depository", "checking", 9m)
+        ]);
+
+        var balances = await _context.PlaidAccounts.AsNoTracking().ToDictionaryAsync(a => a.PlaidAccountId, a => a.CurrentBalance);
+        Assert.Equal(1500.25m, balances["chk"]);
+        Assert.Null(balances["card"]);
+        Assert.Equal(2, balances.Count);
+    }
 }

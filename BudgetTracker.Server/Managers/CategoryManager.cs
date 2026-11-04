@@ -7,7 +7,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BudgetTracker.Server.Managers;
 
-public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor) : ICategoryManager
+public class CategoryManager(
+    ICategoryEngine engine,
+    ICategoryAccessor accessor,
+    ITransactionAccessor transactionAccessor,
+    IPlaidEngine plaidEngine) : ICategoryManager
 {
     public async Task<Result<Category>> GetByIdAsync(int id, int userId)
     {
@@ -63,6 +67,7 @@ public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor)
         if (duplicateError is not null)
             return Result<bool>.Failure(duplicateError);
 
+        var typeChanged = existing.CategoryType != category.CategoryType;
         existing.Name = category.Name;
         existing.CategoryType = category.CategoryType;
 
@@ -86,9 +91,22 @@ public class CategoryManager(ICategoryEngine engine, ICategoryAccessor accessor)
             return Result<bool>.Failure(engine.DuplicateNameError(category.Name));
         }
 
-        return updated
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("Category not found");
+        if (!updated)
+            return Result<bool>.Failure("Category not found");
+
+        // The category type is the user's Income/Expense override, so its rows follow it (Transfer and Adjustment
+        // rows keep their type). ponytail: a second save, not atomic with the category's; a unit of work is the
+        // upgrade path if a half-applied change is ever seen.
+        if (typeChanged)
+        {
+            var rows = await transactionAccessor.GetFilteredAsync(existing.UserId, new TransactionFilter(CategoryId: existing.Id));
+            var types = rows.ToDictionary(
+                r => r.Id,
+                r => plaidEngine.ClassifyTransactionType(r.PlaidCategoryPrimary, existing.CategoryType, r.TransactionType));
+            await transactionAccessor.SetCategoryAsync(types, existing.Id, existing.UserId);
+        }
+
+        return Result<bool>.Success(true);
     }
 
     // TODO: CategoryManager violates IDesign layering (catches an EF exception type) — consult tony.

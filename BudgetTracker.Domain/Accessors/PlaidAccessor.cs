@@ -180,6 +180,7 @@ public class PlaidAccessor : IPlaidAccessor
         var added = new List<PlaidTransactionDto>();
         var modified = new List<PlaidTransactionDto>();
         var removed = new List<string>();
+        var accounts = new Dictionary<string, PlaidAccountDto>();
         var nextCursor = cursor;
         bool hasMore;
 
@@ -203,11 +204,19 @@ public class PlaidAccessor : IPlaidAccessor
             foreach (var element in response.GetProperty("removed").EnumerateArray())
                 removed.Add(element.GetProperty("transaction_id").GetString() ?? string.Empty);
 
+            // Every page repeats the item's accounts with Plaid's cached balances; the latest page wins.
+            if (response.TryGetProperty("accounts", out var accountsProp) && accountsProp.ValueKind == JsonValueKind.Array)
+                foreach (var element in accountsProp.EnumerateArray())
+                {
+                    var account = ReadAccount(element);
+                    accounts[account.AccountId] = account;
+                }
+
             nextCursor = response.GetProperty("next_cursor").GetString() ?? nextCursor;
             hasMore = response.GetProperty("has_more").GetBoolean();
         } while (hasMore);
 
-        return new PlaidSyncResult(added, modified, removed, nextCursor ?? string.Empty);
+        return new PlaidSyncResult(added, modified, removed, nextCursor ?? string.Empty, accounts.Values.ToList());
     }
 
     /// <inheritdoc />
@@ -340,7 +349,13 @@ public class PlaidAccessor : IPlaidAccessor
         var subtype = element.TryGetProperty("subtype", out var subProp) && subProp.ValueKind == JsonValueKind.String
             ? subProp.GetString()
             : null;
-        return new PlaidAccountDto(accountId, name, mask, type, subtype);
+        var currentBalance = element.TryGetProperty("balances", out var balancesProp) &&
+                             balancesProp.ValueKind == JsonValueKind.Object &&
+                             balancesProp.TryGetProperty("current", out var currentProp) &&
+                             currentProp.ValueKind == JsonValueKind.Number
+            ? currentProp.GetDecimal()
+            : (decimal?)null;
+        return new PlaidAccountDto(accountId, name, mask, type, subtype, currentBalance);
     }
 
     private static PlaidTransactionDto ReadTransaction(JsonElement element)

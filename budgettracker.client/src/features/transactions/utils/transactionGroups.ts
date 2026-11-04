@@ -20,21 +20,18 @@ export type TransactionMonthSummary = {
   netTotal: number;
 };
 
-// BUD-18: Transaction.amount is already signed (Expense/Transfer negative,
-// Income positive). Display totals (incomeTotal, outflowTotal) are expressed
-// as non-negative magnitudes; netTotal carries the sign.
+// BUD-18: Transaction.amount is already signed. Display totals (incomeTotal,
+// outflowTotal) are expressed as non-negative magnitudes; netTotal carries the sign.
 const getOutflowMagnitude = (transaction: Transaction) =>
   transaction.amount < 0 ? -transaction.amount : transaction.amount;
 
-// An Adjustment is a user-driven balance correction. Its sign carries
-// semantic meaning: negative = balance was overstated (outflow correction,
-// render as expense), positive = balance was understated (inflow correction,
-// render as income). The engine accepts either sign for this type precisely
-// because direction is the user's choice; the UI must honor that choice
-// rather than forcing all Adjustments into the "outflow" bucket.
-export const isInflowTransaction = (transaction: Transaction) =>
-  transaction.transactionType === 'Income' ||
-  (transaction.transactionType === 'Adjustment' && transaction.amount > 0);
+// Direction is the sign, never the type: a refund is an Expense row with a positive
+// amount, and an own-account Transfer can go either way. Money in is amount > 0.
+export const isInflowTransaction = (transaction: Transaction) => transaction.amount > 0;
+
+// A paired own-account transfer is out of every figure already, so it never waits on a category.
+export const needsCategory = (transaction: Transaction) =>
+  transaction.categoryId == null && transaction.transactionType !== 'Transfer';
 
 export const toDateKey = (value: Date | string) =>
   format(typeof value === 'string' ? parseISO(value) : value, 'yyyy-MM-dd');
@@ -115,4 +112,40 @@ export const getTransactionMonthSummary = (
     outflowTotal,
     netTotal,
   };
+};
+export type PayeeGroup = {
+  payee: string;
+  ids: number[];
+  netTotal: number;
+  plaidCategoryPrimary: string | null;
+};
+
+/**
+ * The uncategorized backlog collapsed to one entry per payee, most rows first, so a payee is filed
+ * once instead of row by row. Payees match case-insensitively, as sync does when it learns from
+ * these picks.
+ */
+export const groupUncategorizedByPayee = (transactions: Transaction[]): PayeeGroup[] => {
+  const groups = new Map<string, PayeeGroup>();
+
+  for (const transaction of transactions) {
+    if (!needsCategory(transaction)) continue;
+
+    const payee = transaction.payee?.trim() || 'No payee';
+    const key = payee.toLowerCase();
+    const group = groups.get(key) ?? {
+      payee,
+      ids: [],
+      netTotal: 0,
+      plaidCategoryPrimary: transaction.plaidCategoryPrimary ?? null,
+    };
+
+    group.ids.push(transaction.id);
+    group.netTotal += transaction.amount;
+    groups.set(key, group);
+  }
+
+  return [...groups.values()].sort(
+    (a, b) => b.ids.length - a.ids.length || Math.abs(b.netTotal) - Math.abs(a.netTotal),
+  );
 };

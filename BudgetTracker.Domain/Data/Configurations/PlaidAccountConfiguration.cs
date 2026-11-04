@@ -33,6 +33,9 @@ public class PlaidAccountConfiguration : IEntityTypeConfiguration<PlaidAccount>
         builder.Property(a => a.AccountSubtype)
             .HasMaxLength(50);
 
+        builder.Property(a => a.CurrentBalance)
+            .HasColumnType("numeric(18,2)");
+
         builder.HasIndex(a => a.PlaidAccountId)
             .IsUnique()
             .HasDatabaseName("UQ_PlaidAccounts_PlaidAccountId");

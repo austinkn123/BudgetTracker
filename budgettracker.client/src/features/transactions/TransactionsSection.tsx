@@ -9,6 +9,7 @@ import { useBudgetAnalysis } from '../dashboard/hooks/useBudgetAnalysis';
 import { usePlaidConnections } from '../linked-accounts/hooks/usePlaidConnections';
 import type { TransactionQuery } from '../../shared/services/transaction.service';
 import MonthHeader from './components/MonthHeader';
+import PayeeReview from './components/PayeeReview';
 import PlanGroupedView from './components/PlanGroupedView';
 import TransactionRows from './components/TransactionRows';
 import TransactionTable from './components/TransactionTable';
@@ -18,6 +19,7 @@ import { groupByPlan } from './utils/planGrouping';
 import {
   buildTransactionDaySummaries,
   getTransactionDaySummary,
+  needsCategory,
 } from './utils/transactionGroups';
 
 type TransactionsSectionProps = {
@@ -26,7 +28,8 @@ type TransactionsSectionProps = {
   setStatusError: (msg: string | null) => void;
 };
 
-type ViewMode = 'plan' | 'list' | 'calendar';
+// 'review' is the payee backlog, reached from the "need a category" button rather than the toggle.
+type ViewMode = 'plan' | 'list' | 'calendar' | 'review';
 
 const VIEW_OPTIONS = [
   { value: 'plan' as const, label: 'Plan' },
@@ -135,7 +138,7 @@ const TransactionsSection = ({
   // Counted across the whole ledger rather than the month on screen, so the number does not shift
   // as you browse — it is the size of the backlog, not of this page.
   const uncategorizedCount = useMemo(
-    () => allTransactions.filter((t) => t.categoryId == null).length,
+    () => allTransactions.filter(needsCategory).length,
     [allTransactions],
   );
 
@@ -199,12 +202,11 @@ const TransactionsSection = ({
         />
         {uncategorizedCount > 0 && (
           <Button
-            variant={status === 'uncategorized' ? 'primary' : 'secondary'}
+            variant={view === 'review' ? 'primary' : 'secondary'}
             size="sm"
             onClick={() => {
-              setStatus(status === 'uncategorized' ? 'all' : 'uncategorized');
               setMonthStep(null);
-              setView('list');
+              setView(view === 'review' ? 'plan' : 'review');
             }}
           >
             {uncategorizedCount} need a category
@@ -212,11 +214,14 @@ const TransactionsSection = ({
         )}
       </div>
 
-      <MonthHeader
-        month={monthStart}
-        onMonthChange={handleMonthChange}
-        performance={analysis?.planMonth ?? null}
-      />
+      {/* The backlog spans every month, so a month header would only mislead. */}
+      {view !== 'review' && (
+        <MonthHeader
+          month={monthStart}
+          onMonthChange={handleMonthChange}
+          performance={analysis?.planMonth ?? null}
+        />
+      )}
 
       {review.selectedIds.size > 0 && (
         <Card padding="sm" className="animate-rise-in">
@@ -258,6 +263,15 @@ const TransactionsSection = ({
         }
       >
         {view === 'plan' && <PlanGroupedView grouping={grouping} {...rowProps} />}
+
+        {view === 'review' && (
+          <PayeeReview
+            transactions={allTransactions}
+            categoryOptions={categoryOptions}
+            onCategorize={review.setCategoryForIds}
+            isBusy={review.isBusy}
+          />
+        )}
 
         {view === 'list' && (
           <div className="flex flex-col gap-4">

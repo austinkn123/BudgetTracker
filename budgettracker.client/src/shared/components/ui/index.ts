@@ -18,8 +18,8 @@ export type { BadgeColor, BadgeProps, BadgeVariant } from './Badge';
 export { default as Button } from './Button';
 export type { ButtonProps, ButtonSize, ButtonVariant } from './Button';
 
-export { default as Calendar } from './Calendar';
-export type { CalendarProps } from './Calendar';
+export { default as Calendar, DateRangeCalendar } from './Calendar';
+export type { CalendarProps, DateRangeCalendarProps } from './Calendar';
 
 export { default as Card } from './Card';
 export type { CardPadding, CardProps, CardVariant } from './Card';
@@ -57,6 +57,9 @@ export type { ModalActionsProps } from './ModalActions';
 export { default as Progress } from './Progress';
 export type { ProgressProps } from './Progress';
 
+export { default as SearchInput } from './SearchInput';
+export type { SearchInputProps } from './SearchInput';
+
 export { default as Select } from './Select';
 export type { SelectOption, SelectProps } from './Select';
 
@@ -77,6 +80,9 @@ export type { SpinnerProps } from './Spinner';
 
 export { default as Table } from './Table';
 export type { TableColumn, TableProps } from './Table';
+
+export { default as Tabs } from './Tabs';
+export type { TabsOption, TabsProps } from './Tabs';
 
 export { default as ToggleGroup } from './ToggleGroup';
 export type { ToggleGroupOption, ToggleGroupProps } from './ToggleGroup';

@@ -5,7 +5,8 @@ namespace BudgetTracker.Domain.Engines;
 
 public class CategoryEngine : ICategoryEngine
 {
-    private static readonly HashSet<string> ValidCategoryTypes = ["Income", "Expense", "Both"];
+    // Transfer: money moving between the user's own accounts or into savings/investing, never counted as spending.
+    private static readonly HashSet<string> ValidCategoryTypes = ["Income", "Expense", "Both", "Transfer"];
 
     public string? ValidateCategory(Category category)
     {
@@ -19,7 +20,7 @@ public class CategoryEngine : ICategoryEngine
             return "Category name must be 100 characters or fewer";
 
         if (string.IsNullOrWhiteSpace(category.CategoryType) || !ValidCategoryTypes.Contains(category.CategoryType))
-            return "Category type must be Income, Expense, or Both";
+            return "Category type must be Income, Expense, Both, or Transfer";
 
         return null;
     }

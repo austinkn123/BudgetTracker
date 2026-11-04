@@ -11,13 +11,14 @@ public class CategoryManagerTests
 {
     private readonly Mock<ICategoryAccessor> _accessor = new(MockBehavior.Strict);
     private readonly CategoryEngine _engine = new();
+    private readonly Mock<ITransactionAccessor> _txnAccessor = new(MockBehavior.Strict);
 
     public CategoryManagerTests()
     {
         _accessor.Setup(a => a.GetOtherNamesAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync([]);
     }
 
-    private CategoryManager BuildSut() => new(_engine, _accessor.Object);
+    private CategoryManager BuildSut() => new(_engine, _accessor.Object, _txnAccessor.Object, new PlaidEngine());
 
     private static Category BuildMappedCategory() => new()
     {
@@ -205,5 +206,90 @@ public class CategoryManagerTests
 
         Assert.True(result.IsSuccess);
         _accessor.Verify(a => a.GetOtherNamesAsync(5, 8), Times.Once);
+    }
+
+    // ── Changing the type re-classifies the category's rows (the user's override) ─
+
+    private static Transaction Row(int id, string type, string? plaidCategory) => new()
+    {
+        Id = id,
+        AccountId = 1,
+        CategoryId = 8,
+        TransactionType = type,
+        Amount = -10m,
+        PlaidCategoryPrimary = plaidCategory
+    };
+
+    private void StubTypeChange(params Transaction[] rows)
+    {
+        _accessor.Setup(a => a.GetByIdForUserAsync(8, 5)).ReturnsAsync(BuildMappedCategory());
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).ReturnsAsync(true);
+        var byCategory = new TransactionFilter(CategoryId: 8);
+        _txnAccessor.Setup(a => a.GetFilteredAsync(5, byCategory)).ReturnsAsync(rows);
+    }
+
+    [Fact]
+    public async Task Update_TypeChangedToIncome_ReclassifiesItsRows_ButPairedTransfersStay()
+    {
+        StubTypeChange(Row(1, "Expense", "TRANSFER_IN"), Row(2, "Transfer", "TRANSFER_IN"), Row(3, "Adjustment", null));
+        IReadOnlyDictionary<int, string>? written = null;
+        _txnAccessor.Setup(a => a.SetCategoryAsync(It.IsAny<IReadOnlyDictionary<int, string>>(), 8, 5))
+            .Callback<IReadOnlyDictionary<int, string>, int?, int>((types, _, _) => written = types)
+            .ReturnsAsync(3);
+        var incoming = BuildMappedCategory();
+        incoming.CategoryType = "Income";
+
+        var result = await BuildSut().UpdateAsync(incoming);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Income", written![1]);
+        Assert.Equal("Transfer", written[2]);
+        Assert.Equal("Income", written[3]);
+    }
+
+    [Fact]
+    public async Task Update_TypeChangedToBoth_FallsBackToTheAutomaticRule()
+    {
+        StubTypeChange(Row(1, "Expense", "INCOME"), Row(2, "Expense", "FOOD_AND_DRINK"));
+        IReadOnlyDictionary<int, string>? written = null;
+        _txnAccessor.Setup(a => a.SetCategoryAsync(It.IsAny<IReadOnlyDictionary<int, string>>(), 8, 5))
+            .Callback<IReadOnlyDictionary<int, string>, int?, int>((types, _, _) => written = types)
+            .ReturnsAsync(2);
+        var incoming = BuildMappedCategory();
+        incoming.CategoryType = "Both";
+
+        await BuildSut().UpdateAsync(incoming);
+
+        Assert.Equal("Income", written![1]);
+        Assert.Equal("Expense", written[2]);
+    }
+
+    [Fact]
+    public async Task Update_TypeUnchanged_LeavesTransactionsAlone()
+    {
+        _accessor.Setup(a => a.GetByIdForUserAsync(8, 5)).ReturnsAsync(BuildMappedCategory());
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).ReturnsAsync(true);
+        var incoming = BuildMappedCategory();
+        incoming.Name = "Food";
+
+        var result = await BuildSut().UpdateAsync(incoming);
+
+        Assert.True(result.IsSuccess);
+        _txnAccessor.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Update_TypeChangeRejected_LeavesTransactionsAlone()
+    {
+        _accessor.Setup(a => a.GetByIdForUserAsync(8, 5)).ReturnsAsync(BuildMappedCategory());
+        _accessor.Setup(a => a.GetOtherNamesAsync(5, 8)).ReturnsAsync(["RENT"]);
+        var incoming = BuildMappedCategory();
+        incoming.Name = "Rent";
+        incoming.CategoryType = "Income";
+
+        var result = await BuildSut().UpdateAsync(incoming);
+
+        Assert.False(result.IsSuccess);
+        _txnAccessor.VerifyNoOtherCalls();
     }
 }

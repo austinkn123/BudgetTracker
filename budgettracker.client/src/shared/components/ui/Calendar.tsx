@@ -1,4 +1,5 @@
 import { DayPicker } from 'react-day-picker';
+import type { DateRange, Matcher } from 'react-day-picker';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -16,6 +17,37 @@ export interface CalendarProps {
   negativeDays?: Date[];
   className?: string;
 }
+
+const components = {
+  Chevron: ({ orientation }: { orientation?: string }) =>
+    orientation === 'left' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />,
+};
+
+const classNames = {
+  months: 'relative flex flex-col',
+  month: 'w-full',
+  month_caption: 'flex h-9 items-center justify-center',
+  caption_label: 'text-sm font-semibold text-ink',
+  nav: 'absolute inset-x-0 top-0 z-10 flex h-9 items-center justify-between',
+  button_previous:
+    'focus-ring inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition-colors duration-120 hover:bg-border-subtle hover:text-ink',
+  button_next:
+    'focus-ring inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition-colors duration-120 hover:bg-border-subtle hover:text-ink',
+  month_grid: 'mt-3 w-full border-separate border-spacing-1',
+  weekdays: '',
+  weekday: 'pb-1 text-center text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted',
+  week: '',
+  day: 'rounded p-0 text-center',
+  day_button:
+    'focus-ring mx-auto flex h-9 w-full min-w-9 cursor-pointer items-center justify-center rounded text-sm text-ink transition-colors duration-120 hover:bg-border-subtle',
+  selected: 'bg-primary text-white [&_button]:text-white [&_button:hover]:bg-transparent',
+  // Days between the two ends of a range also carry `selected`; this has to win over it.
+  range_middle: '!bg-primary-subtle [&_button]:!text-primary-dark',
+  today: 'font-bold',
+  outside: 'opacity-40',
+  hidden: 'invisible',
+  disabled: 'opacity-40 [&_button]:cursor-not-allowed [&_button:hover]:bg-transparent',
+};
 
 /**
  * Month calendar (BUD-20). Replaces @mui/x-date-pickers DateCalendar.
@@ -45,33 +77,41 @@ const Calendar = ({
     fixedWeeks
     modifiers={{ positive: positiveDays, negative: negativeDays }}
     modifiersClassNames={{ positive: 'day-pos', negative: 'day-neg' }}
-    components={{
-      Chevron: ({ orientation }) =>
-        orientation === 'left' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />,
-    }}
+    components={components}
     className={cn('w-full select-none', className)}
-    classNames={{
-      months: 'relative flex flex-col',
-      month: 'w-full',
-      month_caption: 'flex h-9 items-center justify-center',
-      caption_label: 'text-sm font-semibold text-ink',
-      nav: 'absolute inset-x-0 top-0 z-10 flex h-9 items-center justify-between',
-      button_previous:
-        'focus-ring inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition-colors duration-120 hover:bg-border-subtle hover:text-ink',
-      button_next:
-        'focus-ring inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition-colors duration-120 hover:bg-border-subtle hover:text-ink',
-      month_grid: 'mt-3 w-full border-separate border-spacing-1',
-      weekdays: '',
-      weekday: 'pb-1 text-center text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted',
-      week: '',
-      day: 'rounded p-0 text-center',
-      day_button:
-        'focus-ring mx-auto flex h-9 w-full min-w-9 cursor-pointer items-center justify-center rounded text-sm text-ink transition-colors duration-120 hover:bg-border-subtle',
-      selected: 'bg-primary text-white [&_button]:text-white [&_button:hover]:bg-transparent',
-      today: 'font-bold',
-      outside: 'opacity-40',
-      hidden: 'invisible',
-    }}
+    classNames={classNames}
+  />
+);
+
+export interface DateRangeCalendarProps {
+  selected: DateRange | undefined;
+  onSelect: (range: DateRange | undefined) => void;
+  /** Month shown first; uncontrolled after that. */
+  defaultMonth?: Date;
+  disabled?: Matcher;
+  className?: string;
+}
+
+/** The same calendar picking a from–to range: first click sets the start, second the end. */
+export const DateRangeCalendar = ({
+  selected,
+  onSelect,
+  defaultMonth,
+  disabled,
+  className,
+}: DateRangeCalendarProps) => (
+  <DayPicker
+    mode="range"
+    // With a full range selected, the next click starts a new one rather than stretching it.
+    resetOnSelect
+    selected={selected}
+    onSelect={onSelect}
+    defaultMonth={defaultMonth}
+    disabled={disabled}
+    fixedWeeks
+    components={components}
+    className={cn('w-full select-none', className)}
+    classNames={classNames}
   />
 );
 

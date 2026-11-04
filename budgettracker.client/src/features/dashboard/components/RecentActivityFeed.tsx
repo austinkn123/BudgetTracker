@@ -5,6 +5,7 @@ import { cn } from '../../../shared/utils/cn';
 import { withAlpha } from '../../../shared/theme/tokens';
 import type { Category, Transaction } from '../../../shared/types/api';
 import { categoryLabel } from '../utils/selectors';
+import { isInflowTransaction } from '../../transactions/utils/transactionGroups';
 import { chartPalette, semanticColors } from '../utils/chartTheme';
 import { currencyPrecise } from '../../../shared/utils/format';
 
@@ -44,7 +45,7 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
               (t.categoryId != null ? colorByCategory.get(t.categoryId) : undefined) ??
               semanticColors.neutral;
             const name = categoryLabel(categoryNames, t.categoryId ?? null);
-            const isIncome = t.transactionType === 'Income';
+            const isIncome = isInflowTransaction(t);
             return (
               <li
                 key={t.id}

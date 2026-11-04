@@ -17,5 +17,8 @@ public class PlaidAccount
     public string AccountType { get; set; } = string.Empty;
     public string? AccountSubtype { get; set; }
 
+    /// <summary>Plaid's cached <c>balances.current</c> as of the last sync; null until synced or when Plaid sends none.</summary>
+    public decimal? CurrentBalance { get; set; }
+
     public PlaidItem Item { get; set; } = null!;
 }

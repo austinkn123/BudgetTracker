@@ -50,7 +50,7 @@ public record CategoryPerformance(int? CategoryId, decimal Planned, decimal Actu
 
 public record BucketPerformance(string Bucket, decimal Planned, decimal Actual);
 
-/// <summary>Total expense magnitude for one category over the requested window.</summary>
+/// <summary>Net expense (outflows minus refunds) for one category over the requested window.</summary>
 public record CategorySpend(int? CategoryId, decimal Amount);
 
 /// <summary>One category's income/expense totals for a single calendar month.</summary>

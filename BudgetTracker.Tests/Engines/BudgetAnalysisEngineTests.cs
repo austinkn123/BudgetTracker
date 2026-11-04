@@ -281,4 +281,51 @@ public class BudgetAnalysisEngineTests
         Assert.Empty(_sut.SummarizeByMonth([Expense(1, -10m, MidJune)], MidJune, months: 0));
         Assert.Empty(_sut.SummarizeByMonth([Expense(1, -10m, MidJune)], MidJune, months: -1));
     }
+
+    // ---- Refunds net against spending (positive Expense rows) ----
+
+    private static Transaction Typed(int id, string type, decimal amount, DateTime occurredAt, int? categoryId = 1) => new()
+    {
+        Id = id,
+        AccountId = 1,
+        CategoryId = categoryId,
+        TransactionType = type,
+        Amount = amount,
+        OccurredAt = occurredAt
+    };
+
+    [Fact]
+    public void AnalyzeMonth_Refund_ReducesActualSpend()
+    {
+        var result = _sut.AnalyzeMonth(
+            [Expense(1, -80m, MidJune), Expense(2, 30m, MidJune)],
+            Plan(ExpenseLine(1, 100m)), MidJune);
+
+        Assert.Equal(50m, result.Expenses);
+        Assert.Equal(50m, result.ByCategory.Single(c => c.CategoryId == 1).Actual);
+        Assert.Equal(50m, result.ByBucket.Single(b => b.Bucket == "Core").Actual);
+    }
+
+    [Fact]
+    public void SummarizeSpend_Refund_NetsWithinItsCategory()
+    {
+        var spend = _sut.SummarizeSpend([Expense(1, -80m, MidJune), Expense(2, 30m, MidJune)]);
+
+        Assert.Equal(50m, Assert.Single(spend).Amount);
+    }
+
+    [Fact]
+    public void SummarizeByMonth_Refund_NetsAndTransfersAreNotSpending()
+    {
+        var trend = _sut.SummarizeByMonth(
+            [
+                Expense(1, -80m, MidJune),
+                Expense(2, 30m, MidJune),
+                Typed(3, "Transfer", -500m, MidJune),
+                Typed(4, "Adjustment", -7m, MidJune)
+            ],
+            MidJune, months: 1);
+
+        Assert.Equal(50m, Assert.Single(trend).Expenses);
+    }
 }

@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns';
 import { Card, Sparkline } from '../../../shared/components/ui';
 import { cn } from '../../../shared/utils/cn';
 import type { CategoryCard } from '../utils/selectors';
+import { isInflowTransaction } from '../../transactions/utils/transactionGroups';
 import { semanticColors } from '../utils/chartTheme';
 import { currency, currencyPrecise } from '../../../shared/utils/format';
 
@@ -171,12 +172,12 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
                               <span
                                 className={cn(
                                   'shrink-0 text-[13px] font-semibold',
-                                  t.transactionType === 'Income'
+                                  isInflowTransaction(t)
                                     ? 'text-success-dark'
                                     : 'text-ink',
                                 )}
                               >
-                                {t.transactionType === 'Income' ? '+' : '−'}
+                                {isInflowTransaction(t) ? '+' : '−'}
                                 {currencyPrecise.format(Math.abs(t.amount))}
                               </span>
                             </li>

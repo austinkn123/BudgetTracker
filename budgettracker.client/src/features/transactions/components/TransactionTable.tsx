@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { format, startOfDay, startOfMonth } from 'date-fns';
 import { Badge, Calendar, Separator } from '../../../shared/components/ui';
 import type { Category, Transaction } from '../../../shared/types/api';
-import type { TransactionDaySummary } from '../utils/transactionGroups';
+import { isInflowTransaction, type TransactionDaySummary } from '../utils/transactionGroups';
 import { currencyPrecise, signedAmount } from '../../../shared/utils/format';
 
 type TransactionTableProps = {
@@ -105,17 +105,7 @@ const TransactionTable = ({
           {selectedTransactions.length > 0 ? (
             <ul className="overflow-hidden rounded-lg bg-surface ring-1 ring-ink/[0.06]">
               {selectedTransactions.map((transaction, index) => {
-                // An Adjustment is a user-driven balance correction. Its sign carries
-                // semantic meaning: negative = balance was overstated (outflow correction,
-                // render as expense), positive = balance was understated (inflow correction,
-                // render as income). The engine accepts either sign for this type precisely
-                // because direction is the user's choice; the UI must honor that choice
-                // rather than forcing all Adjustments into the "outflow" bucket.
-                const isInflow =
-                  transaction.transactionType === 'Income' ||
-                  (transaction.transactionType === 'Adjustment' && transaction.amount > 0);
-                const sign = isInflow ? '+' : '-';
-
+                const isInflow = isInflowTransaction(transaction);
                 const mask = transaction.plaidAccountId
                   ? maskByPlaidAccountId.get(transaction.plaidAccountId)
                   : undefined;
@@ -158,7 +148,7 @@ const TransactionTable = ({
                             : 'numeric whitespace-nowrap text-sm font-semibold text-ink'
                         }
                       >
-                        {sign}{currencyPrecise.format(Math.abs(transaction.amount))}
+                        {signedAmount(transaction.amount, isInflow)}
                       </span>
                     </button>
                   </li>

@@ -14,4 +14,7 @@ public record TransactionFilter(
     bool? IsImported = null,
     bool? IsPending = null,
     /// <summary>Case-insensitive substring match against payee and notes.</summary>
-    string? Search = null);
+    string? Search = null,
+    /// <summary>Only rows imported from this Plaid account.</summary>
+    string? PlaidAccountId = null,
+    int? CategoryId = null);

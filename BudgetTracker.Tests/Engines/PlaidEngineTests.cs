@@ -168,6 +168,34 @@ public class PlaidEngineTests
     }
 
     [Fact]
+    public void ResolveCategoryId_UsersPickForThePayee_BeatsThePlaidMapping()
+    {
+        var categories = new[] { new Category { Id = 8, PlaidCategoryPrimary = "FOOD_AND_DRINK" } };
+        var categoryByPayee = new Dictionary<string, int> { ["Starbucks"] = 12 };
+
+        Assert.Equal(12, _sut.ResolveCategoryId(BuildPlaidDebit(), categories, categoryByPayee));
+    }
+
+    [Fact]
+    public void ResolveCategoryId_PayeeFallsBackToNameWithoutMerchant()
+    {
+        // The stored Payee is merchant_name ?? name, so the lookup has to key on the same value.
+        var dto = BuildPlaidDebit() with { MerchantName = null, PersonalFinanceCategoryPrimary = null };
+        var categoryByPayee = new Dictionary<string, int> { ["STARBUCKS #1234"] = 12 };
+
+        Assert.Equal(12, _sut.ResolveCategoryId(dto, Array.Empty<Category>(), categoryByPayee));
+    }
+
+    [Fact]
+    public void ResolveCategoryId_UnknownPayee_FallsBackToThePlaidMapping()
+    {
+        var categories = new[] { new Category { Id = 8, PlaidCategoryPrimary = "FOOD_AND_DRINK" } };
+        var categoryByPayee = new Dictionary<string, int> { ["Amazon"] = 12 };
+
+        Assert.Equal(8, _sut.ResolveCategoryId(BuildPlaidDebit(), categories, categoryByPayee));
+    }
+
+    [Fact]
     public void Map_StampsPlaidIdentifiersAndImportedFlag()
     {
         var dto = BuildPlaidDebit();
@@ -581,5 +609,367 @@ public class PlaidEngineTests
     public void Should_Throw_When_ActiveItemsIsNull()
     {
         Assert.Throws<ArgumentNullException>(() => _sut.IsAlreadyLinked("ins_3", [], null!));
+    }
+
+    // ── ClassifyTransactionType: only Plaid INCOME is income unless the category says otherwise ─
+
+    [Theory]
+    [InlineData("INCOME", null, "Income")]
+    [InlineData("TRANSFER_IN", null, "Expense")]        // money from a friend nets against spending
+    [InlineData("GENERAL_MERCHANDISE", null, "Expense")] // a refund
+    [InlineData(null, null, "Expense")]                  // manual row, no Plaid category
+    [InlineData("INCOME", "Both", "Income")]             // Both defers to the automatic rule
+    [InlineData("TRANSFER_IN", "Both", "Expense")]
+    public void Classify_WithoutAnOverridingCategory_OnlyPlaidIncomeIsIncome(string? plaidCategory, string? categoryType, string expected)
+    {
+        Assert.Equal(expected, _sut.ClassifyTransactionType(plaidCategory, categoryType));
+    }
+
+    [Theory]
+    [InlineData("TRANSFER_IN", "Income", "Income")]   // e.g. a side gig paid by Zelle
+    [InlineData("INCOME", "Expense", "Expense")]      // e.g. an interest line the user files as spending
+    public void Classify_IncomeOrExpenseCategory_OverridesPlaid(string plaidCategory, string categoryType, string expected)
+    {
+        Assert.Equal(expected, _sut.ClassifyTransactionType(plaidCategory, categoryType));
+    }
+
+    [Theory]
+    [InlineData("Income")]
+    [InlineData("Transfer")]
+    public void Classify_PairedTransferRow_KeepsItsType(string? categoryType)
+    {
+        Assert.Equal("Transfer", _sut.ClassifyTransactionType("TRANSFER_OUT", categoryType, "Transfer"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Expense")]
+    [InlineData("Adjustment")]
+    public void Classify_TransferCategory_TakesTheRowOutOfSpending(string? currentType)
+    {
+        // A Webull deposit or a card payment whose other side is not linked: money moved, nothing was spent.
+        Assert.Equal("Adjustment", _sut.ClassifyTransactionType("TRANSFER_OUT", "Transfer", currentType));
+    }
+
+    [Fact]
+    public void Classify_AdjustmentRow_FollowsTheCategoryItMovesTo()
+    {
+        Assert.Equal("Expense", _sut.ClassifyTransactionType("TRANSFER_OUT", "Expense", "Adjustment"));
+    }
+
+    [Fact]
+    public void Classify_IncomeOrExpenseRow_IsReDerived()
+    {
+        Assert.Equal("Income", _sut.ClassifyTransactionType("TRANSFER_IN", "Income", currentType: "Expense"));
+    }
+
+    [Fact]
+    public void Map_Refund_IsAnExpenseWithPositiveAmount()
+    {
+        var dto = BuildPlaidDebit(amount: -25m) with { PersonalFinanceCategoryPrimary = "GENERAL_MERCHANDISE" };
+
+        var result = _sut.MapToBudgetTrackerTransaction(dto, accountId: 7);
+
+        Assert.Equal(25m, result.Amount);
+        Assert.Equal("Expense", result.TransactionType);
+    }
+
+    [Fact]
+    public void Map_IncomeCategoryType_OverridesPlaidCategory()
+    {
+        var dto = BuildPlaidDebit(amount: -300m) with { PersonalFinanceCategoryPrimary = "TRANSFER_IN" };
+
+        var result = _sut.MapToBudgetTrackerTransaction(dto, accountId: 7, categoryId: 4, categoryType: "Income");
+
+        Assert.Equal("Income", result.TransactionType);
+    }
+
+    // ── ReconcileOwnAccountTransfers ───────────────────────────────────────
+
+    private static readonly DateTime TransferDay = new(2026, 9, 10);
+
+    // BudgetTracker account ids: chk 10, sav 20, card 30, loan 40, brokerage 50.
+    private static readonly PlaidAccount[] Linked =
+    [
+        new() { PlaidAccountId = "chk", AccountType = "depository" },
+        new() { PlaidAccountId = "sav", AccountType = "depository" },
+        new() { PlaidAccountId = "card", AccountType = "credit" },
+        new() { PlaidAccountId = "loan", AccountType = "loan" },
+        new() { PlaidAccountId = "brokerage", AccountType = "investment" }
+    ];
+
+    private static Transaction Leg(
+        int id, decimal amount, string plaidAccountId, int accountId, int dayOffset = 0,
+        string plaidCategory = "TRANSFER_OUT", bool pending = false, string type = "Expense",
+        int? transferAccountId = null, int? categoryId = null) => new()
+    {
+        Id = id,
+        AccountId = accountId,
+        PlaidAccountId = plaidAccountId,
+        Amount = amount,
+        OccurredAt = TransferDay.AddDays(dayOffset),
+        PlaidCategoryPrimary = plaidCategory,
+        IsPending = pending,
+        TransactionType = type,
+        TransferAccountId = transferAccountId,
+        CategoryId = categoryId
+    };
+
+    private IReadOnlyList<TransferUpdate> Reconcile(IEnumerable<Transaction> rows, params Category[] categories) =>
+        _sut.ReconcileOwnAccountTransfers(rows, Linked, categories);
+
+    /// <summary>(row, counterpart account) for every leg marked Transfer, by row id.</summary>
+    private static List<(int, int?)> Pairs(IReadOnlyList<TransferUpdate> updates) =>
+        updates.Where(u => u.TransactionType == "Transfer").OrderBy(u => u.TransactionId).Select(u => (u.TransactionId, u.TransferAccountId)).ToList();
+
+    [Fact]
+    public void Pair_OppositeAmountsAcrossAccounts_MarksBothLegsAsTransfersToTheOtherAccount()
+    {
+        var updates = Reconcile(
+        [
+            Leg(1, -500m, "chk", accountId: 10),
+            Leg(2, 500m, "sav", accountId: 20, dayOffset: 1, plaidCategory: "TRANSFER_IN")
+        ]);
+
+        Assert.Equal([new TransferUpdate(1, "Transfer", 20), new TransferUpdate(2, "Transfer", 10)], updates.OrderBy(u => u.TransactionId));
+    }
+
+    [Fact]
+    public void Pair_CardPaymentCategorisedAsLoanPayment_Pairs()
+    {
+        var updates = Reconcile(
+        [
+            Leg(1, -900m, "chk", accountId: 10, plaidCategory: "LOAN_PAYMENTS"),
+            Leg(2, 900m, "card", accountId: 30, dayOffset: 2, plaidCategory: "LOAN_PAYMENTS")
+        ]);
+
+        Assert.Equal([(1, 30), (2, 10)], Pairs(updates));
+    }
+
+    [Theory]
+    [InlineData("loan")]        // a payment to a linked loan is money out, as the balance chart sees it
+    [InlineData("brokerage")]   // so is a move into investments
+    [InlineData("unlinked")]
+    public void Pair_LegOnANonCashAccount_StaysMoneyInOrOut(string plaidAccountId)
+    {
+        var updates = Reconcile(
+        [
+            Leg(1, -900m, "chk", 10, plaidCategory: "LOAN_PAYMENTS"),
+            Leg(2, 900m, plaidAccountId, 40, dayOffset: 1, plaidCategory: "LOAN_PAYMENTS")
+        ]);
+
+        Assert.Empty(updates);
+    }
+
+    [Theory]
+    [InlineData(5, 2)]   // boundary: five days apart still pairs
+    [InlineData(-5, 2)]
+    [InlineData(6, 0)]   // a day further is a different event
+    [InlineData(-6, 0)]
+    public void Pair_DatesMoreThanFiveDaysApart_DoNotPair(int dayOffset, int expectedLegs)
+    {
+        var updates = Reconcile(
+        [
+            Leg(1, -500m, "chk", 10),
+            Leg(2, 500m, "sav", 20, dayOffset, "TRANSFER_IN")
+        ]);
+
+        Assert.Equal(expectedLegs, Pairs(updates).Count);
+    }
+
+    [Fact]
+    public void Pair_SamePlaidAccount_IsRejected()
+    {
+        // A reversal on one account is not a transfer between two.
+        Assert.Empty(Reconcile([Leg(1, -500m, "chk", 10), Leg(2, 500m, "chk", 10, 1, "TRANSFER_IN")]));
+    }
+
+    [Fact]
+    public void Pair_NonTransferCategory_IsRejected()
+    {
+        // Payroll that happens to equal an outgoing transfer is still income.
+        Assert.Empty(Reconcile([Leg(1, -500m, "chk", 10), Leg(2, 500m, "sav", 20, 1, "INCOME")]));
+    }
+
+    [Fact]
+    public void Pair_AmountsNotExactlyOpposite_DoNotPair()
+    {
+        Assert.Empty(Reconcile([Leg(1, -500m, "chk", 10), Leg(2, 499.99m, "sav", 20, 0, "TRANSFER_IN")]));
+    }
+
+    [Fact]
+    public void Pair_PendingAndAdjustmentRows_AreLeftAlone()
+    {
+        var updates = Reconcile(
+        [
+            Leg(1, -500m, "chk", 10, pending: true),
+            Leg(2, 500m, "sav", 20, 0, "TRANSFER_IN"),
+            Leg(3, -70m, "chk", 10, type: "Adjustment"),
+            Leg(4, 70m, "sav", 20, 0, "TRANSFER_IN")
+        ]);
+
+        Assert.Empty(updates);
+    }
+
+    [Fact]
+    public void Pair_MaximisesThePairCount()
+    {
+        // Closest-first would pair outflow 2 (day 3) with inflow 3 (day 2) and strand the other two legs;
+        // 1↔3 and 2↔4 are both inside the window.
+        var updates = Reconcile(
+        [
+            Leg(1, -200m, "chk", 10, dayOffset: 0),
+            Leg(2, -200m, "chk", 10, dayOffset: 3),
+            Leg(3, 200m, "sav", 20, dayOffset: 2, plaidCategory: "TRANSFER_IN"),
+            Leg(4, 200m, "sav", 20, dayOffset: 6, plaidCategory: "TRANSFER_IN")
+        ]);
+
+        Assert.Equal([(1, 20), (2, 20), (3, 10), (4, 10)], Pairs(updates));
+    }
+
+    [Fact]
+    public void Pair_EachRowIsUsedAtMostOnce()
+    {
+        // Two outflows, one inflow: only one pair is possible.
+        var updates = Reconcile(
+        [
+            Leg(1, -200m, "chk", 10),
+            Leg(2, -200m, "chk", 10, dayOffset: 2),
+            Leg(3, 200m, "sav", 20, dayOffset: 1, plaidCategory: "TRANSFER_IN")
+        ]);
+
+        Assert.Equal(2, updates.Count);
+        Assert.Single(updates, u => u.TransactionId == 3);
+    }
+
+    [Fact]
+    public void Pair_Tie_IsDeterministicRegardlessOfInputOrder()
+    {
+        Transaction[] rows =
+        [
+            Leg(5, -200m, "chk", 10, dayOffset: -1),
+            Leg(3, -200m, "chk", 10, dayOffset: 1),
+            Leg(4, 200m, "sav", 20, dayOffset: 0, plaidCategory: "TRANSFER_IN")
+        ];
+
+        var forward = Reconcile(rows);
+        var reversed = Reconcile(rows.Reverse());
+
+        Assert.Equal(forward.OrderBy(u => u.TransactionId), reversed.OrderBy(u => u.TransactionId));
+        Assert.Contains(forward, u => u.TransactionId == 5);   // the earlier outflow takes the inflow
+    }
+
+    [Fact]
+    public void Pair_NoCandidates_ReturnsEmpty() => Assert.Empty(Reconcile([]));
+
+    [Fact]
+    public void Pair_TwoEqualTransfersOnTheSameDay_BothPair()
+    {
+        var updates = Reconcile(
+        [
+            Leg(1, -100m, "chk", 10),
+            Leg(2, -100m, "chk", 10),
+            Leg(3, 100m, "sav", 20, plaidCategory: "TRANSFER_IN"),
+            Leg(4, 100m, "sav", 20, plaidCategory: "TRANSFER_IN")
+        ]);
+
+        Assert.Equal([1, 2, 3, 4], Pairs(updates).Select(p => p.Item1));
+    }
+
+    [Fact]
+    public void Pair_InflowWhoseClosestOutflowIsTaken_StillPairs()
+    {
+        var updates = Reconcile(
+        [
+            Leg(1, -300m, "chk", 10),
+            Leg(2, -300m, "chk", 10, dayOffset: 4),
+            Leg(3, 300m, "sav", 20, plaidCategory: "TRANSFER_IN"),
+            Leg(4, 300m, "sav", 20, dayOffset: 1, plaidCategory: "TRANSFER_IN")
+        ]);
+
+        Assert.Equal([(1, 20), (2, 20), (3, 10), (4, 10)], Pairs(updates));
+    }
+
+    [Fact]
+    public void Pair_PendingLegAndItsPostedCopy_OnlyThePostedCopyPairs()
+    {
+        // Plaid posts a pending row under a new id and removes the pending one later; until then both exist.
+        var updates = Reconcile(
+        [
+            Leg(1, -250m, "chk", 10, pending: true),
+            Leg(2, -250m, "chk", 10, dayOffset: 1),
+            Leg(3, 250m, "sav", 20, plaidCategory: "TRANSFER_IN")
+        ]);
+
+        Assert.Equal([(2, 20), (3, 10)], Pairs(updates));
+    }
+
+    [Fact]
+    public void Pair_CardPaymentToAnUnlinkedCard_StaysUnpaired()
+    {
+        // No matching leg on a linked card, so the payment is real money out of checking.
+        Assert.Empty(Reconcile(
+        [
+            Leg(1, -800m, "chk", 10, plaidCategory: "LOAN_PAYMENTS"),
+            Leg(2, -800m, "chk", 10, plaidCategory: "LOAN_PAYMENTS")
+        ]));
+    }
+
+    // ── Re-pairing from scratch: only changes are written, and lost pairs revert ─
+
+    [Fact]
+    public void Reconcile_AlreadyPairedLegs_NeedNoUpdate()
+    {
+        var updates = Reconcile(
+        [
+            Leg(1, -500m, "chk", 10, type: "Transfer", transferAccountId: 20),
+            Leg(2, 500m, "sav", 20, 1, "TRANSFER_IN", type: "Transfer", transferAccountId: 10)
+        ]);
+
+        Assert.Empty(updates);
+    }
+
+    [Fact]
+    public void Reconcile_WritesOnlyRowsWhoseResultChanged()
+    {
+        // Leg 1 pointed at the wrong account; leg 2 is already right.
+        var updates = Reconcile(
+        [
+            Leg(1, -500m, "chk", 10, type: "Transfer", transferAccountId: 30),
+            Leg(2, 500m, "sav", 20, 1, "TRANSFER_IN", type: "Transfer", transferAccountId: 10)
+        ]);
+
+        Assert.Equal([new TransferUpdate(1, "Transfer", 20)], updates);
+    }
+
+    [Fact]
+    public void Reconcile_PartnerDeletedByPlaid_SurvivingLegRevertsToItsClassifiedType()
+    {
+        var updates = Reconcile([Leg(2, 500m, "sav", 20, 1, "TRANSFER_IN", type: "Transfer", transferAccountId: 10)]);
+
+        Assert.Equal([new TransferUpdate(2, "Expense", null)], updates);
+    }
+
+    [Fact]
+    public void Reconcile_SurvivingLegInAnIncomeCategory_RevertsToIncome()
+    {
+        var updates = Reconcile(
+            [Leg(2, 500m, "sav", 20, 1, "TRANSFER_IN", type: "Transfer", transferAccountId: 10, categoryId: 9)],
+            new Category { Id = 9, Name = "Side gig", CategoryType = "Income" });
+
+        Assert.Equal([new TransferUpdate(2, "Income", null)], updates);
+    }
+
+    [Fact]
+    public void Reconcile_PairWithANonCashAccount_BothLegsRevert()
+    {
+        // Paired before the cash-accounts-only rule; a move into investments is money out again.
+        var updates = Reconcile(
+        [
+            Leg(1, -500m, "chk", 10, type: "Transfer", transferAccountId: 50),
+            Leg(2, 500m, "brokerage", 50, 1, "TRANSFER_IN", type: "Transfer", transferAccountId: 10)
+        ]);
+
+        Assert.Equal([new TransferUpdate(1, "Expense", null), new TransferUpdate(2, "Expense", null)], updates.OrderBy(u => u.TransactionId));
     }
 }

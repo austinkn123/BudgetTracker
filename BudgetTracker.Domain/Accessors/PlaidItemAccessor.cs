@@ -156,6 +156,26 @@ public class PlaidItemAccessor : IPlaidItemAccessor
     }
 
     /// <inheritdoc />
+    public async Task UpdateBalancesAsync(int plaidItemId, IReadOnlyList<PlaidAccountDto> accounts)
+    {
+        var balanceById = accounts
+            .GroupBy(a => a.AccountId)
+            .ToDictionary(g => g.Key, g => g.Last().CurrentBalance);
+        var ids = balanceById.Keys.ToList();
+
+        var rows = await _context.PlaidAccounts
+            .Where(a => a.PlaidItemId == plaidItemId && ids.Contains(a.PlaidAccountId))
+            .ToListAsync();
+        if (rows.Count == 0)
+            return;
+
+        foreach (var row in rows)
+            row.CurrentBalance = balanceById[row.PlaidAccountId];
+
+        await _context.SaveChangesAsync();
+    }
+
+    /// <inheritdoc />
     public async Task SetNeedsReconnectAsync(int plaidItemId, bool needsReconnect)
     {
         var item = await _context.PlaidItems.FirstOrDefaultAsync(p => p.Id == plaidItemId);

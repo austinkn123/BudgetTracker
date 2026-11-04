@@ -58,13 +58,16 @@ export const buildCategoryPlanIndex = (entries: readonly BudgetPlanEntry[]) => {
   return { plannedByCategory, bucketByCategory };
 };
 
+/** Expense rows are negative and refunds positive, so spend is the negated sum. */
+const netSpend = (rows: readonly Transaction[]) => rows.reduce((sum, t) => sum - t.amount, 0);
+
 /**
  * Group a month's transactions by bucket, then category, against the governing plan.
  *
- * Mirrors `BudgetAnalysisEngine.AnalyzeMonth`: only Expense rows count toward actuals, amounts are
- * accumulated as magnitudes (they arrive signed), and **spend in a category the plan doesn't budget
- * for falls into Buffer** — as does uncategorised spend. That is the budgeting philosophy: you
- * commit to Core, and everything else eats your Buffer.
+ * Mirrors `BudgetAnalysisEngine.AnalyzeMonth`: only Expense rows count toward actuals, actual spend
+ * is Σ(−amount) so a refund (a positive Expense row) nets off what it refunds, and **spend in a
+ * category the plan doesn't budget for falls into Buffer** — as does uncategorised spend. That is
+ * the budgeting philosophy: you commit to Core, and everything else eats your Buffer.
  *
  * `serverPerformance` is preferred for planned/actual when supplied, so the page and the dashboard
  * never disagree; the transactions themselves are only ever grouped locally.
@@ -100,7 +103,7 @@ export const groupByPlan = (
   const groups: (CategoryGroup & { bucket: Bucket })[] = [];
   for (const categoryId of categoryIds) {
     const rows = byCategory.get(categoryId) ?? [];
-    const actual = rows.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    const actual = netSpend(rows);
     const planned = plannedFor(categoryId);
 
     groups.push({
@@ -136,10 +139,7 @@ export const groupByPlan = (
     };
   });
 
-  const uncategorizedActual = uncategorizedTransactions.reduce(
-    (sum, t) => sum + Math.abs(t.amount),
-    0,
-  );
+  const uncategorizedActual = netSpend(uncategorizedTransactions);
 
   return {
     uncategorized:

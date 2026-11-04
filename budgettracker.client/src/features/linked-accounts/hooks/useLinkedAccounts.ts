@@ -85,6 +85,7 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
     void queryClient.invalidateQueries({ queryKey: PLAID_CONNECTIONS_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: ['transactions'] });
     void queryClient.invalidateQueries({ queryKey: ['budget-analysis'] });
+    void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
   }, [queryClient]);
 
   const prepareLinkMutation = useMutation({

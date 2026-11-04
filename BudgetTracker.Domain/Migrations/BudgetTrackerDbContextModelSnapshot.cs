@@ -223,7 +223,7 @@ namespace BudgetTracker.Domain.Migrations
 
                     b.ToTable("Categories", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Categories_CategoryType", "\"CategoryType\" IN ('Expense', 'Income', 'Both')");
+                            t.HasCheckConstraint("CK_Categories_CategoryType", "\"CategoryType\" IN ('Expense', 'Income', 'Both', 'Transfer')");
                         });
                 });
 
@@ -243,6 +243,9 @@ namespace BudgetTracker.Domain.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<decimal?>("CurrentBalance")
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("Mask")
                         .HasMaxLength(4)
@@ -459,6 +462,280 @@ namespace BudgetTracker.Domain.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("AccountLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("AccountType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<decimal?>("TotalCashBalance")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("TotalDayProfitLoss")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("TotalMarketValue")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("TotalNetLiquidationValue")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("TotalUnrealizedProfitLoss")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("WebullConnectionId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WebullConnectionId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_WebullAccounts_WebullConnectionId_AccountId");
+
+                    b.ToTable("WebullAccounts", (string)null);
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccountOrder", b =>
+                {
+                    b.Property<int>("WebullConnectionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("OrderId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("FilledAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal?>("FilledPrice")
+                        .HasColumnType("numeric(28,10)");
+
+                    b.Property<decimal?>("FilledQuantity")
+                        .HasColumnType("numeric(28,10)");
+
+                    b.Property<string>("InstrumentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("PlacedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("WebullConnectionId", "AccountId", "OrderId");
+
+                    b.ToTable("WebullOrders", (string)null);
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccountOrderSync", b =>
+                {
+                    b.Property<int>("WebullConnectionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("CoveredFrom")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("CoveredTo")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("PaginationKey")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("WindowEnd")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("WindowStart")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("WebullConnectionId", "AccountId");
+
+                    b.ToTable("WebullOrderSyncs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_WebullOrderSyncs_Covered", "(\"CoveredFrom\" IS NULL AND \"CoveredTo\" IS NULL) OR (\"CoveredFrom\" IS NOT NULL AND \"CoveredTo\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_WebullOrderSyncs_LastError", "\"LastError\" IN ('Unreachable', 'KeyRejected', 'TokenRejected')");
+
+                            t.HasCheckConstraint("CK_WebullOrderSyncs_Window", "(\"WindowStart\" IS NULL AND \"WindowEnd\" IS NULL AND \"PaginationKey\" IS NULL) OR (\"WindowStart\" IS NOT NULL AND \"WindowEnd\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccountPosition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("CostPrice")
+                        .HasColumnType("numeric(28,10)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("InstrumentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal?>("LastPrice")
+                        .HasColumnType("numeric(28,10)");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasColumnType("numeric(28,10)");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal?>("UnrealizedProfitLoss")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("WebullAccountId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WebullAccountId");
+
+                    b.ToTable("WebullPositions", (string)null);
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullConnection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccessTokenEncrypted")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("LastFetchedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("TokenCreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("TokenStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_WebullConnections_UserId");
+
+                    b.ToTable("WebullConnections", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_WebullConnections_LastError", "\"LastError\" IN ('Unreachable', 'KeyRejected', 'TokenRejected')");
+
+                            t.HasCheckConstraint("CK_WebullConnections_Token", "(\"AccessTokenEncrypted\" IS NULL AND \"TokenStatus\" IS NULL AND \"TokenCreatedAt\" IS NULL) OR (\"AccessTokenEncrypted\" IS NOT NULL AND \"TokenStatus\" IS NOT NULL AND \"TokenCreatedAt\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_WebullConnections_TokenStatus", "\"TokenStatus\" IN ('Pending', 'Normal', 'Expired', 'Invalid')");
+                        });
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullDailyValue", b =>
+                {
+                    b.Property<int>("WebullConnectionId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("EasternDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal?>("Cash")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<decimal?>("DayProfitLoss")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("FetchedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal?>("MarketValue")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("TotalValue")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("UnrealizedProfitLoss")
+                        .HasColumnType("numeric(18,4)");
+
+                    b.HasKey("WebullConnectionId", "EasternDate", "AccountId");
+
+                    b.ToTable("WebullDailyValues", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
                 {
                     b.Property<int>("Id")
@@ -576,6 +853,60 @@ namespace BudgetTracker.Domain.Migrations
                     b.Navigation("TransferAccount");
                 });
 
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccount", b =>
+                {
+                    b.HasOne("BudgetTracker.Domain.Models.WebullConnection", null)
+                        .WithMany("Accounts")
+                        .HasForeignKey("WebullConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccountOrder", b =>
+                {
+                    b.HasOne("BudgetTracker.Domain.Models.WebullConnection", null)
+                        .WithMany()
+                        .HasForeignKey("WebullConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccountOrderSync", b =>
+                {
+                    b.HasOne("BudgetTracker.Domain.Models.WebullConnection", null)
+                        .WithMany()
+                        .HasForeignKey("WebullConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccountPosition", b =>
+                {
+                    b.HasOne("BudgetTracker.Domain.Models.WebullAccount", null)
+                        .WithMany("Positions")
+                        .HasForeignKey("WebullAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullConnection", b =>
+                {
+                    b.HasOne("BudgetTracker.Domain.Models.User", null)
+                        .WithOne()
+                        .HasForeignKey("BudgetTracker.Domain.Models.WebullConnection", "UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullDailyValue", b =>
+                {
+                    b.HasOne("BudgetTracker.Domain.Models.WebullConnection", null)
+                        .WithMany("DailyValues")
+                        .HasForeignKey("WebullConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BudgetTracker.Domain.Models.Account", b =>
                 {
                     b.Navigation("Transactions");
@@ -605,6 +936,18 @@ namespace BudgetTracker.Domain.Migrations
                     b.Navigation("BudgetPlans");
 
                     b.Navigation("Categories");
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullAccount", b =>
+                {
+                    b.Navigation("Positions");
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.WebullConnection", b =>
+                {
+                    b.Navigation("Accounts");
+
+                    b.Navigation("DailyValues");
                 });
 #pragma warning restore 612, 618
         }

@@ -26,7 +26,9 @@ public class BudgetAnalysisManager(
         // change — for a month already finished we pass its last day, which makes daysElapsed cover
         // the full month and pacing read as final; for the current month we clamp to now so live
         // pacing is untouched.
-        var requestedMonth = new DateTime(to.Year, to.Month, 1);
+        // A future `to` (the ALL range sends 9999-12-31) means the current month; clamping first keeps AddMonths in range.
+        var lastDay = to < now ? to : now;
+        var requestedMonth = new DateTime(lastDay.Year, lastDay.Month, 1);
         var lastInstantOfRequestedMonth = requestedMonth.AddMonths(1).AddDays(-1);
         var asOf = lastInstantOfRequestedMonth < now ? lastInstantOfRequestedMonth : now;
         var analyzedMonth = new DateTime(asOf.Year, asOf.Month, 1);

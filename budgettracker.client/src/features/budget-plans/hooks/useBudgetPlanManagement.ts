@@ -5,6 +5,7 @@ import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan } from '../../../shared/types/api';
 import type { BudgetPlanFormData } from '../../../shared/validation/budgetPlanSchema';
 import { errorMessage } from '../../../shared/utils/errorMessage';
+import { invalidatePlanQueries } from './useBudgetPlans';
 
 const defaultValues: BudgetPlanFormData = {
   name: '',
@@ -115,7 +116,7 @@ export const useBudgetPlanManagement = (
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['budgetPlans'] });
+      await invalidatePlanQueries(queryClient);
       setStatusError(null);
       setStatusMessage(dialogMode === 'add' ? 'Budget plan created.' : 'Budget plan updated.');
       closeDialog();
@@ -147,7 +148,7 @@ export const useBudgetPlanManagement = (
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['budgetPlans'] });
+      await invalidatePlanQueries(queryClient);
       setStatusError(null);
       setStatusMessage('Budget plan deleted.');
       closeDialog();
@@ -184,7 +185,7 @@ export const useBudgetPlanManagement = (
       return true;
     },
     onSuccess: async (switched) => {
-      await queryClient.invalidateQueries({ queryKey: ['budgetPlans'] });
+      await invalidatePlanQueries(queryClient);
       setStatusError(null);
       setStatusMessage(switched ? 'Active budget plan updated.' : 'That plan is already active.');
     },

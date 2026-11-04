@@ -92,10 +92,11 @@ describe('useSyncOnOpen', () => {
 
     renderHook(() => useSyncOnOpen(), { wrapper: createQueryWrapper(queryClient) });
 
-    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(4));
     const keys = invalidatedKeys(invalidate);
     expect(keys).toContainEqual(['transactions']);
     expect(keys).toContainEqual(['budget-analysis']);
+    expect(keys).toContainEqual(['cash-flow']);
   });
 
   it('swallows a sync error without retrying or rendering an error, but refreshes connections', async () => {

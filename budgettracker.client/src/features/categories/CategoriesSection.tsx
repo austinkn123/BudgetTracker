@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { subMonths } from 'date-fns';
+import { Trash2 } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -12,16 +13,18 @@ import {
   ModalActions,
   Select,
   Skeleton,
+  ToggleGroup,
   Tooltip,
-  type BadgeColor,
 } from '../../shared/components/ui';
 import type { Category } from '../../shared/types/api';
 import { PLAID_CATEGORY_OPTIONS } from '../../shared/constants/plaidCategories';
 import { categorySchema, type CategoryFormValues } from '../../shared/validation/categorySchema';
+import { currency } from '../../shared/utils/format';
 import { useTransactions } from '../transactions/hooks/useTransactions';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
 import { useCategories } from './hooks/useCategories';
 import { useCategoryMutations } from './hooks/useCategoryMutations';
+import { rankCategories, type CategorySegment, type RankedCategory } from './utils/rankCategories';
 
 type CategoriesSectionProps = {
   isLoading: boolean;
@@ -29,16 +32,28 @@ type CategoriesSectionProps = {
   setStatusError: (message: string | null) => void;
 };
 
-const GROUPS: { label: string; type: string; color: BadgeColor }[] = [
-  { label: 'Income', type: 'Income', color: 'success' },
-  { label: 'Expense', type: 'Expense', color: 'neutral' },
-  { label: 'Both', type: 'Both', color: 'info' },
-];
+const WINDOW_MONTHS = 12;
+
+const SEGMENTS = [
+  { value: 'spending', label: 'Spending' },
+  { value: 'income', label: 'Income' },
+  { value: 'transfers', label: 'Transfers' },
+] as const;
+
+// One measure per segment, so one colour per segment: spending stays the neutral expense slate.
+const SEGMENT_STYLE: Record<CategorySegment, { bar: string; measure: string; empty: string }> = {
+  spending: { bar: 'bg-ink-muted', measure: 'spend', empty: 'No spending categories yet.' },
+  income: { bar: 'bg-success', measure: 'income', empty: 'No income categories yet.' },
+  transfers: { bar: 'bg-secondary', measure: 'amount moved', empty: 'No transfer categories yet.' },
+};
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 const CATEGORY_TYPE_OPTIONS = [
   { value: 'Income', label: 'Income' },
   { value: 'Expense', label: 'Expense' },
   { value: 'Both', label: 'Both' },
+  { value: 'Transfer', label: 'Transfer (not spending)' },
 ] as const;
 
 const CategoriesSection = ({
@@ -57,7 +72,8 @@ const CategoriesSection = ({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RankedCategory | null>(null);
+  const [segment, setSegment] = useState<CategorySegment>('spending');
   const { control, handleSubmit, reset } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
@@ -66,59 +82,29 @@ const CategoriesSection = ({
     },
   });
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, typeof categories>();
-    for (const cat of categories) {
-      const list = map.get(cat.categoryType) ?? [];
-      list.push(cat);
-      map.set(cat.categoryType, list);
-    }
-    return map;
-  }, [categories]);
-
-  const usageByCategoryId = useMemo(() => {
-    const map = new Map<number, { transactions: number; planEntries: number; total: number }>();
-
-    for (const category of categories) {
-      map.set(category.id, { transactions: 0, planEntries: 0, total: 0 });
-    }
-
-    for (const transaction of transactions) {
-      // Uncategorised rows belong to no category, so they cannot count toward any category's
-      // usage. Before categoryId was typed nullable these accumulated under a null key.
-      if (transaction.categoryId == null) continue;
-
-      const usage = map.get(transaction.categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
-      usage.transactions += 1;
-      usage.total += 1;
-      map.set(transaction.categoryId, usage);
-    }
-
-    for (const plan of budgetPlans) {
-      for (const entry of plan.entries) {
-        if (entry.categoryId == null) continue;
-        const usage = map.get(entry.categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
-        usage.planEntries += 1;
-        usage.total += 1;
-        map.set(entry.categoryId, usage);
-      }
-    }
-
-    return map;
-  }, [categories, transactions, budgetPlans]);
+  const rows = useMemo(
+    () => rankCategories(categories, transactions, budgetPlans, segment, subMonths(new Date(), WINDOW_MONTHS)),
+    [categories, transactions, budgetPlans, segment],
+  );
+  // Nothing filed here and no plan line: deleting it changes no figure, so it waits apart.
+  const used = rows.filter((r) => r.transactions > 0 || r.planEntries > 0);
+  const unused = rows.filter((r) => r.transactions === 0 && r.planEntries === 0);
+  const max = used.reduce((m, r) => Math.max(m, r.total), 0);
+  const sum = used.reduce((s, r) => s + Math.max(r.total, 0), 0);
+  const style = SEGMENT_STYLE[segment];
 
   if (isLoading) {
     return (
       <Card title="Categories">
-        <div className="space-y-3">
-          {[5, 3].map((count, group) => (
-            <div key={group} className="space-y-2">
-              <Skeleton width={72} height={10} />
-              <div className="flex flex-wrap gap-1">
-                {Array.from({ length: count }, (_, i) => (
-                  <Skeleton key={i} width={72 + ((i * 23) % 48)} height={24} className="rounded-full" />
-                ))}
+        <div className="space-y-4" aria-busy>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-4">
+              <div className="w-40 space-y-1.5">
+                <Skeleton width={96 + ((i * 23) % 48)} height={12} />
+                <Skeleton width={80} height={10} />
               </div>
+              <Skeleton height={6} className="flex-1 rounded-full" />
+              <Skeleton width={64} height={12} />
             </div>
           ))}
         </div>
@@ -135,7 +121,9 @@ const CategoriesSection = ({
 
   const openEditDialog = (category: Category) => {
     const categoryType =
-      category.categoryType === 'Income' || category.categoryType === 'Both'
+      category.categoryType === 'Income' ||
+      category.categoryType === 'Both' ||
+      category.categoryType === 'Transfer'
         ? category.categoryType
         : 'Expense';
 
@@ -186,12 +174,8 @@ const CategoriesSection = ({
 
   const onConfirmDelete = async () => {
     if (!deleteTarget) return;
-    await deleteCategory.mutateAsync(deleteTarget.id);
+    await deleteCategory.mutateAsync(deleteTarget.category.id);
     setDeleteTarget(null);
-  };
-
-  const getUsage = (categoryId: number) => {
-    return usageByCategoryId.get(categoryId) ?? { transactions: 0, planEntries: 0, total: 0 };
   };
 
   const isSaving = createCategory.isPending || updateCategory.isPending || deleteCategory.isPending;
@@ -199,54 +183,95 @@ const CategoriesSection = ({
   return (
     <Card
       title="Categories"
+      subtitle={`Ranked by average monthly ${style.measure} over the last ${WINDOW_MONTHS} months. Select one to rename it or change its type.`}
       actions={
-        <Button size="sm" onClick={openAddDialog}>
-          Add category
-        </Button>
+        <>
+          <ToggleGroup value={segment} onChange={setSegment} options={SEGMENTS} ariaLabel="Category type" />
+          <Button size="sm" onClick={openAddDialog}>
+            Add category
+          </Button>
+        </>
       }
     >
-      <>
-        {categories.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            No categories yet. Add one for each kind of spending you want to see in your plan, like
-            groceries or the mortgage.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {GROUPS.map((group) => {
-              const items = grouped.get(group.type);
-              if (!items || items.length === 0) return null;
+      {categories.length === 0 ? (
+        <p className="text-sm text-ink-muted">
+          No categories yet. Add one for each kind of spending you want to see in your plan, like
+          groceries or the mortgage.
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-ink-muted">{style.empty}</p>
+      ) : (
+        <>
+          <ul className="flex flex-col">
+            {used.map((row, idx) => {
+              const value = Math.max(row.total, 0);
+              const notInPlan = segment === 'spending' && value > 0 && !row.inActivePlan;
               return (
-                <div key={group.type}>
-                  <span className="mb-1.5 block text-2xs font-semibold uppercase tracking-[0.06em] text-ink-muted">
-                    {group.label}
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {items.map((cat) => {
-                      const usage = getUsage(cat.id);
-                      const tooltipLabel = `Used in ${usage.transactions} transaction${usage.transactions === 1 ? '' : 's'} and ${usage.planEntries} budget plan entr${usage.planEntries === 1 ? 'y' : 'ies'}`;
-
-                      return (
-                        <Tooltip key={cat.id} title={tooltipLabel}>
-                          <span className="inline-flex">
-                            <Badge
-                              label={`${cat.name} (${usage.total})`}
-                              color={group.color}
-                              variant="outline"
-                              onClick={() => openEditDialog(cat)}
-                              onDelete={() => setDeleteTarget(cat)}
-                            />
-                          </span>
-                        </Tooltip>
-                      );
-                    })}
-                  </div>
-                </div>
+                <li
+                  key={row.category.id}
+                  className="flex items-center gap-1 border-b border-border-subtle last:border-b-0"
+                >
+                  <button
+                    type="button"
+                    onClick={() => openEditDialog(row.category)}
+                    className="focus-ring -mx-2 grid min-w-0 flex-1 grid-cols-[minmax(0,13rem)_1fr_5.5rem_2.5rem] items-center gap-4 rounded-md px-2 py-2.5 text-left transition-colors duration-120 hover:bg-background"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-ink">{row.category.name}</span>
+                      <span className="block text-xs text-ink-muted">
+                        {plural(row.transactions, 'transaction')}
+                        {row.inActivePlan && ' · in plan'}
+                        {notInPlan && <span className="font-semibold text-warning-dark"> · not in plan</span>}
+                      </span>
+                    </span>
+                    <Tooltip title={`${currency.format(value)} over the last ${WINDOW_MONTHS} months`}>
+                      <span className="block h-1.5 overflow-hidden rounded-full bg-border-subtle">
+                        <span
+                          className={`block h-full origin-left animate-grow-x rounded-full ${style.bar}`}
+                          style={{ width: `${max > 0 ? (value / max) * 100 : 0}%`, animationDelay: `${idx * 30}ms` }}
+                        />
+                      </span>
+                    </Tooltip>
+                    <span className="text-right text-sm font-semibold numeric text-ink">
+                      {currency.format(value / WINDOW_MONTHS)}
+                      <span className="text-xs font-normal text-ink-muted">/mo</span>
+                    </span>
+                    <span className="text-right text-xs numeric text-ink-muted">
+                      {sum > 0 ? Math.round((value / sum) * 100) : 0}%
+                    </span>
+                  </button>
+                  <Tooltip title={`Delete ${row.category.name}`}>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(row)}
+                      aria-label={`Delete ${row.category.name}`}
+                      className="focus-ring inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-120 hover:bg-error/10 hover:text-error"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </Tooltip>
+                </li>
               );
             })}
-          </div>
-        )}
-      </>
+          </ul>
+
+          {unused.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3 text-xs text-ink-muted">
+              <span className="font-semibold">Never used</span>
+              {unused.map((row) => (
+                <Badge
+                  key={row.category.id}
+                  label={row.category.name}
+                  variant="outline"
+                  onClick={() => openEditDialog(row.category)}
+                  onDelete={() => setDeleteTarget(row)}
+                />
+              ))}
+              <span>No transactions or plan lines, so deleting one changes no figure.</span>
+            </div>
+          )}
+        </>
+      )}
 
       <Modal
         open={dialogOpen}
@@ -286,9 +311,9 @@ const CategoriesSection = ({
         message={
           deleteTarget ? (
             <>
-              Delete <strong>{deleteTarget.name}</strong>? It is used in{' '}
-              {getUsage(deleteTarget.id).transactions} transactions and{' '}
-              {getUsage(deleteTarget.id).planEntries} budget plan entries. This can't be undone.
+              Delete <strong>{deleteTarget.category.name}</strong>? It is used in{' '}
+              {deleteTarget.transactions} transactions and {deleteTarget.planEntries} budget plan
+              entries. This can't be undone.
             </>
           ) : (
             ''

@@ -24,16 +24,19 @@ public static class TransactionEndpoints
             bool? uncategorized,
             bool? isImported,
             bool? isPending,
-            string? search) =>
+            string? search,
+            string? plaidAccountId,
+            int? categoryId) =>
         {
             var hasFilter = from is not null || to is not null || uncategorized is not null
                 || isImported is not null || isPending is not null
-                || !string.IsNullOrWhiteSpace(search);
+                || !string.IsNullOrWhiteSpace(search)
+                || !string.IsNullOrWhiteSpace(plaidAccountId) || categoryId is not null;
 
             var result = hasFilter
                 ? await manager.GetFilteredAsync(
                     currentUser.UserId,
-                    new TransactionFilter(from, to, uncategorized, isImported, isPending, search))
+                    new TransactionFilter(from, to, uncategorized, isImported, isPending, search, plaidAccountId, categoryId))
                 : await manager.GetByUserIdAsync(currentUser.UserId);
 
             return Results.Ok(result.Value);

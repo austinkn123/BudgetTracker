@@ -18,6 +18,12 @@ public class BudgetTrackerDbContext(DbContextOptions<BudgetTrackerDbContext> opt
     public DbSet<BudgetPlanEntry> BudgetPlanEntries => Set<BudgetPlanEntry>();
     public DbSet<PlaidItem> PlaidItems => Set<PlaidItem>();
     public DbSet<PlaidAccount> PlaidAccounts => Set<PlaidAccount>();
+    public DbSet<WebullConnection> WebullConnections => Set<WebullConnection>();
+    public DbSet<WebullAccount> WebullAccounts => Set<WebullAccount>();
+    public DbSet<WebullAccountPosition> WebullPositions => Set<WebullAccountPosition>();
+    public DbSet<WebullDailyValue> WebullDailyValues => Set<WebullDailyValue>();
+    public DbSet<WebullAccountOrder> WebullOrders => Set<WebullAccountOrder>();
+    public DbSet<WebullAccountOrderSync> WebullOrderSyncs => Set<WebullAccountOrderSync>();
 
     /// <inheritdoc />
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();

@@ -58,6 +58,9 @@ public interface IPlaidItemAccessor
     /// </summary>
     Task UpdateSyncStateAsync(int plaidItemId, string nextCursor, DateTime lastSyncedAt);
 
+    /// <summary>Stores each account's <see cref="PlaidAccountDto.CurrentBalance"/> on the item's matching <see cref="PlaidAccount"/> rows.</summary>
+    Task UpdateBalancesAsync(int plaidItemId, IReadOnlyList<PlaidAccountDto> accounts);
+
     /// <summary>Sets <see cref="PlaidItem.NeedsReconnect"/> on the item with the given row id. No-op when it does not exist.</summary>
     Task SetNeedsReconnectAsync(int plaidItemId, bool needsReconnect);
 

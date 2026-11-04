@@ -128,7 +128,7 @@ describe('groupByPlan', () => {
     expect(result.uncategorized).toBeNull();
   });
 
-  it('accumulates magnitudes because amounts arrive signed', () => {
+  it('reports spend as a positive figure from negative Expense rows', () => {
     const result = groupByPlan(
       [txn({ id: 1, amount: -120 }), txn({ id: 2, amount: -80 })],
       plan([entry({ monthlyEquivalent: 400 })]),
@@ -138,9 +138,36 @@ describe('groupByPlan', () => {
     expect(result.buckets.find((b) => b.bucket === 'Core')!.actual).toBe(200);
   });
 
+  it('nets a refund (a positive Expense row) off the spend it refunds', () => {
+    const result = groupByPlan(
+      [txn({ id: 1, amount: -120 }), txn({ id: 2, amount: 20 })],
+      plan([entry({ monthlyEquivalent: 400 })]),
+      names,
+    );
+
+    const food = result.buckets.find((b) => b.bucket === 'Core')!.categories[0];
+    expect(food.actual).toBe(100);
+    expect(food.overBy).toBe(-300);
+  });
+
+  it('nets refunds in uncategorised spend too', () => {
+    const result = groupByPlan(
+      [txn({ id: 1, categoryId: null, amount: -50 }), txn({ id: 2, categoryId: null, amount: 15 })],
+      plan([entry()]),
+      names,
+    );
+
+    expect(result.uncategorized!.actual).toBe(35);
+  });
+
   it('counts only Expense rows toward actuals', () => {
     const result = groupByPlan(
-      [txn({ id: 1, amount: -120 }), txn({ id: 2, transactionType: 'Income', amount: 2823 })],
+      [
+        txn({ id: 1, amount: -120 }),
+        txn({ id: 2, transactionType: 'Income', amount: 2823 }),
+        // An own-account transfer is neither spend nor income.
+        txn({ id: 3, transactionType: 'Transfer', amount: -500 }),
+      ],
       plan([entry({ monthlyEquivalent: 400 })]),
       names,
     );

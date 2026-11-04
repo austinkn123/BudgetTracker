@@ -4,24 +4,41 @@ import { chartPalette, semanticColors } from '../utils/chartTheme';
 import { currency } from '../../../shared/utils/format';
 
 interface WhereItWentProps {
-  /** Window-scoped expense totals, already ranked with a trailing "Other". */
+  /** Window-scoped totals, already ranked with a trailing "Other". */
   rows: SpendSlice[];
+  /** Defaults describe spending; Cash Flow reuses the list for income sources. */
+  title?: string;
+  emptyTitle?: string;
+  emptyDetail?: string;
+  /** One colour for every row instead of the category palette — income is always success green. */
+  color?: string;
+  /** Headline total when it differs from the sum of `rows`; shares still divide by that sum. */
+  total?: number;
 }
 
-const WhereItWent = ({ rows }: WhereItWentProps) => {
+const WhereItWent = ({
+  rows,
+  title = 'Where it went',
+  emptyTitle = 'No expenses in this range',
+  emptyDetail = 'Spending will break down here once it lands.',
+  color: rowColor,
+  total: headlineTotal,
+}: WhereItWentProps) => {
   const max = rows.reduce((m, r) => Math.max(m, r.value), 0);
   const total = rows.reduce((sum, r) => sum + r.value, 0);
 
   return (
     <Card
-      title="Where it went"
-      subtitle={total > 0 ? `${currency.format(total)} total` : undefined}
+      title={title}
+      subtitle={
+        (headlineTotal ?? total) > 0 ? `${currency.format(headlineTotal ?? total)} total` : undefined
+      }
       fullHeight
     >
       {rows.length === 0 ? (
         <div className="flex min-h-[240px] flex-col items-center justify-center gap-1 text-center">
-          <p className="text-sm font-medium text-ink">No expenses in this range</p>
-          <p className="text-xs text-ink-muted">Spending will break down here once it lands.</p>
+          <p className="text-sm font-medium text-ink">{emptyTitle}</p>
+          <p className="text-xs text-ink-muted">{emptyDetail}</p>
         </div>
       ) : (
         <ul className="flex flex-col">
@@ -29,7 +46,9 @@ const WhereItWent = ({ rows }: WhereItWentProps) => {
             const pct = max > 0 ? (row.value / max) * 100 : 0;
             const share = total > 0 ? Math.round((row.value / total) * 100) : 0;
             const color =
-              row.key === 'other' ? semanticColors.neutral : chartPalette[idx % chartPalette.length];
+              row.key === 'other'
+                ? semanticColors.neutral
+                : (rowColor ?? chartPalette[idx % chartPalette.length]);
             return (
               <li
                 key={row.key}

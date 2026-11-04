@@ -16,7 +16,7 @@ public interface IBudgetAnalysisEngine
     PlanPerformance AnalyzeMonth(IReadOnlyList<Transaction> transactions, BudgetPlan plan, DateTime now);
 
     /// <summary>
-    /// Total expense magnitude per category across whatever transactions are supplied.
+    /// Net expense per category across whatever transactions are supplied: outflows minus refunds.
     /// Callers do their own date filtering — the window is not a business concept.
     /// </summary>
     IReadOnlyList<CategorySpend> SummarizeSpend(IReadOnlyList<Transaction> transactions);

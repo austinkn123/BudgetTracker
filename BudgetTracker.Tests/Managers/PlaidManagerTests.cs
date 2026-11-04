@@ -31,6 +31,18 @@ public class PlaidManagerTests
         _categoryAccessor
             .Setup(a => a.GetByUserIdAsync(It.IsAny<int>()))
             .ReturnsAsync(Array.Empty<Category>());
+
+        // Every sync classifies against already-imported rows and then scans for own-account transfers.
+        // Default to "nothing imported yet, nothing to pair"; tests that care override these.
+        _txnAccessor
+            .Setup(a => a.GetByPlaidTransactionIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync([]);
+        _txnAccessor
+            .Setup(a => a.GetTransferCandidatesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
+            .ReturnsAsync([]);
+        _txnAccessor
+            .Setup(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>()))
+            .ReturnsAsync(new Dictionary<string, int>());
     }
 
     private PlaidManager BuildSut() => new(
@@ -843,7 +855,7 @@ public class PlaidManagerTests
             UserId = 5,
             InstitutionName = "Chase",
             LastSyncedAt = new DateTime(2026, 1, 1),
-            Accounts = [new PlaidAccount { PlaidAccountId = "plaid-acct-checking", Name = "Checking", Mask = "0000", AccountType = "depository" }]
+            Accounts = [new PlaidAccount { PlaidAccountId = "plaid-acct-checking", Name = "Checking", Mask = "0000", AccountType = "depository", CurrentBalance = 812.40m }]
         };
         _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([plaidItem]);
 
@@ -853,9 +865,11 @@ public class PlaidManagerTests
         Assert.Equal(11, view.PlaidItemId);
         Assert.Equal("Chase", view.InstitutionName);
         Assert.Equal(new DateTime(2026, 1, 1), view.LastSyncedAt);
+        Assert.Equal(DateTimeKind.Utc, view.LastSyncedAt!.Value.Kind);
         Assert.Single(view.Accounts);
         Assert.Equal("plaid-acct-checking", view.Accounts[0].PlaidAccountId);
         Assert.Equal("0000", view.Accounts[0].Mask);
+        Assert.Equal(812.40m, view.Accounts[0].CurrentBalance);
     }
 
     [Fact]
@@ -1624,6 +1638,192 @@ public class PlaidManagerTests
         _itemAccessor.Verify(a => a.UpdateSyncStateAsync(1, "next", It.IsAny<DateTime>()), Times.Once);
         // The good item is unaffected.
         _plaidAccessor.Verify(a => a.SyncTransactionsAsync("token-2", "c-good", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── Cash flow: classification, transfer pairing, balances ───────────────
+
+    private PlaidItem StubSyncWith(PlaidSyncResult syncResult, IReadOnlyList<Category>? categories = null)
+    {
+        const int userId = 5;
+        var plaidItem = new PlaidItem
+        {
+            Id = 11,
+            UserId = userId,
+            PlaidItemId = "plaid-item-1",
+            SyncCursor = "prev-cursor",
+            Accounts = [new PlaidAccount { Id = 1, PlaidAccountId = "plaid-acct-1", Name = "Plaid Checking", Mask = "0000" }]
+        };
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(userId)).ReturnsAsync([plaidItem]);
+        _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, syncResult.NextCursor, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(new List<Account>
+        {
+            new() { Id = 77, UserId = userId, Name = "Chase - Plaid Checking (••0000)", AccountType = "depository" }
+        });
+        if (categories is not null)
+            _categoryAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(categories);
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(syncResult);
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>())).ReturnsAsync((0, 0));
+        return plaidItem;
+    }
+
+    private static PlaidTransactionDto ZelleIn() =>
+        new("plaid-txn-1", "plaid-acct-1", -300m, new DateTime(2026, 10, 1), null, "ZELLE FROM SAM", false, "TRANSFER_IN");
+
+    [Fact]
+    public async Task Sync_UpsertedRow_IsClassifiedAgainstTheCategoryTheUserPicked()
+    {
+        // The user filed this Zelle under their Income-typed "Side gig" category; a re-sync must not flip it back to Expense.
+        StubSyncWith(
+            new PlaidSyncResult([], [ZelleIn()], [], "next-cursor"),
+            [new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income" }]);
+        _txnAccessor.Setup(a => a.GetByPlaidTransactionIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync([new Transaction { Id = 40, PlaidTransactionId = "plaid-txn-1", CategoryId = 9, TransactionType = "Income" }]);
+        List<Transaction>? captured = null;
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(t => captured = t.ToList())
+            .ReturnsAsync((0, 1));
+
+        await BuildSut().SyncAsync(5);
+
+        var mapped = Assert.Single(captured!);
+        Assert.Equal(9, mapped.CategoryId);
+        Assert.Equal("Income", mapped.TransactionType);
+    }
+
+    [Fact]
+    public async Task Sync_NewRow_TakesTheCategoryTheUserLastPickedForItsPayee()
+    {
+        StubSyncWith(
+            new PlaidSyncResult([ZelleIn()], [], [], "next-cursor"),
+            [new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income" }]);
+        _txnAccessor.Setup(a => a.GetLatestCategoryByPayeeAsync(5))
+            .ReturnsAsync(new Dictionary<string, int> { ["ZELLE FROM SAM"] = 9 });
+        List<Transaction>? captured = null;
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(t => captured = t.ToList())
+            .ReturnsAsync((1, 0));
+
+        await BuildSut().SyncAsync(5);
+
+        var mapped = Assert.Single(captured!);
+        Assert.Equal(9, mapped.CategoryId);
+        Assert.Equal("Income", mapped.TransactionType);
+    }
+
+    [Fact]
+    public async Task Sync_NewRow_IsClassifiedByItsResolvedCategoryType()
+    {
+        StubSyncWith(
+            new PlaidSyncResult([ZelleIn()], [], [], "next-cursor"),
+            [new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income", PlaidCategoryPrimary = "TRANSFER_IN" }]);
+        List<Transaction>? captured = null;
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(t => captured = t.ToList())
+            .ReturnsAsync((1, 0));
+
+        await BuildSut().SyncAsync(5);
+
+        Assert.Equal("Income", Assert.Single(captured!).TransactionType);
+    }
+
+    [Fact]
+    public async Task Sync_PairsOwnAccountTransfersBetweenLinkedCashAccounts()
+    {
+        var item = StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor"));
+        item.Accounts.Add(new PlaidAccount { PlaidAccountId = "chk", AccountType = "depository" });
+        item.Accounts.Add(new PlaidAccount { PlaidAccountId = "sav", AccountType = "depository" });
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+            .ReturnsAsync(
+            [
+                new Transaction { Id = 1, AccountId = 77, PlaidAccountId = "chk", Amount = -500m, OccurredAt = new DateTime(2026, 10, 1), PlaidCategoryPrimary = "TRANSFER_OUT", TransactionType = "Expense" },
+                new Transaction { Id = 2, AccountId = 78, PlaidAccountId = "sav", Amount = 500m, OccurredAt = new DateTime(2026, 10, 2), PlaidCategoryPrimary = "TRANSFER_IN", TransactionType = "Expense" }
+            ]);
+        IReadOnlyList<TransferUpdate>? written = null;
+        _txnAccessor.Setup(a => a.ApplyTransferUpdatesAsync(It.IsAny<IReadOnlyList<TransferUpdate>>()))
+            .Callback<IReadOnlyList<TransferUpdate>>(updates => written = updates)
+            .Returns(Task.CompletedTask);
+
+        var result = await BuildSut().SyncAsync(5);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal([new TransferUpdate(1, "Transfer", 78), new TransferUpdate(2, "Transfer", 77)], written!.OrderBy(u => u.TransactionId));
+    }
+
+    [Fact]
+    public async Task Sync_TransferLegWhosePartnerPlaidRemoved_RevertsUsingItsCategory()
+    {
+        StubSyncWith(
+            new PlaidSyncResult([], [], ["partner-leg"], "next-cursor"),
+            [new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income" }]);
+        _txnAccessor.Setup(a => a.DeleteByPlaidTransactionIdsAsync(It.IsAny<IEnumerable<string>>())).ReturnsAsync(1);
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+            .ReturnsAsync(
+            [
+                new Transaction { Id = 2, AccountId = 78, PlaidAccountId = "sav", Amount = 500m, OccurredAt = new DateTime(2026, 10, 2), PlaidCategoryPrimary = "TRANSFER_IN", TransactionType = "Transfer", TransferAccountId = 77, CategoryId = 9 }
+            ]);
+        IReadOnlyList<TransferUpdate>? written = null;
+        _txnAccessor.Setup(a => a.ApplyTransferUpdatesAsync(It.IsAny<IReadOnlyList<TransferUpdate>>()))
+            .Callback<IReadOnlyList<TransferUpdate>>(updates => written = updates)
+            .Returns(Task.CompletedTask);
+
+        await BuildSut().SyncAsync(5);
+
+        Assert.Equal([new TransferUpdate(2, "Income", null)], written);
+    }
+
+    [Fact]
+    public async Task Sync_TransferPairingFailure_StillReportsTheSync()
+    {
+        // Pairing re-runs on every sync, so a failure here is logged and retried next time, not surfaced.
+        StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor"));
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+            .ThrowsAsync(new InvalidOperationException("db blip"));
+
+        var result = await BuildSut().SyncAsync(5);
+
+        Assert.True(result.IsSuccess);
+        VerifyWarningLogged(Times.Once());
+    }
+
+    [Fact]
+    public async Task Sync_PersistsTheCachedBalancesSyncReturns()
+    {
+        IReadOnlyList<PlaidAccountDto> accounts = [new("plaid-acct-1", "Plaid Checking", "0000", "depository", "checking", 1234.56m)];
+        StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor", accounts));
+        _itemAccessor.Setup(a => a.UpdateBalancesAsync(11, accounts)).Returns(Task.CompletedTask);
+
+        await BuildSut().SyncAsync(5);
+
+        _itemAccessor.Verify(a => a.UpdateBalancesAsync(11, accounts), Times.Once);
+    }
+
+    [Fact]
+    public async Task Exchange_StoresTheLinkTimeBalanceOnTheAccountSnapshot()
+    {
+        const int userId = 5;
+        _plaidAccessor.Setup(a => a.ExchangePublicTokenAsync("public-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidExchangeResult("access-token-xyz", "plaid-item-1"));
+        _plaidAccessor.Setup(a => a.GetItemMetadataAsync("access-token-xyz", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidItemMetadata("plaid-item-1", "ins_3", "Chase", null));
+        _plaidAccessor.Setup(a => a.GetAccountsAsync("access-token-xyz", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PlaidAccountDto> { new("plaid-acct-1", "Plaid Checking", "0000", "depository", "checking", 812.40m) });
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(userId)).ReturnsAsync([]);
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(Array.Empty<Account>());
+        _accountAccessor.Setup(a => a.CreateAsync(It.IsAny<Account>())).ReturnsAsync(77);
+        IReadOnlyList<PlaidAccount>? snapshots = null;
+        _itemAccessor.Setup(a => a.AddAsync(userId, "access-token-xyz", "plaid-item-1", "ins_3", "Chase", null, It.IsAny<IReadOnlyList<PlaidAccount>>()))
+            .Callback<int, string, string, string, string, DateTime?, IReadOnlyList<PlaidAccount>>((_, _, _, _, _, _, a) => snapshots = a)
+            .ReturnsAsync(11);
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidSyncResult([], [], [], "cursor-after"));
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>())).ReturnsAsync((0, 0));
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, "cursor-after", It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+
+        await BuildSut().ExchangePublicTokenAsync(userId, "public-token");
+
+        Assert.Equal(812.40m, Assert.Single(snapshots!).CurrentBalance);
     }
 
     // ── Real-engine harness helpers ─────────────────────────────────────────

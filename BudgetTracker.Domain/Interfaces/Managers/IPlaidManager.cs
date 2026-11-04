@@ -14,8 +14,11 @@ public record PlaidConnectionView(
     IReadOnlyList<PlaidLinkedAccountView> Accounts,
     bool NeedsReconnect);
 
-/// <summary>One linked Plaid account, exposed to the client for display.</summary>
-public record PlaidLinkedAccountView(string PlaidAccountId, string Name, string? Mask, string AccountType);
+/// <summary>
+/// One linked Plaid account, exposed to the client for display. <paramref name="CurrentBalance"/> is Plaid's cached
+/// balance from the last sync (what a card owes, for credit); null until synced.
+/// </summary>
+public record PlaidLinkedAccountView(string PlaidAccountId, string Name, string? Mask, string AccountType, decimal? CurrentBalance = null);
 
 /// <summary>Outcome of a sync operation.</summary>
 public record PlaidSyncSummary(int Inserted, int Updated, int Removed, DateTime SyncedAt);

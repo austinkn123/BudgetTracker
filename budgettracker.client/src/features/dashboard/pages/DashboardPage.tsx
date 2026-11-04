@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Alert, PageHeader } from '../../../shared/components/ui';
+import { PageHeader } from '../../../shared/components/ui';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { useUser } from '../../user/hooks/useUser';
 import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
-import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
+import ReconnectAlert from '../../linked-accounts/components/ReconnectAlert';
+import { useWebullRefreshOnOpen } from '../../webull/hooks/useWebull';
+import WebullBalanceCard from '../../webull/components/WebullBalanceCard';
+import NetWorthCard from '../components/NetWorthCard';
 import DashboardLoadingState from '../components/DashboardLoadingState';
 import DashboardErrorState from '../components/DashboardErrorState';
 import RangeSelector from '../components/RangeSelector';
@@ -30,6 +32,7 @@ import {
   selectWaterfall,
 } from '../utils/selectors';
 import { currency } from '../../../shared/utils/format';
+import { needsCategory } from '../../transactions/utils/transactionGroups';
 
 // How much of the server's analysis this particular screen chooses to show.
 const TREND_MONTHS = 3;
@@ -39,11 +42,12 @@ const DRIFTING_CATEGORIES = 3;
 const RECENT_ACTIVITY_ITEMS = 8;
 const DRILL_TRANSACTIONS = 10;
 
-const listFormat = new Intl.ListFormat('en-US', { type: 'conjunction' });
-
 const DashboardPage = () => {
   // Background "sync if stale" on open; silent and non-blocking, refreshes the queries below when it lands.
   useSyncOnOpen();
+  // Webull's own silent refresh. It only writes the ['webull'] cache, so it can't move the
+  // loading/error state below, and the card reads that cache by itself.
+  useWebullRefreshOnOpen();
 
   const { isLoading: loadingUser, error: userError } = useUser();
   const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories();
@@ -51,14 +55,6 @@ const DashboardPage = () => {
   const { range, setRange, start, end } = useDateRange();
   const { data: analysis, isLoading: loadingAnalysis, error: analysisError } =
     useBudgetAnalysis(start, end, TREND_MONTHS);
-  // Shared cache with Settings; never blocks the page.
-  const { data: connections = [] } = usePlaidConnections();
-
-  const needsSignIn = useMemo(
-    () => connections.filter((c) => c.needsReconnect).map((c) => c.institutionName),
-    [connections],
-  );
-
   const categoryNames = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
     [categories],
@@ -156,7 +152,7 @@ const DashboardPage = () => {
   // Counted across the whole ledger, not the selected range: a row outside the current window
   // is still missing from the plan-vs-actual maths.
   const uncategorizedCount = useMemo(
-    () => transactions.filter((t) => t.categoryId == null).length,
+    () => transactions.filter(needsCategory).length,
     [transactions],
   );
 
@@ -192,25 +188,15 @@ const DashboardPage = () => {
         actions={<RangeSelector value={range} onChange={setRange} />}
       />
 
-      {/* Above the figures: a paused bank means every one of them may be missing recent activity. */}
-      {needsSignIn.length > 0 && (
-        <Alert
-          severity="warning"
-          title={`${listFormat.format(needsSignIn)} ${needsSignIn.length === 1 ? 'needs' : 'need'} you to sign in again`}
-        >
-          New transactions won't import until you do, so this page may be missing recent activity.{' '}
-          <Link
-            to="/settings"
-            className="focus-ring rounded-sm font-semibold underline underline-offset-2"
-          >
-            Reconnect in Settings
-          </Link>
-        </Alert>
-      )}
+      <ReconnectAlert />
 
       {stats.length > 0 && <StatStrip stats={stats} />}
 
+      <NetWorthCard />
+
       <UncategorizedNudge count={uncategorizedCount} />
+
+      <WebullBalanceCard />
 
       {/* Hero */}
       {hero ? (

@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LogOut, Moon, Sun, User, Wallet } from 'lucide-react';
+import { LogOut, Moon, Settings, Sun, User, Wallet } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../../features/user/hooks/useUser';
 import { useSignOut } from '../../hooks/useSignOut';
 import { useTheme } from '../../theme/useTheme';
 import { Skeleton } from '../ui';
 import { cn } from '../../utils/cn';
-import { NAV_ITEMS } from './navItems';
+import { useNavItems } from './navItems';
 import { getAccountLabel, getInitials } from './userIdentity';
 
 export interface MobileNavPanelProps {
@@ -19,6 +19,7 @@ const MobileNavPanel = ({ onNavigate }: MobileNavPanelProps) => {
   const { user: cognitoUser } = useAuth();
   const { signOut, isSigningOut, error } = useSignOut();
   const { theme, toggle: toggleTheme } = useTheme();
+  const navItems = useNavItems();
 
   const email = user?.email || cognitoUser?.email || '';
   const accountLabel = getAccountLabel(email, cognitoUser?.username);
@@ -37,7 +38,7 @@ const MobileNavPanel = ({ onNavigate }: MobileNavPanelProps) => {
 
       <nav aria-label="Main navigation" className="flex-1 px-3">
         <ul className="flex flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <li key={item.path}>
               <NavLink
                 to={item.path}
@@ -84,6 +85,24 @@ const MobileNavPanel = ({ onNavigate }: MobileNavPanelProps) => {
         )}
 
         {error && <p className="px-2 pb-1 text-xs text-error-light">{error}</p>}
+
+        <NavLink
+          to="/settings"
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            cn(
+              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] font-medium outline-none transition-colors duration-120 focus-visible:ring-2 focus-visible:ring-primary-light/60',
+              isActive ? 'bg-white/[0.09] text-white' : 'text-white/55 hover:bg-white/[0.05] hover:text-white/90',
+            )
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <Settings size={18} className={cn('shrink-0', isActive ? 'text-primary-light' : 'text-white/45')} />
+              Settings
+            </>
+          )}
+        </NavLink>
 
         <button
           type="button"

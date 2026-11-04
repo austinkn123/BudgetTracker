@@ -7,6 +7,8 @@ namespace BudgetTracker.Domain.Accessors;
 
 public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionAccessor
 {
+    private const string TransferType = "Transfer";
+
     public async Task<IEnumerable<Transaction>> GetByUserIdAsync(int userId)
     {
         return await context.Transactions
@@ -50,6 +52,12 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
             if (filter.IsPending is bool pending)
                 query = query.Where(t => t.IsPending == pending);
 
+            if (!string.IsNullOrWhiteSpace(filter.PlaidAccountId))
+                query = query.Where(t => t.PlaidAccountId == filter.PlaidAccountId);
+
+            if (filter.CategoryId is int categoryId)
+                query = query.Where(t => t.CategoryId == categoryId);
+
             if (!string.IsNullOrWhiteSpace(filter.Search))
             {
                 var pattern = LikePattern.Contains(filter.Search.Trim());
@@ -74,17 +82,98 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
         return affected > 0;
     }
 
-    public async Task<int> SetCategoryAsync(IEnumerable<int> ids, int? categoryId, int userId)
+    public async Task<IReadOnlyList<Transaction>> GetByIdsAsync(IEnumerable<int> ids, int userId)
     {
         var idList = ids.Distinct().ToList();
-        if (idList.Count == 0)
+        return await context.Transactions
+            .AsNoTracking()
+            .Where(t => idList.Contains(t.Id) && t.Account.UserId == userId)
+            .ToListAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Transaction>> GetByPlaidTransactionIdsAsync(IEnumerable<string> plaidTransactionIds)
+    {
+        var ids = plaidTransactionIds.Distinct().ToList();
+        return await context.Transactions
+            .AsNoTracking()
+            .Where(t => t.PlaidTransactionId != null && ids.Contains(t.PlaidTransactionId))
+            .ToListAsync();
+    }
+
+    public async Task<int> SetCategoryAsync(IReadOnlyDictionary<int, string> transactionTypes, int? categoryId, int userId)
+    {
+        var ids = transactionTypes.Keys.ToList();
+        if (ids.Count == 0)
             return 0;
 
         // Scoped through Account.UserId so ids belonging to someone else are silently excluded
-        // rather than trusted — the same tenancy rule every other read here uses.
+        // rather than trusted — the same tenancy rule every other read here uses. Tracked rather than
+        // ExecuteUpdate because each row gets its own type; one SaveChanges keeps the batch atomic.
+        var rows = await context.Transactions
+            .Where(t => ids.Contains(t.Id) && t.Account.UserId == userId)
+            .ToListAsync();
+
+        foreach (var row in rows)
+        {
+            row.CategoryId = categoryId;
+            row.TransactionType = transactionTypes[row.Id];
+        }
+
+        await context.SaveChangesAsync();
+        return rows.Count;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, int>> GetLatestCategoryByPayeeAsync(int userId)
+    {
+        // ponytail: pulls every categorized row's payee and picks in memory; fine for one user's ledger, a DISTINCT ON
+        // query if it ever gets big.
+        var rows = await context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId && t.CategoryId != null && t.Payee != null)
+            .OrderByDescending(t => t.OccurredAt)
+            .ThenByDescending(t => t.Id)
+            .Select(t => new { Payee = t.Payee!, CategoryId = t.CategoryId!.Value })
+            .ToListAsync();
+
+        var latest = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+            latest.TryAdd(row.Payee, row.CategoryId);
+        return latest;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Transaction>> GetTransferCandidatesAsync(int userId, IReadOnlyCollection<string> plaidCategoryPrimaries)
+    {
+        var categories = plaidCategoryPrimaries.ToList();
         return await context.Transactions
-            .Where(t => idList.Contains(t.Id) && t.Account.UserId == userId)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.CategoryId, categoryId));
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId &&
+                        !t.IsPending &&
+                        t.PlaidCategoryPrimary != null &&
+                        categories.Contains(t.PlaidCategoryPrimary))
+            .ToListAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task ApplyTransferUpdatesAsync(IReadOnlyList<TransferUpdate> updates)
+    {
+        if (updates.Count == 0)
+            return;
+
+        var updateById = updates.ToDictionary(u => u.TransactionId);
+        var ids = updateById.Keys.ToList();
+        var rows = await context.Transactions.Where(t => ids.Contains(t.Id)).ToListAsync();
+
+        // Type and transfer account change together: CK_Transactions_TransferAccount requires both or neither.
+        foreach (var row in rows)
+        {
+            row.TransactionType = updateById[row.Id].TransactionType;
+            row.TransferAccountId = updateById[row.Id].TransferAccountId;
+        }
+
+        await context.SaveChangesAsync();
     }
 
     /// <inheritdoc />
@@ -117,7 +206,11 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
                 current.Amount = incomingTxn.Amount;
                 current.OccurredAt = incomingTxn.OccurredAt;
                 current.Payee = incomingTxn.Payee;
-                current.TransactionType = incomingTxn.TransactionType;
+
+                // A paired Transfer keeps its type: overwriting it would also break CK_Transactions_TransferAccount,
+                // which needs a Transfer to carry its TransferAccountId and anything else to carry none.
+                if (current.TransactionType != TransferType)
+                    current.TransactionType = incomingTxn.TransactionType;
                 current.IsPending = incomingTxn.IsPending;
                 current.PlaidAccountId = incomingTxn.PlaidAccountId;
                 current.PlaidCategoryPrimary = incomingTxn.PlaidCategoryPrimary;

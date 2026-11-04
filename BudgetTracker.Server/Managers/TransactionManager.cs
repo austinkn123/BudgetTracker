@@ -1,5 +1,6 @@
 using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Interfaces.Accessors;
+using BudgetTracker.Domain.Interfaces.Engines;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Models;
 
@@ -10,7 +11,7 @@ namespace BudgetTracker.Server.Managers;
 /// <see cref="ITransactionAccessor.UpsertImportedAsync"/>), so this manager owns no create or
 /// delete path — only the two annotations a person makes: category and notes.
 /// </summary>
-public class TransactionManager(ITransactionAccessor accessor, ICategoryAccessor categoryAccessor) : ITransactionManager
+public class TransactionManager(ITransactionAccessor accessor, ICategoryAccessor categoryAccessor, IPlaidEngine plaidEngine) : ITransactionManager
 {
     public async Task<Result<IEnumerable<Transaction>>> GetByUserIdAsync(int userId)
     {
@@ -32,14 +33,22 @@ public class TransactionManager(ITransactionAccessor accessor, ICategoryAccessor
 
         // Verify the target category is the user's own before writing it across a batch; the accessor
         // scopes the rows by owner, but the category id arrives straight from the request body.
+        Category? category = null;
         if (categoryId is int id)
         {
-            var category = await categoryAccessor.GetByIdForUserAsync(id, userId);
+            category = await categoryAccessor.GetByIdForUserAsync(id, userId);
             if (category is null)
                 return Result<int>.Failure("Category not found");
         }
 
-        var changed = await accessor.SetCategoryAsync(idList, categoryId, userId);
+        // An Income- or Expense-typed category overrides Plaid's classification, so each row's type is re-derived
+        // from the category it is moving to (Transfer rows keep theirs).
+        var rows = await accessor.GetByIdsAsync(idList, userId);
+        var types = rows.ToDictionary(
+            r => r.Id,
+            r => plaidEngine.ClassifyTransactionType(r.PlaidCategoryPrimary, category?.CategoryType, r.TransactionType));
+
+        var changed = await accessor.SetCategoryAsync(types, categoryId, userId);
         return Result<int>.Success(changed);
     }
 

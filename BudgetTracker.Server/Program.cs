@@ -1,10 +1,13 @@
 using Amazon.Lambda.AspNetCoreServer.Hosting;
+using Amazon.Lambda.RuntimeSupport;
 using BudgetTracker.Domain.Accessors;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Engines;
 using BudgetTracker.Domain.Interfaces.Accessors;
+using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Domain.Plaid;
+using BudgetTracker.Domain.Webull;
 using BudgetTracker.Server.Endpoints;
 using BudgetTracker.Server.Managers;
 using BudgetTracker.Server.Services;
@@ -56,16 +59,23 @@ builder.Services.AddHttpClient<IPlaidAccessor, PlaidAccessor>((sp, client) =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+// Webull configuration + typed HttpClient. WebullAccessor builds URLs from Webull:BaseUrl itself, since that host is signed.
+builder.Services.Configure<WebullOptions>(builder.Configuration.GetSection(WebullOptions.SectionName));
+builder.Services.AddHttpClient<IWebullAccessor, WebullAccessor>(client => client.Timeout = TimeSpan.FromSeconds(10));
+// Order history gets its own typed client, so the trades manager can never reach token creation (an SMS).
+builder.Services.AddHttpClient<IWebullOrderHistoryAccessor, WebullAccessor>(client => client.Timeout = TimeSpan.FromSeconds(10));
+
 // HTTP context accessor for Cognito claims extraction
 builder.Services.AddHttpContextAccessor();
 
 // Current user provider backed by Cognito
 builder.Services.AddScoped<ICurrentUserProvider, CognitoCurrentUserProvider>();
 
-// Accessors (data access). PlaidAccessor is excluded because it's registered above as a typed HttpClient.
+// Accessors (data access). PlaidAccessor and WebullAccessor are excluded because they're registered above as typed HttpClients.
 builder.Services.Scan(scan => scan
     .FromAssemblies(typeof(TransactionAccessor).Assembly)
-        .AddClasses(classes => classes.Where(c => c.Name.EndsWith("Accessor") && c != typeof(PlaidAccessor)))
+        .AddClasses(classes => classes.Where(c =>
+            c.Name.EndsWith("Accessor") && c != typeof(PlaidAccessor) && c != typeof(WebullAccessor)))
         .AsImplementedInterfaces()
         .WithScopedLifetime());
 
@@ -85,10 +95,11 @@ builder.Services.Scan(scan => scan
 
 // Background sweep — periodic backup re-sync of all active Plaid items (BUD-6). Lambda freezes the process
 // between requests, so a timer-driven hosted service cannot run there; the client triggers
-// POST /api/plaid/sync?staleAfterHours= instead.
+// POST /api/plaid/sync?staleAfterHours= instead. The Webull close snapshot runs from an EventBridge schedule there.
 if (!isLambda)
 {
     builder.Services.AddHostedService<PlaidSyncSweepService>();
+    builder.Services.AddHostedService<WebullCloseSnapshotService>();
 }
 
 // Serialize enums as names rather than ordinals so API consumers get e.g. "Ahead", not 0.
@@ -123,6 +134,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Scheduled Lambda invocation (EventBridge Scheduler): run the Webull market-close snapshot instead of serving HTTP.
+if (isLambda && Environment.GetEnvironmentVariable("BUDGETTRACKER_ENTRY") == "webull-close-snapshot")
+{
+    await LambdaBootstrapBuilder.Create(async () =>
+    {
+        using var scope = app.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IWebullManager>().RunCloseSnapshotsAsync();
+    }).Build().RunAsync();
+    return;
+}
 
 
 app.UseDefaultFiles();
@@ -169,6 +191,18 @@ plaidGroup.MapPlaidEndpoints();
 var budgetAnalysisGroup = apiGroup.MapGroup("/budget-analysis")
     .WithTags("Budget Analysis");
 budgetAnalysisGroup.MapBudgetAnalysisEndpoints();
+
+var moneyMapGroup = apiGroup.MapGroup("/money-map")
+    .WithTags("Money Map");
+moneyMapGroup.MapMoneyMapEndpoints();
+
+var cashFlowGroup = apiGroup.MapGroup("/cash-flow")
+    .WithTags("Cash Flow");
+cashFlowGroup.MapCashFlowEndpoints();
+
+var webullGroup = apiGroup.MapGroup("/webull")
+    .WithTags("Webull");
+webullGroup.MapWebullEndpoints();
 
 app.MapFallbackToFile("/index.html");
 

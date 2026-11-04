@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LogOut, Menu, Moon, Sun, User, Wallet } from 'lucide-react';
+import { LogOut, Menu, Moon, Settings, Sun, User, Wallet } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../../features/user/hooks/useUser';
 import { useSignOut } from '../../hooks/useSignOut';
@@ -9,7 +9,7 @@ import { useSlidingIndicator } from '../../hooks/useSlidingIndicator';
 import { useTheme } from '../../theme/useTheme';
 import { Skeleton, Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
-import { NAV_ITEMS } from './navItems';
+import { useNavItems } from './navItems';
 import {
   NAV_HEIGHT_COMPACT,
   NAV_HEIGHT_FULL,
@@ -64,9 +64,11 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
   const { signOut, isSigningOut } = useSignOut();
   const { theme, toggle: toggleTheme } = useTheme();
   const { pathname } = useLocation();
+  const navItems = useNavItems();
   const { containerRef: linksRef, rect: activeRect } = useSlidingIndicator<HTMLUListElement>(
     '[aria-current="page"]',
-    pathname,
+    // Investments can appear after first paint and shift the links after it; re-measure then too.
+    `${pathname}|${navItems.length}`,
   );
   // Only animate the Sun/Moon swap after a click, not on first paint.
   const [themeToggled, setThemeToggled] = useState(false);
@@ -115,9 +117,10 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
           <span className="flex text-primary-light">
             <Wallet size={compact ? 18 : 20} />
           </span>
+          {/* Hidden from lg to xl, where the wordmark would push the account cluster off a 1024px screen. */}
           <span
             className={cn(
-              'hidden text-[14.5px] font-semibold tracking-[-0.01em] text-white sm:inline',
+              'hidden text-[14.5px] font-semibold tracking-[-0.01em] text-white sm:inline lg:hidden xl:inline',
               labelClasses,
             )}
           >
@@ -156,7 +159,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
               }}
             />
           )}
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <li key={item.path}>
               <CompactTip compact={compact} label={item.label}>
                 <NavLink
@@ -210,6 +213,24 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
                 {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               </span>
             </button>
+          </Tooltip>
+
+          <Tooltip title="Settings">
+            <NavLink
+              to="/settings"
+              aria-label="Settings"
+              className={({ isActive }) =>
+                cn(
+                  'focus-ring inline-flex items-center justify-center rounded-full transition-all duration-240 ease-out-soft motion-reduce:transition-none',
+                  isActive
+                    ? 'bg-white/[0.12] text-primary-light'
+                    : 'text-white/45 hover:bg-white/[0.06] hover:text-white/90',
+                  compact ? 'h-8 w-8' : 'h-9 w-9',
+                )
+              }
+            >
+              <Settings size={16} />
+            </NavLink>
           </Tooltip>
 
           {loadingUser ? (

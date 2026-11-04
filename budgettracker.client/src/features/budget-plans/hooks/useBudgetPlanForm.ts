@@ -4,6 +4,7 @@ import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan, BudgetPlanEntry, Category } from '../../../shared/types/api';
 import type { PlanLineFormData } from '../../../shared/validation/planLineSchema';
 import { errorMessage } from '../../../shared/utils/errorMessage';
+import { invalidatePlanQueries } from './useBudgetPlans';
 
 const emptyForm = (defaultCategoryId: number): PlanLineFormData => ({
   categoryId: defaultCategoryId,
@@ -60,7 +61,7 @@ export const useBudgetPlanForm = (
     mutationFn: async ({ id, payload }: { id: number; payload: BudgetPlan }) =>
       budgetPlanService.update(id, payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['budgetPlans'] });
+      await invalidatePlanQueries(queryClient);
       setStatusError(null);
       setStatusMessage('Budget plan updated.');
       closeDialog();

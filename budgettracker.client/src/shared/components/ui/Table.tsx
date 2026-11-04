@@ -23,7 +23,8 @@ export type TableColumn<TRow> =
 export interface TableProps<TRow> {
   columns: readonly TableColumn<TRow>[];
   rows: readonly TRow[];
-  rowKey: (row: TRow) => string | number;
+  /** `index` is for rows with no unique field of their own; only stable if the rows never reorder. */
+  rowKey: (row: TRow, index: number) => string | number;
   onRowClick?: (row: TRow) => void;
   loading?: boolean;
   emptyMessage?: string;
@@ -94,9 +95,9 @@ const Table = <TRow,>({
               </td>
             </tr>
           ) : (
-            rows.map((row) => (
+            rows.map((row, index) => (
               <tr
-                key={rowKey(row)}
+                key={rowKey(row, index)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn(
                   'border-b border-border-subtle last:border-b-0',

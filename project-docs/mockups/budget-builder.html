@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Simple budget builder — mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#635BFF;--primary-light:#8F8AFF;--primary-subtle:#EFEEFF;--ink:#0A2540;--muted:#5B6B7F;--bg:#F6F9FC;--surface:#fff;--border:#E3E8EE;--border-strong:#C9D2DD;--success:#0E9F6E;--success-dark:#05704B;--success-subtle:#E6F6F0;--warning:#C77700;--warning-dark:#8A5300;--warning-subtle:#FDF3E2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:#E4E9F0;color:var(--ink);padding:48px;letter-spacing:-0.011em}
+.title{font-size:32px;font-weight:700;letter-spacing:-0.025em}
+.sub{font-size:17px;color:var(--muted);margin:6px 0 40px;max-width:900px;line-height:26px}
+.board{display:flex;flex-wrap:wrap;gap:56px 44px;align-items:flex-start}
+.screen{display:flex;flex-direction:column;gap:16px;width:390px}
+.cap{font-size:16px;font-weight:700}
+.why{font-size:15px;line-height:22px;color:var(--muted)}
+.phone{width:390px;height:844px;background:var(--bg);border-radius:44px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 0 10px #0A2540,0 30px 60px rgba(10,37,64,.25);position:relative}
+.body{flex:1;overflow:hidden;padding:52px 24px 24px;display:flex;flex-direction:column;gap:16px}
+.top{display:flex;justify-content:space-between;align-items:center}
+.back{display:flex;align-items:center;gap:4px;color:var(--primary);font-size:19px;font-weight:600;padding:12px 12px 12px 0}
+.stepno{font-size:17px;font-weight:600;color:var(--muted)}
+.bar{display:flex;gap:6px;margin-top:-4px}.bar i{flex:1;height:8px;border-radius:4px;background:var(--border)}.bar i.on{background:var(--primary)}
+h2{font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.02em;margin-top:6px}
+.lead{font-size:18px;line-height:26px;color:var(--muted)}
+.list{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:flex-start;gap:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;flex:none}
+.row.off{background:var(--bg)}
+.box{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--primary)}
+.row.off .box{background:#fff;border:2px solid var(--border-strong)}
+.bub{width:44px;height:44px;border-radius:22px;background:var(--primary-subtle);display:grid;place-items:center;flex:none}
+.txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.name{font-size:19px;line-height:32px;font-weight:600;display:flex;align-items:center;gap:8px}
+.name svg{flex:none}
+.line2{display:flex;align-items:center;gap:12px}
+.hint{font-size:15px;line-height:20px;color:var(--muted)}
+.row.off .name{color:var(--muted)}
+.amt{font-size:20px;font-weight:600;padding:8px 14px;border:1.5px solid var(--border-strong);border-radius:12px;background:var(--bg);font-variant-numeric:tabular-nums;white-space:nowrap}
+.row.off .amt{background:#fff;color:var(--primary)}
+.add{display:flex;align-items:center;justify-content:center;gap:8px;min-height:64px;border:2px dashed var(--border-strong);border-radius:16px;color:var(--primary);font-size:19px;font-weight:600;flex:none}
+.foot{background:#fff;border-top:1px solid var(--border);padding:18px 24px 34px;display:flex;flex-direction:column;gap:12px}
+.left{display:flex;justify-content:space-between;align-items:center;font-size:18px;font-weight:500;color:var(--muted)}
+.left b{font-size:26px;font-weight:700;color:var(--success-dark);font-variant-numeric:tabular-nums}
+.btn{height:60px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:20px;font-weight:600;background:var(--primary);color:#fff;flex:none}
+.btn.sec{background:#fff;color:var(--ink);border:1.5px solid var(--border-strong)}
+.btn.plain{background:none;color:var(--muted);height:52px}
+.hero{width:96px;height:96px;border-radius:48px;background:var(--primary-subtle);display:grid;place-items:center;margin-top:24px}
+.steps{list-style:none;display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.steps li{display:flex;align-items:center;gap:14px;font-size:20px;font-weight:600;background:#fff;border:1.5px solid var(--border);border-radius:16px;padding:14px 16px}
+.num{width:36px;height:36px;border-radius:18px;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:18px;font-weight:700;flex:none}
+.note{font-size:17px;line-height:24px;color:var(--muted)}
+.bigin{background:#fff;border:2px solid var(--primary);box-shadow:0 0 0 5px var(--primary-subtle);border-radius:18px;padding:16px 20px;font-size:52px;font-weight:700;letter-spacing:-0.03em;font-variant-numeric:tabular-nums;display:flex;align-items:center;margin-top:8px}
+.bigin .cur{color:var(--muted);margin-right:4px}.caret{width:3px;height:48px;background:var(--primary);margin-left:4px;border-radius:2px}
+.per{font-size:18px;color:var(--muted);font-weight:500;margin-top:-6px}
+.tip{display:flex;gap:14px;background:var(--primary-subtle);border-radius:16px;padding:16px;font-size:17px;line-height:24px}
+.tip b{font-weight:600}
+.card{background:#fff;border:1.5px solid var(--border);border-radius:20px;padding:20px}
+.card.good{background:var(--success-subtle);border-color:transparent}
+.card.warn{background:var(--warning-subtle);border-color:transparent}
+.klabel{font-size:18px;font-weight:600;color:var(--muted)}
+.kfig{font-size:52px;font-weight:700;letter-spacing:-0.03em;font-variant-numeric:tabular-nums;line-height:60px}
+.good .kfig{color:var(--success-dark)}.warn .kfig{color:var(--warning-dark)}
+.kmsg{font-size:18px;line-height:26px;margin-top:6px}
+.stack{display:flex;height:16px;border-radius:8px;overflow:hidden;margin-top:16px;gap:2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:15px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}.legend i{width:10px;height:10px;border-radius:5px;display:inline-block}
+.sum{display:flex;flex-direction:column}
+.sum{padding:8px 20px}
+.sum div{display:flex;justify-content:space-between;font-size:18px;padding:9px 0;border-bottom:1px solid var(--border)}
+.tip svg{flex:none}
+.sum div:last-child{border:none;font-weight:700;font-size:20px}
+.sum b{font-weight:600;font-variant-numeric:tabular-nums}
+.overlay{position:absolute;inset:0;background:rgba(10,37,64,.5)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:28px 28px 0 0;padding:12px 24px 34px;display:flex;flex-direction:column;gap:16px}
+.handle{width:44px;height:5px;border-radius:3px;background:var(--border-strong);align-self:center}
+.sheet h3{font-size:26px;font-weight:700;display:flex;align-items:center;gap:12px}
+.stepper{display:flex;align-items:center;gap:12px}
+.round{width:64px;height:64px;border-radius:32px;border:1.5px solid var(--border-strong);display:grid;place-items:center;flex:none}
+.stepper .val{flex:1;text-align:center;font-size:52px;font-weight:700;letter-spacing:-0.03em;font-variant-numeric:tabular-nums}
+.rules{width:520px;background:#fff;border-radius:24px;padding:32px;display:flex;flex-direction:column;gap:18px}
+.rules h3{font-size:22px;font-weight:700}
+.rules ol{padding-left:22px;display:flex;flex-direction:column;gap:10px;font-size:16px;line-height:24px}
+.rules table{border-collapse:collapse;font-size:15px}
+.rules td,.rules th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
+.rules th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.rules td:first-child{color:var(--muted);text-decoration:line-through}
+</style>
+</head>
+<body>
+<p class="title">Simple budget builder</p>
+<p class="sub">Phone-first mockups using BudgetTracker's tokens. One question per screen. The bank fills in the numbers and the user checks them. The "money left" number is always on screen. Example numbers: $4,750 in, $2,545 in bills, $1,520 everyday, $270 a month for once-a-year bills, so $415 is left over.</p>
+<div class="board" id="board"></div>
+
+<script>
+const ICON = {
+  house:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  zap:'<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  droplet:'<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  smartphone:'<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  wifi:'<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>',
+  car:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  cart:'<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+  fuel:'<path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5"/><path d="M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16"/><path d="M2 21h13"/><path d="M3 9h11"/>',
+  utensils:'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>',
+  send:'<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  bag:'<path d="M16 10a4 4 0 0 1-8 0"/><path d="M3.103 6.034h17.794"/><path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z"/>',
+  chevron:'<path d="m15 18-6-6 6-6"/>',
+  plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  minus:'<path d="M5 12h14"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  landmark:'<path d="M10 18v-7"/><path d="M11.12 2.198a2 2 0 0 1 1.76.006l7.866 3.847c.476.233.31.949-.22.949H3.474c-.53 0-.695-.716-.22-.949z"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M3 22h18"/><path d="M6 18v-7"/>',
+  wallet:'<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  calendar:'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>'
+};
+const ic = (n, color = 'var(--ink)', size = 24) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
+
+const header = step => `
+  <div class="top"><span class="back">${ic('chevron', 'var(--primary)', 26)}Back</span><span class="stepno">Step ${step} of 4</span></div>
+  <div class="bar">${[1,2,3,4].map(i => `<i class="${i <= step ? 'on' : ''}"></i>`).join('')}</div>`;
+
+const row = ([icon, name, hint, amt, on = true]) => `
+  <div class="row ${on ? '' : 'off'}">
+    <span class="box">${on ? ic('check', '#fff', 22) : ''}</span>
+    <span class="txt">
+      <span class="name">${ic(icon, on ? 'var(--ink)' : 'var(--muted)')}${name}</span>
+      <span class="line2"><span class="amt">${amt}</span><span class="hint">${hint}</span></span>
+    </span>
+  </div>`;
+
+const foot = (label, amount, btn = 'Next') => `
+  <div class="foot">
+    ${label ? `<div class="left"><span>${label}</span><b>${amount}</b></div>` : ''}
+    <div class="btn">${btn}</div>
+  </div>`;
+
+const add = label => `<div class="add">${ic('plus', 'var(--primary)')}${label}</div>`;
+
+const BILLS = [
+  ['house', 'Rent or mortgage', 'Bank: about $2,100', '$2,100'],
+  ['zap', 'Electricity', 'Bank: about $118', '$118'],
+  ['droplet', 'Water', 'Bank: about $45', '$45'],
+  ['smartphone', 'Phone', 'Bank: about $80', '$80'],
+  ['wifi', 'Internet', 'Bank: about $60', '$60'],
+  ['car', 'Car insurance', 'Bank: about $142', '$142'],
+  ['shield', 'Health insurance', 'Not in your bank', 'Add', false],
+];
+const EVERYDAY = [
+  ['cart', 'Groceries', 'Bank: about $612', '$620'],
+  ['fuel', 'Gas for the car', 'Bank: about $158', '$160'],
+  ['utensils', 'Eating out', 'Bank: about $214', '$210'],
+  ['bag', 'Shopping', 'Bank: about $147', '$150'],
+  ['send', 'Send money to family', 'Bank: about $300', '$300'],
+  ['gift', 'Gifts and holidays', 'Bank: about $76', '$80'],
+];
+const YEARLY = [
+  ['car', 'Car registration', '= $20 a month', '$240 a year'],
+  ['landmark', 'Property tax', '= $150 a month', '$1,800 a year'],
+  ['house', 'Home insurance', '= $100 a month', '$1,200 a year'],
+  ['calendar', 'Yearly memberships', 'Not in your bank', 'Add', false],
+];
+
+const legend = [['Bills', 'var(--primary)'], ['Everyday', 'var(--primary-light)'], ['Once a year', 'var(--border-strong)'], ['Left over', 'var(--success)']];
+const stackBar = parts => `<div class="stack">${parts.map(([w, c]) => `<i style="flex:${w};background:${c}"></i>`).join('')}</div>
+  <div class="legend">${legend.map(([l, c]) => `<span><i style="background:${c}"></i>${l}</span>`).join('')}</div>`;
+
+const summary = (everyday, left, leftLabel) => `
+  <div class="card sum">
+    <div><span>Money coming in</span><b>$4,750</b></div>
+    <div><span>Bills</span><b>− $2,545</b></div>
+    <div><span>Everyday spending</span><b>− ${everyday}</b></div>
+    <div><span>Saving for once-a-year bills</span><b>− $270</b></div>
+    <div><span>${leftLabel}</span><span>${left}</span></div>
+  </div>`;
+
+const SCREENS = [
+  {
+    cap: '1 · Start',
+    why: 'Says what a budget is in one sentence and shows the whole path up front, so nothing is a surprise.',
+    html: `<div class="body">
+      <div class="hero">${ic('wallet', 'var(--primary)', 48)}</div>
+      <h2 style="font-size:32px;line-height:38px">Make your monthly budget</h2>
+      <p class="lead">A budget is a plan for your money. We will ask you 4 short questions.</p>
+      <ol class="steps">
+        <li><span class="num">1</span>Money coming in</li>
+        <li><span class="num">2</span>Bills you must pay</li>
+        <li><span class="num">3</span>Everyday spending</li>
+        <li><span class="num">4</span>Bills once a year</li>
+      </ol>
+      <p class="note">About 5 minutes. You can change anything later.</p>
+    </div>${foot(null, null, 'Start')}`,
+  },
+  {
+    cap: '2 · Money in (step 1)',
+    why: 'One number, already filled in from the last 3 months of deposits. The user checks it rather than working it out.',
+    html: `<div class="body">${header(1)}
+      <h2>How much money comes in each month?</h2>
+      <p class="lead">Count the money that goes into your bank, after tax.</p>
+      <div class="bigin"><span class="cur">$</span>4,750<span class="caret"></span></div>
+      <p class="per">each month</p>
+      <div class="tip">${ic('landmark', 'var(--primary)', 28)}<div><b>We filled this in from your bank.</b> About $4,750 came in each month for the last 3 months. Change it if it is wrong.</div></div>
+    </div>${foot(null, null)}`,
+  },
+  {
+    cap: '3 · Bills (step 2)',
+    why: 'Common bills are ready to tick, with amounts from the bank. Tap the box to add or remove. Tap the amount to change it.',
+    html: `<div class="body">${header(2)}
+      <h2>Which bills do you pay every month?</h2>
+      <p class="lead">Tap the box to add or remove. Tap the amount to change it.</p>
+      <div class="list">${BILLS.map(row).join('')}${add('Add another bill')}</div>
+    </div>${foot('Left after bills', '$2,205')}`,
+  },
+  {
+    cap: '4 · Everyday spending (step 3)',
+    why: 'Same layout as step 2, so there is nothing new to learn. Amounts are rounded to the nearest $10.',
+    html: `<div class="body">${header(3)}
+      <h2>How much do you spend on everyday things?</h2>
+      <p class="lead">These change each month. We used your average from the last 3 months.</p>
+      <div class="list">${EVERYDAY.map(row).join('')}${add('Add something else')}</div>
+    </div>${foot('Money left', '$685')}`,
+  },
+  {
+    cap: '5 · Once a year (step 4)',
+    why: 'Takes the place of "Cadence: Annual". The user types the yearly amount and the app shows the monthly saving.',
+    html: `<div class="body">${header(4)}
+      <h2>Any bills you pay once a year?</h2>
+      <p class="lead">We will save a little each month, so the big bill is not a surprise.</p>
+      <div class="list">${YEARLY.map(row).join('')}${add('Add a yearly bill')}</div>
+    </div>${foot('Money left', '$415')}`,
+  },
+  {
+    cap: '6 · Check and save',
+    why: 'One big answer ("$415 left over") followed by the four totals. Saving puts the plan in place; there is no "active plan" choice.',
+    html: `<div class="body">
+      <div class="top"><span class="back">${ic('chevron', 'var(--primary)', 26)}Back</span><span class="stepno">Last step</span></div>
+      <h2>Here is your budget</h2>
+      <div class="card good">
+        <div class="klabel">Left over each month</div>
+        <div class="kfig">$415</div>
+        <p class="kmsg">Good. You plan to spend less than comes in.</p>
+        ${stackBar([[2545, 'var(--primary)'], [1520, 'var(--primary-light)'], [270, 'var(--border-strong)'], [415, 'var(--success)']])}
+      </div>
+      ${summary('$1,520', '$415', 'Left over')}
+    </div>
+    <div class="foot"><div class="btn">Save my budget</div><div class="btn sec">Change something</div></div>`,
+  },
+  {
+    cap: '6b · Check: spending more than comes in',
+    why: 'Amber, not red. It names the number and suggests one change. "Save anyway" is allowed, because it is a plan and not a test.',
+    html: `<div class="body">
+      <div class="top"><span class="back">${ic('chevron', 'var(--primary)', 26)}Back</span><span class="stepno">Last step</span></div>
+      <h2>Here is your budget</h2>
+      <div class="card warn">
+        <div class="klabel">Over each month</div>
+        <div class="kfig">$120</div>
+        <p class="kmsg">You plan to spend $120 more than comes in. Try lowering one or two items, like Eating out.</p>
+      </div>
+      ${summary('$2,055', '− $120', 'Over')}
+    </div>
+    <div class="foot"><div class="btn">Change something</div><div class="btn plain">Save anyway</div></div>`,
+  },
+  {
+    cap: '7 · Change one amount',
+    why: 'Tap any amount to open this sheet. Big − and + buttons change it by $10 with no typing. The bank average stays in view.',
+    html: `<div class="body">${header(3)}
+      <h2>How much do you spend on everyday things?</h2>
+      <div class="list">${EVERYDAY.slice(0, 4).map(row).join('')}</div>
+    </div>
+    <div class="overlay"></div>
+    <div class="sheet">
+      <div class="handle"></div>
+      <h3><span class="bub">${ic('cart')}</span>Groceries</h3>
+      <p class="lead">How much each month?</p>
+      <div class="stepper">
+        <span class="round">${ic('minus', 'var(--ink)', 28)}</span>
+        <span class="val">$620</span>
+        <span class="round">${ic('plus', 'var(--ink)', 28)}</span>
+      </div>
+      <div class="tip">${ic('landmark', 'var(--primary)', 28)}<div>Your bank: about <b>$612</b> a month.</div></div>
+      <div class="btn">Save</div>
+      <div class="btn plain">Remove from my budget</div>
+    </div>`,
+  },
+];
+
+const board = document.getElementById('board');
+board.innerHTML = SCREENS.map(s => `
+  <div class="screen"><div class="cap">${s.cap}</div><div class="phone">${s.html}</div><p class="why">${s.why}</p></div>`).join('') + `
+  <div class="rules">
+    <h3>Rules for this flow</h3>
+    <ol>
+      <li><b>One question per screen.</b> A big button at the bottom. "Back" is always a word, not only an arrow.</li>
+      <li><b>Big by default.</b> Body text is at least 18px, money is 20–52px. Buttons are 60px tall. Anything you can tap is at least 48px.</li>
+      <li><b>The bank fills in the numbers.</b> The user checks them and doesn't have to invent them.</li>
+      <li><b>"Money left" is always on screen</b> and updates as amounts change.</li>
+      <li><b>Every icon has a word next to it.</b> Color never carries meaning alone.</li>
+      <li><b>No red for spending.</b> When the plan is over, show amber and suggest a fix.</li>
+      <li><b>Nothing gets lost.</b> Back keeps every answer. The draft survives a closed tab.</li>
+      <li><b>Write for translation.</b> Short sentences, everyday words, no idioms, no text inside images. Chrome Translate should give a clean result.</li>
+    </ol>
+    <h3>Words we stop using</h3>
+    <table>
+      <tr><th>Today</th><th>In the builder</th></tr>
+      <tr><td>Net monthly income</td><td>Money coming in</td></tr>
+      <tr><td>Plan line</td><td>Bill / item</td></tr>
+      <tr><td>Bucket: Core</td><td>Bills you must pay</td></tr>
+      <tr><td>Bucket: Buffer</td><td>Everyday spending</td></tr>
+      <tr><td>Cadence: Annual</td><td>Once a year</td></tr>
+      <tr><td>Monthly net</td><td>Left over</td></tr>
+      <tr><td>Active plan / Set active</td><td>(hidden: saving puts the plan in place)</td></tr>
+      <tr><td>Stress factor, Notes, Plan month</td><td>(hidden)</td></tr>
+    </table>
+  </div>`;
+</script>
+</body>
+</html>

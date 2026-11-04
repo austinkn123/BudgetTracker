@@ -15,11 +15,16 @@ export const useCategoryMutations = ({
   setStatusError,
 }: UseCategoryMutationsArgs) => {
   const queryClient = useQueryClient();
+  // The map names its lines by category and leaves transfers out, so a rename or retype moves it too.
+  const invalidateCategoryQueries = () =>
+    Promise.all(
+      ['categories', 'money-map'].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
+    );
 
   const createCategory = useMutation({
     mutationFn: async (category: Omit<Category, 'id'>) => categoryService.create(category),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+      await invalidateCategoryQueries();
       setStatusError(null);
       setStatusMessage('Category created.');
     },
@@ -32,7 +37,7 @@ export const useCategoryMutations = ({
   const updateCategory = useMutation({
     mutationFn: async (category: Category) => categoryService.update(category.id, category),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+      await invalidateCategoryQueries();
       setStatusError(null);
       setStatusMessage('Category updated.');
     },
@@ -45,7 +50,7 @@ export const useCategoryMutations = ({
   const deleteCategory = useMutation({
     mutationFn: async (id: number) => categoryService.delete(id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+      await invalidateCategoryQueries();
       setStatusError(null);
       setStatusMessage('Category deleted.');
     },

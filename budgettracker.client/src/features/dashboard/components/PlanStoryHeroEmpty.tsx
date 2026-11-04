@@ -46,7 +46,7 @@ const PlanStoryHeroEmpty = () => (
         <p className="mt-1.5 text-sm text-white/70">
           Pacing, projection and drifting categories, measured against what you said you'd spend.
         </p>
-        <Button component={RouterLink} to="/budget-plans" size="lg" className="mt-5">
+        <Button component={RouterLink} to="/?tab=plan" size="lg" className="mt-5">
           Create a plan
         </Button>
       </div>

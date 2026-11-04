@@ -48,19 +48,20 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
             }
         }
 
-        // Actual side. BUD-18: expense amounts arrive signed, so accumulate magnitude.
+        // Actual side. BUD-18: expense amounts arrive signed (outflows negative), so negate to get spend;
+        // a refund is a positive Expense and nets against it.
         var actualByCategory = monthExpenses.ToLookup(t => t.CategoryId);
 
         decimal actualTotal = 0, actualCore = 0, actualBuffer = 0;
         foreach (var t in monthExpenses)
         {
-            var magnitude = Math.Abs(t.Amount);
-            actualTotal += magnitude;
+            var spend = -t.Amount;
+            actualTotal += spend;
 
             // Spend in a category the plan doesn't budget for falls back to Buffer.
             var bucket = t.CategoryId is int id ? bucketByCategory.GetValueOrDefault(id) : null;
-            if (bucket == CoreBucket) actualCore += magnitude;
-            else actualBuffer += magnitude;
+            if (bucket == CoreBucket) actualCore += spend;
+            else actualBuffer += spend;
         }
 
         var categoryIds = new HashSet<int?>(actualByCategory.Select(g => g.Key));
@@ -70,7 +71,7 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
             .Select(id => new CategoryPerformance(
                 id,
                 id is int planned ? plannedByCategory.GetValueOrDefault(planned) : 0m,
-                actualByCategory[id].Sum(t => Math.Abs(t.Amount))))
+                actualByCategory[id].Sum(t => -t.Amount)))
             .ToList();
 
         var byBucket = new List<BucketPerformance>
@@ -93,7 +94,7 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
         transactions
             .Where(t => t.TransactionType == Expense)
             .GroupBy(t => t.CategoryId)
-            .Select(g => new CategorySpend(g.Key, g.Sum(t => Math.Abs(t.Amount))))
+            .Select(g => new CategorySpend(g.Key, g.Sum(t => -t.Amount)))
             .ToList();
 
     public IReadOnlyList<CategoryMonthSpend> SummarizeByMonth(IReadOnlyList<Transaction> transactions, DateTime now, int months)
@@ -115,7 +116,7 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
                     categoryGroup.Key,
                     month,
                     byMonth[month].Where(t => t.TransactionType == Income).Sum(t => t.Amount),
-                    byMonth[month].Where(t => t.TransactionType != Income).Sum(t => Math.Abs(t.Amount))));
+                    byMonth[month].Where(t => t.TransactionType == Expense).Sum(t => -t.Amount)));
             })
             .ToList();
     }

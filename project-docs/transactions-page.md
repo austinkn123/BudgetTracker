@@ -56,17 +56,26 @@ A category with a plan line but no spend still appears — an untouched budget i
 
 ## Categorising
 
-Three ways, in increasing order of speed:
+Four ways, in increasing order of speed:
 
 1. **Inline** — the category dropdown on any transaction row.
 2. **One-click suggestion** — imported rows carry Plaid's suggested category. When one of your
    categories claims that Plaid value, a "Use *Category*" button appears. Plaid's raw suggestion is
    kept even after you override it.
 3. **Bulk** — select rows with their checkboxes and set a category for all of them at once.
+4. **By payee** — the "*N* need a category" button opens the whole backlog, every month, one line
+   per payee. One pick files every row from that payee.
 
-Map a category to a Plaid taxonomy value in the **Categories** page ("Auto-categorise imports as").
-Once mapped, matching transactions are categorised automatically on the next sync, and a re-sync
-never overwrites a category you chose yourself.
+New imports are categorised automatically on sync, in this order:
+
+1. **Your last pick for the payee.** A new row takes the category of your most recent categorised
+   transaction with the same payee (case-insensitive, exact match otherwise).
+2. **Plaid mapping.** Map a category to a Plaid taxonomy value in the **Categories** page
+   ("Auto-categorise imports as") and matching imports land there.
+
+Both apply only to rows as they arrive. A mapping added later does not reach rows already imported
+(Plaid does not resend them), so clear those with the payee review. A re-sync never overwrites a
+category you chose yourself.
 
 ## Notes
 

@@ -78,7 +78,7 @@ const BudgetPlansSection = ({
         <div>
           <h2 className="text-base font-semibold text-ink">Your plans</h2>
           <p className="text-sm text-ink-muted">
-            Only the active plan drives the dashboard and the month's pacing.
+            Only the active plan drives the map and the month's pacing.
           </p>
         </div>
 

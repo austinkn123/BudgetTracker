@@ -86,6 +86,20 @@ public class BudgetAnalysisManagerTests
     }
 
     [Fact]
+    public async Task GetAnalysis_OpenEndedAllTimeWindow_AnalysesTheCurrentMonth()
+    {
+        // The dashboard's ALL range sends 9999-12-31; stepping a month past it used to overflow DateTime.
+        _transactionAccessor.Setup(a => a.GetByUserIdAsync(UserId))
+            .ReturnsAsync([Expense(1, -40m, CurrentMonth.AddDays(1))]);
+        _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([Plan(isActive: true, monthsBeforeNow: 6)]);
+
+        var result = await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(CurrentMonth, result.Value!.PlanMonth!.AnalyzedMonth);
+    }
+
+    [Fact]
     public async Task GetAnalysis_CompletedMonth_ReportsPacingAsFinished()
     {
         var plan = Plan(isActive: true, monthsBeforeNow: 6);

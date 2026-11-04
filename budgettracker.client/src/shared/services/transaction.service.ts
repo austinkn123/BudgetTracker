@@ -9,6 +9,8 @@ export type TransactionQuery = {
   isImported?: boolean;
   isPending?: boolean;
   search?: string;
+  plaidAccountId?: string;
+  categoryId?: number;
 };
 
 const toParams = (query: TransactionQuery): Record<string, string> => {

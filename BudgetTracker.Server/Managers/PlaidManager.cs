@@ -144,7 +144,8 @@ public class PlaidManager(
                 Mask = plaidAcct.Mask,
                 Name = plaidAcct.Name,
                 AccountType = plaidAcct.Type,
-                AccountSubtype = plaidAcct.Subtype
+                AccountSubtype = plaidAcct.Subtype,
+                CurrentBalance = plaidAcct.CurrentBalance
             });
         }
 
@@ -231,8 +232,9 @@ public class PlaidManager(
             .Select(item => new PlaidConnectionView(
                 item.Id,
                 item.InstitutionName,
-                item.LastSyncedAt,
-                item.Accounts.Select(a => new PlaidLinkedAccountView(a.PlaidAccountId, a.Name, a.Mask, a.AccountType)).ToList(),
+                // Stored as UTC but read back unspecified; marking it makes the JSON carry a Z, so browsers show local time.
+                item.LastSyncedAt is DateTime synced ? DateTime.SpecifyKind(synced, DateTimeKind.Utc) : null,
+                item.Accounts.Select(a => new PlaidLinkedAccountView(a.PlaidAccountId, a.Name, a.Mask, a.AccountType, a.CurrentBalance)).ToList(),
                 item.NeedsReconnect))
             .ToList();
     }
@@ -519,6 +521,18 @@ public class PlaidManager(
         // imported rows reach BudgetAnalysisEngine, which groups purely by CategoryId (BUD-9).
         var userCategories = (await categoryAccessor.GetByUserIdAsync(userId)).ToList();
 
+        // A category the user picked sticks across syncs (the accessor never overwrites it), so a re-delivered row is
+        // classified against that category rather than Plaid's suggestion.
+        var existingByPlaidId = changes.Count == 0
+            ? []
+            : (await transactionAccessor.GetByPlaidTransactionIdsAsync(changes.Select(t => t.TransactionId)))
+                .ToDictionary(t => t.PlaidTransactionId!);
+
+        // A row still uncategorized follows how the user last filed its payee, ahead of Plaid's suggestion.
+        IReadOnlyDictionary<string, int> categoryByPayee = changes.Count == 0
+            ? new Dictionary<string, int>()
+            : await transactionAccessor.GetLatestCategoryByPayeeAsync(userId);
+
         foreach (var plaidTxn in changes)
         {
             var matchingSnapshot = plaidAccountSnapshots.FirstOrDefault(a => a.PlaidAccountId == plaidTxn.AccountId);
@@ -536,8 +550,10 @@ public class PlaidManager(
             if (resolvedAccountId is null)
                 continue; // Defensive — exchange flow ensures one exists; skip orphans rather than crash.
 
-            var resolvedCategoryId = engine.ResolveCategoryId(plaidTxn, userCategories);
-            mapped.Add(engine.MapToBudgetTrackerTransaction(plaidTxn, resolvedAccountId.Value, resolvedCategoryId));
+            var categoryId = existingByPlaidId.GetValueOrDefault(plaidTxn.TransactionId)?.CategoryId
+                             ?? engine.ResolveCategoryId(plaidTxn, userCategories, categoryByPayee);
+            var categoryType = userCategories.FirstOrDefault(c => c.Id == categoryId)?.CategoryType;
+            mapped.Add(engine.MapToBudgetTrackerTransaction(plaidTxn, resolvedAccountId.Value, categoryId, categoryType));
         }
 
         var (inserted, updated) = await transactionAccessor.UpsertImportedAsync(mapped);
@@ -547,9 +563,39 @@ public class PlaidManager(
             removed = await transactionAccessor.DeleteByPlaidTransactionIdsAsync(idsToDelete);
         }
 
+        // Plaid's cached balances ride along on /transactions/sync for free (/accounts/balance/get is billed).
+        if (syncResult.Accounts is { Count: > 0 } accounts)
+            await itemAccessor.UpdateBalancesAsync(plaidItemId, accounts);
+
         var syncedAt = DateTime.UtcNow;
         await itemAccessor.UpdateSyncStateAsync(plaidItemId, syncResult.NextCursor, syncedAt);
 
+        await PairOwnAccountTransfersAsync(userId, userCategories);
+
         return Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, syncedAt));
+    }
+
+    /// <summary>
+    /// Re-pair every money movement between the user's own linked cash accounts from scratch, so a leg that lands in a
+    /// later sync (or on another bank) still pairs, older history is back-filled, and a leg whose partner Plaid removed
+    /// reverts. Best-effort: the sync itself has already been saved, and the next sync retries.
+    /// </summary>
+    private async Task PairOwnAccountTransfersAsync(int userId, IReadOnlyList<Category> userCategories)
+    {
+        try
+        {
+            var candidates = await transactionAccessor.GetTransferCandidatesAsync(userId, engine.TransferCategories);
+            if (candidates.Count == 0)
+                return;
+
+            var linkedAccounts = (await itemAccessor.GetAllActiveByUserIdAsync(userId)).SelectMany(i => i.Accounts).ToList();
+            var updates = engine.ReconcileOwnAccountTransfers(candidates, linkedAccounts, userCategories);
+            if (updates.Count > 0)
+                await transactionAccessor.ApplyTransferUpdatesAsync(updates);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Transfer pairing failed for user {UserId}; it will retry on the next sync.", userId);
+        }
     }
 }

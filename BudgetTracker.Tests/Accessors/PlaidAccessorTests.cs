@@ -219,4 +219,39 @@ public class PlaidAccessorTests
         Assert.Equal("def", jwk.Y);
         Assert.Equal("ES256", jwk.Alg);
     }
+
+    // ── Cached balances (free: /accounts/get and /transactions/sync both carry balances.current) ─
+
+    private const string AccountsJson = """
+        {"accounts":[
+          {"account_id":"chk","name":"Checking","mask":"0000","type":"depository","subtype":"checking","balances":{"current":1234.56,"available":1200}},
+          {"account_id":"card","name":"Card","mask":null,"type":"credit","subtype":"credit card","balances":{"current":null}},
+          {"account_id":"old","name":"Old","type":"depository"}
+        ],"request_id":"r1"}
+        """;
+
+    [Fact]
+    public async Task GetAccounts_ReadsCurrentBalance_NullWhenAbsent()
+    {
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+
+        var accounts = await BuildAccessor(new CountingHandler(json: AccountsJson), cache).GetAccountsAsync("access-token-xyz");
+
+        Assert.Equal([1234.56m, null, null], accounts.Select(a => a.CurrentBalance));
+    }
+
+    [Fact]
+    public async Task SyncTransactions_ReturnsTheAccountsWithBalances()
+    {
+        const string syncJson = """
+            {"added":[],"modified":[],"removed":[],"next_cursor":"c1","has_more":false,
+             "accounts":[{"account_id":"chk","name":"Checking","type":"depository","balances":{"current":50.5}}],"request_id":"r1"}
+            """;
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+
+        var result = await BuildAccessor(new CountingHandler(json: syncJson), cache).SyncTransactionsAsync("access-token-xyz", cursor: null);
+
+        var account = Assert.Single(result.Accounts!);
+        Assert.Equal(("chk", 50.5m), (account.AccountId, account.CurrentBalance));
+    }
 }

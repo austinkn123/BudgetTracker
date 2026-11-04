@@ -28,6 +28,7 @@ export const useSyncOnOpen = () => {
       if (summary.inserted + summary.updated + summary.removed > 0) {
         void queryClient.invalidateQueries({ queryKey: ['transactions'] });
         void queryClient.invalidateQueries({ queryKey: ['budget-analysis'] });
+        void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
       }
     },
     // Deliberately silent; see the doc comment above.

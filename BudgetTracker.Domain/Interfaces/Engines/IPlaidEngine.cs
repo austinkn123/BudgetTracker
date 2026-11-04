@@ -17,7 +17,41 @@ public interface IPlaidEngine
     /// <param name="dto">Plaid's raw transaction record.</param>
     /// <param name="accountId">BudgetTracker account id the imported transaction is attached to.</param>
     /// <param name="categoryId">Category resolved from Plaid's suggestion, or null to leave it uncategorized.</param>
-    Transaction MapToBudgetTrackerTransaction(PlaidTransactionDto dto, int accountId, int? categoryId = null);
+    /// <param name="categoryType">That category's <see cref="Category.CategoryType"/>; drives <see cref="ClassifyTransactionType"/>.</param>
+    Transaction MapToBudgetTrackerTransaction(PlaidTransactionDto dto, int accountId, int? categoryId = null, string? categoryType = null);
+
+    /// <summary>
+    /// Decide a row's TransactionType. A category typed Income or Expense is the user's override and wins; otherwise only
+    /// Plaid's <c>INCOME</c> category is Income and every other row, refunds and money from friends included, is Expense.
+    /// A category typed Transfer makes the row an Adjustment, out of every spending figure. A paired Transfer row keeps
+    /// that type; pass no <paramref name="currentType"/> to re-derive a former Transfer.
+    /// </summary>
+    /// <param name="plaidCategoryPrimary">Plaid's personal_finance_category.primary, or null for manual rows.</param>
+    /// <param name="categoryType">The row's category type (Income, Expense, Both, Transfer), or null when uncategorized.</param>
+    /// <param name="currentType">The row's present type when re-classifying an existing row; null at import.</param>
+    /// <returns>Income, Expense, Adjustment, or a preserved Transfer.</returns>
+    string ClassifyTransactionType(string? plaidCategoryPrimary, string? categoryType, string? currentType = null);
+
+    /// <summary>Plaid categories whose rows may be one leg of a transfer between two of the user's own accounts.</summary>
+    IReadOnlyCollection<string> TransferCategories { get; }
+
+    /// <summary>
+    /// Re-pair own-account transfers from scratch. Two legs pair when they are the same money moving between two of the
+    /// user's linked checking/savings/credit accounts: exactly opposite amounts, different Plaid accounts, dated within
+    /// five days. Posted rows in <see cref="TransferCategories"/> qualify, whether or not they are already a Transfer;
+    /// Adjustment rows never do. The pairing maximises the number of pairs, each row is used at most once, and the result
+    /// is deterministic.
+    /// </summary>
+    /// <param name="candidates">Every posted row in <see cref="TransferCategories"/>, including current Transfer legs.</param>
+    /// <param name="linkedAccounts">The user's linked Plaid accounts; only depository and credit accounts can hold a leg.</param>
+    /// <param name="userCategories">The user's categories, to re-classify a leg that no longer pairs.</param>
+    /// <returns>
+    /// Only the rows whose result changed: a newly (or differently) paired leg becomes a Transfer to its counterpart's
+    /// <see cref="Transaction.AccountId"/>; a former Transfer that no longer pairs reverts to
+    /// <see cref="ClassifyTransactionType"/> with no transfer account.
+    /// </returns>
+    IReadOnlyList<TransferUpdate> ReconcileOwnAccountTransfers(
+        IEnumerable<Transaction> candidates, IEnumerable<PlaidAccount> linkedAccounts, IEnumerable<Category> userCategories);
 
     /// <summary>
     /// Whether a Plaid transaction can be kept as a BudgetTracker <see cref="Transaction"/>. A $0 row carries
@@ -28,11 +62,13 @@ public interface IPlaidEngine
     bool IsImportable(PlaidTransactionDto dto);
 
     /// <summary>
-    /// Resolve Plaid's suggested category (personal_finance_category.primary) to one of the user's
-    /// categories, via the mapping stored on <see cref="Category.PlaidCategoryPrimary"/>.
-    /// Returns null when Plaid sent no suggestion or the user has not mapped that value.
+    /// Resolve an imported row to one of the user's categories. The user's own latest pick for the row's payee
+    /// (<paramref name="categoryByPayee"/>) wins; otherwise Plaid's suggestion (personal_finance_category.primary)
+    /// via the mapping stored on <see cref="Category.PlaidCategoryPrimary"/>.
+    /// Returns null when neither matches.
     /// </summary>
-    int? ResolveCategoryId(PlaidTransactionDto dto, IEnumerable<Category> userCategories);
+    int? ResolveCategoryId(
+        PlaidTransactionDto dto, IEnumerable<Category> userCategories, IReadOnlyDictionary<string, int>? categoryByPayee = null);
 
     /// <summary>
     /// Resolve which BudgetTracker <see cref="Account"/> should host transactions for a Plaid account.
