@@ -41,7 +41,7 @@ public class PlaidManagerTests
             .Setup(a => a.GetTransferCandidatesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
             .ReturnsAsync([]);
         _txnAccessor
-            .Setup(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>()))
+            .Setup(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
             .ReturnsAsync(new Dictionary<string, int>());
     }
 
@@ -1698,7 +1698,7 @@ public class PlaidManagerTests
         StubSyncWith(
             new PlaidSyncResult([ZelleIn()], [], [], "next-cursor"),
             [new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income" }]);
-        _txnAccessor.Setup(a => a.GetLatestCategoryByPayeeAsync(5))
+        _txnAccessor.Setup(a => a.GetLatestCategoryByPayeeAsync(5, It.Is<IReadOnlyCollection<string>>(p => p.SequenceEqual(new[] { "ZELLE FROM SAM" }))))
             .ReturnsAsync(new Dictionary<string, int> { ["ZELLE FROM SAM"] = 9 });
         List<Transaction>? captured = null;
         _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
@@ -1752,6 +1752,47 @@ public class PlaidManagerTests
     }
 
     [Fact]
+    public async Task Sync_ALegThatStealsAnInflow_RevertsTheOutflowItsOldPartnerLeftBehind_EvenWeeksAfterTheBatch()
+    {
+        // Stored and settled: Sep 15 out pairs Sep 13 in, Sep 22 out pairs Sep 19 in. The sync lands a Sep 10 outflow,
+        // which takes Sep 13; Sep 15 moves on to Sep 19, so Sep 22 is left without a partner and must revert.
+        var newLeg = new PlaidTransactionDto("new-out", "plaid-acct-1", 100m, new DateTime(2026, 9, 10), null, "TO SAVINGS", false, "TRANSFER_OUT");
+        var item = StubSyncWith(new PlaidSyncResult([newLeg], [], [], "next-cursor"));
+        item.Accounts.First().AccountType = "depository";
+        item.Accounts.Add(new PlaidAccount { PlaidAccountId = "sav", AccountType = "depository" });
+        Transaction Leg(int id, decimal amount, int day, string type, int? transferAccountId) => new()
+        {
+            Id = id,
+            AccountId = amount < 0 ? 77 : 78,
+            PlaidAccountId = amount < 0 ? "plaid-acct-1" : "sav",
+            Amount = amount,
+            OccurredAt = new DateTime(2026, 9, day),
+            PlaidCategoryPrimary = amount < 0 ? "TRANSFER_OUT" : "TRANSFER_IN",
+            TransactionType = type,
+            TransferAccountId = transferAccountId
+        };
+        var store = new List<Transaction>
+        {
+            Leg(1, 100m, 13, "Transfer", 77),
+            Leg(2, -100m, 15, "Transfer", 78),
+            Leg(3, 100m, 19, "Transfer", 77),
+            Leg(4, -100m, 22, "Transfer", 78),
+            Leg(5, -100m, 10, "Expense", null) // the upserted batch row
+        };
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(store);
+        IReadOnlyList<TransferUpdate>? written = null;
+        _txnAccessor.Setup(a => a.ApplyTransferUpdatesAsync(It.IsAny<IReadOnlyList<TransferUpdate>>()))
+            .Callback<IReadOnlyList<TransferUpdate>>(updates => written = updates)
+            .Returns(Task.CompletedTask);
+
+        await BuildSut().SyncAsync(5);
+
+        Assert.Equal(
+            [new TransferUpdate(4, "Expense", null), new TransferUpdate(5, "Transfer", 78)],
+            written!.OrderBy(u => u.TransactionId));
+    }
+
+    [Fact]
     public async Task Sync_TransferLegWhosePartnerPlaidRemoved_RevertsUsingItsCategory()
     {
         StubSyncWith(
@@ -1785,6 +1826,18 @@ public class PlaidManagerTests
 
         Assert.True(result.IsSuccess);
         VerifyWarningLogged(Times.Once());
+    }
+
+    [Fact]
+    public async Task Sync_NothingTouched_SkipsPayeeLookups_ButStillRePairsSoAFailedPairingRetries()
+    {
+        StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor"));
+
+        var result = await BuildSut().SyncAsync(5);
+
+        Assert.True(result.IsSuccess);
+        _txnAccessor.Verify(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()), Times.Once);
+        _txnAccessor.Verify(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()), Times.Never);
     }
 
     [Fact]

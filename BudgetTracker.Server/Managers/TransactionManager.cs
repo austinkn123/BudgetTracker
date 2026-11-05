@@ -11,18 +11,43 @@ namespace BudgetTracker.Server.Managers;
 /// <see cref="ITransactionAccessor.UpsertImportedAsync"/>), so this manager owns no create or
 /// delete path — only the two annotations a person makes: category and notes.
 /// </summary>
-public class TransactionManager(ITransactionAccessor accessor, ICategoryAccessor categoryAccessor, IPlaidEngine plaidEngine) : ITransactionManager
+public class TransactionManager(
+    ITransactionAccessor accessor,
+    ICategoryAccessor categoryAccessor,
+    IPlaidEngine plaidEngine,
+    ITransactionEngine transactionEngine) : ITransactionManager
 {
-    public async Task<Result<IEnumerable<Transaction>>> GetByUserIdAsync(int userId)
+    private const string FilterRequired =
+        "At least one filter is required; read the whole ledger a page at a time from GET /api/transactions/page.";
+
+    /// <inheritdoc />
+    public async Task<Result<IEnumerable<Transaction>>> GetFilteredAsync(int userId, TransactionFilter filter)
     {
-        var transactions = await accessor.GetByUserIdAsync(userId);
+        if (!transactionEngine.HasAnyFilter(filter))
+            return Result<IEnumerable<Transaction>>.Failure(FilterRequired);
+
+        var transactions = await accessor.GetFilteredAsync(userId, filter);
         return Result<IEnumerable<Transaction>>.Success(transactions);
     }
 
-    public async Task<Result<IEnumerable<Transaction>>> GetFilteredAsync(int userId, TransactionFilter filter)
+    /// <inheritdoc />
+    public async Task<Result<TransactionPage>> GetPageAsync(int userId, TransactionFilter filter, string? cursor, int? limit)
     {
-        var transactions = await accessor.GetFilteredAsync(userId, filter);
-        return Result<IEnumerable<Transaction>>.Success(transactions);
+        var after = transactionEngine.ParseCursor(cursor);
+        if (!after.IsSuccess)
+            return Result<TransactionPage>.Failure(after.Error!);
+
+        // One row past the page tells the engine whether another page exists, without a COUNT.
+        var pageSize = transactionEngine.ResolvePageSize(limit);
+        var fetched = await accessor.GetPageAsync(userId, filter, after.Value, pageSize + 1);
+        return Result<TransactionPage>.Success(transactionEngine.BuildPage(fetched, pageSize));
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<TransactionSummary>> GetSummaryAsync(int userId)
+    {
+        var summary = await accessor.GetSummaryAsync(userId);
+        return Result<TransactionSummary>.Success(summary);
     }
 
     public async Task<Result<int>> SetCategoryAsync(IEnumerable<int> ids, int? categoryId, int userId)

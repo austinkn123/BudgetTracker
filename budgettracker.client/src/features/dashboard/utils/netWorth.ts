@@ -1,4 +1,4 @@
-import type { PlaidConnectionView, Transaction, WebullBalance } from '../../../shared/types/api';
+import type { PendingByAccount, PlaidConnectionView, WebullBalance } from '../../../shared/types/api';
 
 export interface NetWorth {
   /** Checking and savings. */
@@ -19,18 +19,17 @@ const OWED_TYPES = new Set(['credit', 'loan']);
  * reported a balance yet, so the card never shows a made-up $0.
  *
  * Plaid's current balance counts posted activity only, so a paycheck that is still pending would
- * be missing. Each account's pending rows are added on top, which is how the bank computes its
- * available balance.
+ * be missing. Each account's pending net (summed server-side, see /transactions/summary) is added
+ * on top, which is how the bank computes its available balance.
  */
 export const summarizeNetWorth = (
   connections: PlaidConnectionView[],
   webullBalances: WebullBalance[],
-  transactions: Transaction[] = [],
+  pendingRows: PendingByAccount[] = [],
 ): NetWorth | null => {
   const pendingByAccount = new Map<string, number>();
-  for (const t of transactions) {
-    if (!t.isPending || !t.plaidAccountId) continue;
-    pendingByAccount.set(t.plaidAccountId, (pendingByAccount.get(t.plaidAccountId) ?? 0) + t.amount);
+  for (const row of pendingRows) {
+    pendingByAccount.set(row.plaidAccountId, (pendingByAccount.get(row.plaidAccountId) ?? 0) + row.amount);
   }
 
   let cash = 0;

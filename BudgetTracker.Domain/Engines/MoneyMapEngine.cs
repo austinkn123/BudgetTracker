@@ -32,12 +32,12 @@ public class MoneyMapEngine : IMoneyMapEngine
         ArgumentNullException.ThrowIfNull(transactions);
         ArgumentNullException.ThrowIfNull(categories);
 
-        if (months is < 1 or > MaxMonths)
-            return Result<MoneyMap>.Failure($"months must be between 1 and {MaxMonths}");
+        if (ValidateMonths(months) is string error)
+            return Result<MoneyMap>.Failure(error);
 
         today = today.Date;
-        var from = new DateTime(today.Year, today.Month, 1).AddMonths(-(months - 1));
-        var plan = plans.Where(p => p.IsActive).OrderByDescending(p => p.PlanMonth).FirstOrDefault();
+        var from = WindowStart(today, months);
+        var plan = NewestActivePlan(plans);
         var names = categories.ToDictionary(c => c.Id, c => c.Name);
         var window = transactions.Where(t => t.OccurredAt.Date >= from && t.OccurredAt.Date <= today).ToList();
 
@@ -55,6 +55,44 @@ public class MoneyMapEngine : IMoneyMapEngine
             BuildLines(plan, window.Where(t => t.TransactionType == Expense).ToList(), names, months),
             upcoming));
     }
+
+    /// <inheritdoc />
+    public Result<MoneyMapHistory> DescribeHistory(IEnumerable<BudgetPlan> plans, DateTime today, int months)
+    {
+        ArgumentNullException.ThrowIfNull(plans);
+
+        if (ValidateMonths(months) is string error)
+            return Result<MoneyMapHistory>.Failure(error);
+
+        today = today.Date;
+        var windowStart = WindowStart(today, months);
+        var billLookback = BillLookbackStart(today);
+        var payCategories = NewestActivePlan(plans)?.Entries
+            .Where(e => e.LineType == Income && e.CategoryId is not null)
+            .Select(e => e.CategoryId!.Value)
+            .ToHashSet() ?? [];
+
+        return Result<MoneyMapHistory>.Success(new MoneyMapHistory(
+            windowStart < billLookback ? windowStart : billLookback, payCategories, RecentPaychecks));
+    }
+
+    /// <inheritdoc />
+    public decimal PaycheckFloor(decimal latestPay) => Floor(latestPay);
+
+    /// <summary>A paycheck is at least half the latest one, so a refund or small deposit in between doesn't count.</summary>
+    private static decimal Floor(decimal latestPay) => latestPay / 2;
+
+    private static string? ValidateMonths(int months) =>
+        months is < 1 or > MaxMonths ? $"months must be between 1 and {MaxMonths}" : null;
+
+    private static DateTime WindowStart(DateTime today, int months) =>
+        new DateTime(today.Year, today.Month, 1).AddMonths(-(months - 1));
+
+    /// <summary>The bill projection reads payments dated after this day; fetching from it is inclusive and harmless.</summary>
+    private static DateTime BillLookbackStart(DateTime today) => today.AddMonths(-12);
+
+    private static BudgetPlan? NewestActivePlan(IEnumerable<BudgetPlan> plans) =>
+        plans.Where(p => p.IsActive).OrderByDescending(p => p.PlanMonth).FirstOrDefault();
 
     /// <summary>Plan lines in plan order, then unplanned spend largest first. A category in several plan lines is one line.</summary>
     private static List<MoneyMapLine> BuildLines(BudgetPlan? plan, List<Transaction> spend, Dictionary<int, string> names, int months)
@@ -93,7 +131,7 @@ public class MoneyMapEngine : IMoneyMapEngine
     {
         // ponytail: a yearly bill paid a few days earlier than last year shows twice in the window; key bills by payee if
         // that ever happens.
-        var yearAgo = today.AddMonths(-12);
+        var yearAgo = BillLookbackStart(today);
         var horizon = today.AddMonths(12);
 
         foreach (var entry in plan.Entries.Where(e => e.LineType == Expense && e.Cadence == Annual && e.CategoryId is not null))
@@ -138,7 +176,8 @@ public class MoneyMapEngine : IMoneyMapEngine
             return [];
 
         var latest = pay[0];
-        var paychecks = pay.Where(t => t.Amount >= latest.Amount / 2).Take(RecentPaychecks).ToList();
+        var floor = Floor(latest.Amount);
+        var paychecks = pay.Where(t => t.Amount >= floor).Take(RecentPaychecks).ToList();
         if (paychecks.Count < 2 || Math.Abs((latest.OccurredAt.Date - paychecks[1].OccurredAt.Date).Days - BiweeklyDays) > 1)
             return [];
 

@@ -972,4 +972,171 @@ public class PlaidEngineTests
 
         Assert.Equal([new TransferUpdate(1, "Expense", null), new TransferUpdate(2, "Expense", null)], updates.OrderBy(u => u.TransactionId));
     }
+
+    // ── ResolvePayee ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ResolvePayee_PrefersTheMerchantName_ElseTheRawName()
+    {
+        var withMerchant = new PlaidTransactionDto("t1", "a1", 4m, TransferDay, "Starbucks", "SBUX 1234", false, null);
+        var withoutMerchant = withMerchant with { MerchantName = "  " };
+
+        Assert.Equal("Starbucks", _sut.ResolvePayee(withMerchant));
+        Assert.Equal("SBUX 1234", _sut.ResolvePayee(withoutMerchant));
+    }
+
+    // ── Reconciliation over a sync ──────────────────────────────────────────
+
+    private static List<Transaction> Applied(IEnumerable<Transaction> rows, IReadOnlyList<TransferUpdate> updates)
+    {
+        var byId = updates.ToDictionary(u => u.TransactionId);
+        return rows.Select(r =>
+        {
+            var copy = Leg(r.Id, r.Amount, r.PlaidAccountId!, r.AccountId, 0, r.PlaidCategoryPrimary!, r.IsPending, r.TransactionType, r.TransferAccountId, r.CategoryId);
+            copy.OccurredAt = r.OccurredAt;
+            if (byId.TryGetValue(r.Id, out var u))
+            {
+                copy.TransactionType = u.TransactionType;
+                copy.TransferAccountId = u.TransferAccountId;
+            }
+            return copy;
+        }).ToList();
+    }
+
+    /// <summary>One sync as production runs it: the batch lands on the stored ledger, then pairing re-runs over all of it.</summary>
+    private List<Transaction> SyncOnce(IReadOnlyList<Transaction> stored, IReadOnlyList<Transaction> batch)
+    {
+        var ledger = stored.Concat(batch).ToList();
+        return Applied(ledger, _sut.ReconcileOwnAccountTransfers(ledger, Linked, []));
+    }
+
+    /// <summary>Reconcile from scratch until stable, the state every earlier sync left the ledger in.</summary>
+    private List<Transaction> Settled(IEnumerable<Transaction> rows)
+    {
+        var list = rows.ToList();
+        return Applied(list, _sut.ReconcileOwnAccountTransfers(list, Linked, []));
+    }
+
+    /// <summary>
+    /// A year of history settled by earlier syncs, then a sync that lands one week mid-year. Recurring weekly transfers
+    /// of one amount (which compete for partners across the window edge), one-off transfers between all three cash
+    /// accounts, unpaired legs and a pending leg. "Dense" reuses four amounts with lags up to five days so legs of equal
+    /// amount overlap constantly; "everyday" uses varied amounts.
+    /// </summary>
+    private static (List<Transaction> History, List<Transaction> Batch) RandomLedger(int seed, bool dense)
+    {
+        var random = new Random(seed);
+        var rows = new List<Transaction>();
+        var id = 1;
+        string[] cash = ["chk", "sav", "card"];
+        static int AccountOf(string plaid) => plaid switch { "chk" => 10, "sav" => 20, _ => 30 };
+        void Transfer(decimal amount, int day, int lag, string from, string to)
+        {
+            rows.Add(Leg(id++, -amount, from, AccountOf(from), day));
+            rows.Add(Leg(id++, amount, to, AccountOf(to), day + lag, "TRANSFER_IN"));
+        }
+
+        for (var day = -365; day < 0; day += 7)
+            Transfer(500m, day, random.Next(0, 3), "chk", "sav");
+        for (var day = -365; day < 0; day += random.Next(1, dense ? 6 : 15))
+        {
+            var from = cash[random.Next(3)];
+            var to = cash.Where(c => c != from).ElementAt(random.Next(2));
+            var amount = dense ? new[] { 100m, 250m, 500m, 37.5m }[random.Next(4)] : random.Next(20, 3000);
+            if (random.Next(5) == 0)
+                rows.Add(Leg(id++, random.Next(2) == 0 ? -amount : amount, from, AccountOf(from), day, "TRANSFER_IN"));
+            else
+                Transfer(amount, day, random.Next(0, dense ? 6 : 3), from, to);
+        }
+        rows.Add(Leg(id, -250m, "chk", 10, -100, pending: true));
+
+        bool InBatch(Transaction t) => t.OccurredAt >= TransferDay.AddDays(-180) && t.OccurredAt <= TransferDay.AddDays(-173);
+        return (rows.Where(t => !InBatch(t)).ToList(), rows.Where(InBatch).ToList());
+    }
+
+    /// <summary>
+    /// Every Transfer row has a partner: for each amount, Transfer outflows and inflows can be matched one to one, each
+    /// pair being opposite legs on different accounts within the tolerance that name each other's account.
+    /// </summary>
+    private static void AssertTransferLegsBalanced(IReadOnlyList<Transaction> ledger, string context)
+    {
+        var transfers = ledger.Where(t => t.TransactionType == "Transfer").ToList();
+        foreach (var leg in transfers)
+            Assert.True(leg.TransferAccountId is int other && other != leg.AccountId, $"{context}: row {leg.Id} has no transfer account");
+
+        foreach (var sameAmount in transfers.GroupBy(t => Math.Abs(t.Amount)))
+        {
+            var outflows = sameAmount.Where(t => t.Amount < 0).ToList();
+            var inflows = sameAmount.Where(t => t.Amount > 0).ToList();
+            Assert.True(outflows.Count == inflows.Count,
+                $"{context}: {outflows.Count} Transfer outflows vs {inflows.Count} inflows of {sameAmount.Key}");
+
+            bool Partners(Transaction o, Transaction i) =>
+                o.PlaidAccountId != i.PlaidAccountId && o.TransferAccountId == i.AccountId && i.TransferAccountId == o.AccountId &&
+                Math.Abs((o.OccurredAt.Date - i.OccurredAt.Date).TotalDays) <= 5;
+
+            // Kuhn's augmenting paths: a perfect matching exists iff every outflow can be matched.
+            var inflowOwner = new int[inflows.Count];
+            Array.Fill(inflowOwner, -1);
+            bool TryMatch(int o, bool[] seen)
+            {
+                for (var i = 0; i < inflows.Count; i++)
+                {
+                    if (seen[i] || !Partners(outflows[o], inflows[i]))
+                        continue;
+                    seen[i] = true;
+                    if (inflowOwner[i] < 0 || TryMatch(inflowOwner[i], seen))
+                    {
+                        inflowOwner[i] = o;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            for (var o = 0; o < outflows.Count; o++)
+                Assert.True(TryMatch(o, new bool[inflows.Count]), $"{context}: Transfer row {outflows[o].Id} has no valid partner");
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Sync_LeavesEveryTransferLegWithAPartner_AcrossRandomisedLedgers(bool dense)
+    {
+        for (var seed = 0; seed < 150; seed++)
+        {
+            var (history, batch) = RandomLedger(seed, dense);
+            var stored = Settled(history);
+            AssertTransferLegsBalanced(stored, $"seed {seed} before sync");
+
+            var after = SyncOnce(stored, batch);
+            AssertTransferLegsBalanced(after, $"seed {seed} after sync");
+
+            // A later sync in which Plaid removes some rows, paired legs among them.
+            var random = new Random(seed);
+            var afterRemoval = SyncOnce(after.Where(_ => random.Next(10) != 0).ToList(), []);
+            AssertTransferLegsBalanced(afterRemoval, $"seed {seed} after removals");
+        }
+    }
+
+    [Fact]
+    public void Sync_ALegThatStealsAnInflow_RevertsTheLegItsOldPartnerLeftBehind()
+    {
+        // Settled: day+5 out pairs day+3 in, day+12 out pairs day+9 in. A new day 0 outflow takes day+3, day+5 then takes
+        // day+9, and day+12, two weeks after the batch, is left with no partner.
+        var stored = Settled(
+        [
+            Leg(1, 100m, "sav", 20, dayOffset: 3, plaidCategory: "TRANSFER_IN"),
+            Leg(2, -100m, "chk", 10, dayOffset: 5),
+            Leg(3, 100m, "sav", 20, dayOffset: 9, plaidCategory: "TRANSFER_IN"),
+            Leg(4, -100m, "chk", 10, dayOffset: 12)
+        ]);
+        Assert.Equal(("Transfer", (int?)20), (stored[3].TransactionType, stored[3].TransferAccountId));
+
+        var after = SyncOnce(stored, [Leg(5, -100m, "chk", 10, dayOffset: 0)]).ToDictionary(r => r.Id);
+
+        Assert.Equal(("Expense", (int?)null), (after[4].TransactionType, after[4].TransferAccountId));
+        AssertTransferLegsBalanced(after.Values.ToList(), "repro");
+    }
 }

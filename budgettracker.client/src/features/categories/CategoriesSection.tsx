@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { subMonths } from 'date-fns';
 import { Trash2 } from 'lucide-react';
 import {
   Badge,
@@ -20,11 +19,16 @@ import type { Category } from '../../shared/types/api';
 import { PLAID_CATEGORY_OPTIONS } from '../../shared/constants/plaidCategories';
 import { categorySchema, type CategoryFormValues } from '../../shared/validation/categorySchema';
 import { currency } from '../../shared/utils/format';
-import { useTransactions } from '../transactions/hooks/useTransactions';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
 import { useCategories } from './hooks/useCategories';
 import { useCategoryMutations } from './hooks/useCategoryMutations';
-import { rankCategories, type CategorySegment, type RankedCategory } from './utils/rankCategories';
+import { useCategoryUsage } from './hooks/useCategoryUsage';
+import {
+  rankCategories,
+  usageSince,
+  type CategorySegment,
+  type RankedCategory,
+} from './utils/rankCategories';
 
 type CategoriesSectionProps = {
   isLoading: boolean;
@@ -62,7 +66,9 @@ const CategoriesSection = ({
   setStatusError,
 }: CategoriesSectionProps) => {
   const { data: categories = [] } = useCategories();
-  const { data: transactions = [] } = useTransactions();
+  // A calendar date, so the key holds for the whole day instead of changing every render.
+  const since = usageSince(new Date(), WINDOW_MONTHS);
+  const { data: usage = [] } = useCategoryUsage(since);
   const { data: budgetPlans = [] } = useBudgetPlans();
   const { createCategory, updateCategory, deleteCategory } = useCategoryMutations({
     setStatusMessage,
@@ -83,8 +89,8 @@ const CategoriesSection = ({
   });
 
   const rows = useMemo(
-    () => rankCategories(categories, transactions, budgetPlans, segment, subMonths(new Date(), WINDOW_MONTHS)),
-    [categories, transactions, budgetPlans, segment],
+    () => rankCategories(categories, usage, budgetPlans, segment),
+    [categories, usage, budgetPlans, segment],
   );
   // Nothing filed here and no plan line: deleting it changes no figure, so it waits apart.
   const used = rows.filter((r) => r.transactions > 0 || r.planEntries > 0);

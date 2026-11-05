@@ -59,24 +59,295 @@ public class TransactionAccessorTests : IDisposable
 
     private Task<Transaction> ReloadAsync(int id) => _context.Transactions.AsNoTracking().SingleAsync(t => t.Id == id);
 
-    [Fact]
-    public async Task GetLatestCategoryByPayeeAsync_ReturnsTheNewestPickPerPayee_ForThisUserOnly()
+    private static Transaction At(Transaction row, DateTime occurredAt)
     {
-        var older = Row(1, categoryId: 10);
-        older.Payee = "Amazon";
-        var newer = Row(2, categoryId: 20);
-        newer.Payee = "amazon";
-        newer.OccurredAt = older.OccurredAt.AddDays(1);
-        var uncategorized = Row(3);
-        uncategorized.Payee = "Target";
-        var someoneElses = Row(4, accountId: 3, categoryId: 30);
-        someoneElses.Payee = "Walmart";
-        await SeedAsync(older, newer, uncategorized, someoneElses);
+        row.OccurredAt = occurredAt;
+        return row;
+    }
 
-        var result = await BuildSut().GetLatestCategoryByPayeeAsync(UserId);
+    private static Transaction Paid(Transaction row, string payee)
+    {
+        row.Payee = payee;
+        return row;
+    }
+
+    // ── GetLatestCategoryByPayeeAsync ───────────────────────────────────────
+
+    [Fact]
+    public async Task GetLatestCategoryByPayee_ReturnsTheNewestPickPerRequestedPayee_ForThisUserOnly()
+    {
+        await SeedAsync(
+            Paid(Row(1, categoryId: 10), "Amazon"),
+            At(Paid(Row(2, categoryId: 20), "amazon"), new DateTime(2026, 10, 2)),
+            Paid(Row(3), "Target"),                                  // uncategorized
+            Paid(Row(4, accountId: 3, categoryId: 30), "Walmart"),   // someone else's
+            Paid(Row(5, accountId: 3, categoryId: 31), "Amazon"));   // someone else's, same payee
+
+        var result = await BuildSut().GetLatestCategoryByPayeeAsync(UserId, ["AMAZON", "Target", "Walmart"]);
 
         Assert.Equal(20, Assert.Single(result).Value);
-        Assert.Equal(20, result["AMAZON"]);
+        Assert.Equal(20, result["Amazon"]);
+    }
+
+    [Fact]
+    public async Task GetLatestCategoryByPayee_IgnoresPayeesOutsideTheBatch()
+    {
+        await SeedAsync(Paid(Row(1, categoryId: 10), "Amazon"), Paid(Row(2, categoryId: 11), "Costco"));
+
+        var result = await BuildSut().GetLatestCategoryByPayeeAsync(UserId, ["costco"]);
+
+        Assert.Equal(11, Assert.Single(result).Value);
+    }
+
+    [Fact]
+    public async Task GetLatestCategoryByPayee_BreaksASameInstantTieByTheNewestId()
+    {
+        await SeedAsync(Paid(Row(7, categoryId: 10), "Amazon"), Paid(Row(8, categoryId: 20), "Amazon"));
+
+        var result = await BuildSut().GetLatestCategoryByPayeeAsync(UserId, ["Amazon"]);
+
+        Assert.Equal(20, result["amazon"]);
+    }
+
+    [Fact]
+    public async Task GetLatestCategoryByPayee_EmptyOrBlankBatch_ReturnsNothing()
+    {
+        await SeedAsync(Paid(Row(1, categoryId: 10), "Amazon"));
+
+        Assert.Empty(await BuildSut().GetLatestCategoryByPayeeAsync(UserId, []));
+        Assert.Empty(await BuildSut().GetLatestCategoryByPayeeAsync(UserId, ["", "  "]));
+    }
+
+    // ── GetPageAsync ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetPage_ReturnsNewestFirst_TieBrokenByIdDescending_ForThisUserOnly()
+    {
+        var day = new DateTime(2026, 10, 5);
+        await SeedAsync(
+            At(Row(1), day.AddDays(-1)),
+            At(Row(2), day),
+            At(Row(3), day),
+            At(Row(4), day.AddDays(1)),
+            At(Row(5, accountId: 3), day.AddDays(2)));
+
+        var rows = await BuildSut().GetPageAsync(UserId, new TransactionFilter(), after: null, take: 10);
+
+        Assert.Equal([4, 3, 2, 1], rows.Select(r => r.Id));
+    }
+
+    [Fact]
+    public async Task GetPage_TakesAtMostTheRequestedRows()
+    {
+        await SeedAsync(At(Row(1), new DateTime(2026, 10, 1)), At(Row(2), new DateTime(2026, 10, 2)), At(Row(3), new DateTime(2026, 10, 3)));
+
+        var rows = await BuildSut().GetPageAsync(UserId, new TransactionFilter(), after: null, take: 2);
+
+        Assert.Equal([3, 2], rows.Select(r => r.Id));
+    }
+
+    [Fact]
+    public async Task GetPage_StartsStrictlyAfterTheCursor_IncludingSameInstantRowsWithLowerIds()
+    {
+        var day = new DateTime(2026, 10, 5);
+        await SeedAsync(At(Row(1), day.AddDays(-1)), At(Row(2), day), At(Row(3), day), At(Row(4), day), At(Row(5), day.AddDays(1)));
+
+        var rows = await BuildSut().GetPageAsync(UserId, new TransactionFilter(), new TransactionCursor(day, 3), take: 10);
+
+        Assert.Equal([2, 1], rows.Select(r => r.Id));
+    }
+
+    [Fact]
+    public async Task GetPage_WalkingEveryPage_VisitsEachRowOnce()
+    {
+        var day = new DateTime(2026, 10, 5);
+        var seeded = Enumerable.Range(1, 23).Select(i => At(Row(i), day.AddDays(-(i % 4)))).ToArray();
+        await SeedAsync(seeded);
+        var sut = BuildSut();
+
+        var seen = new List<int>();
+        TransactionCursor? after = null;
+        while (true)
+        {
+            var page = await sut.GetPageAsync(UserId, new TransactionFilter(), after, take: 5);
+            seen.AddRange(page.Select(r => r.Id));
+            if (page.Count < 5) break;
+            after = new TransactionCursor(page[^1].OccurredAt, page[^1].Id);
+        }
+
+        var expected = seeded.OrderByDescending(r => r.OccurredAt).ThenByDescending(r => r.Id).Select(r => r.Id);
+        Assert.Equal(expected, seen);
+    }
+
+    [Fact]
+    public async Task GetPage_AppliesTheSameFiltersAsTheFilteredRead()
+    {
+        await SeedAsync(
+            At(Row(1, plaidAccountId: "chk", categoryId: 3), new DateTime(2026, 9, 30)),
+            At(Row(2, plaidAccountId: "chk", categoryId: 3), new DateTime(2026, 10, 1, 18, 0, 0)),
+            At(Row(3, plaidAccountId: "sav", categoryId: 3), new DateTime(2026, 10, 2)),
+            At(Row(4, plaidAccountId: "chk"), new DateTime(2026, 10, 3)),
+            At(Row(5, plaidAccountId: "chk", categoryId: 3, pending: true), new DateTime(2026, 10, 31, 23, 59, 0)),
+            At(Row(6, plaidAccountId: "chk", categoryId: 3), new DateTime(2026, 11, 1)));
+
+        var rows = await BuildSut().GetPageAsync(
+            UserId,
+            new TransactionFilter(From: new DateTime(2026, 10, 1), To: new DateTime(2026, 10, 31), PlaidAccountId: "chk", CategoryId: 3),
+            after: null,
+            take: 10);
+        var notPending = await BuildSut().GetPageAsync(UserId, new TransactionFilter(IsPending: false, Uncategorized: true), null, 10);
+
+        Assert.Equal([5, 2], rows.Select(r => r.Id));
+        Assert.Equal([4], notPending.Select(r => r.Id));
+    }
+
+    // ── GetFilteredAsync ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetFiltered_ToOnTheLastRepresentableDay_DoesNotOverflow()
+    {
+        await SeedAsync(At(Row(1), new DateTime(2026, 10, 1)));
+
+        var rows = await BuildSut().GetFilteredAsync(UserId, new TransactionFilter(From: new DateTime(1970, 1, 1), To: new DateTime(9999, 12, 31)));
+
+        Assert.Equal([1], rows.Select(r => r.Id));
+    }
+
+    // ── GetSummaryAsync ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetSummary_CountsUncategorizedNonTransferRows_AndSumsPendingPerPlaidAccount()
+    {
+        await SeedAsync(
+            Row(1),                                                         // uncategorized: counts
+            Row(2, type: "Income", amount: 40m),                            // uncategorized: counts
+            Row(3, type: "Transfer", transferAccountId: 2),                 // paired transfer: never waits on a category
+            Row(4, categoryId: 9),                                          // categorized
+            Row(5, accountId: 3),                                           // someone else's
+            Row(6, categoryId: 9, pending: true, amount: -12.50m, plaidAccountId: "chk"),
+            Row(7, categoryId: 9, pending: true, amount: -7.25m, plaidAccountId: "chk"),
+            Row(8, categoryId: 9, pending: true, amount: 100m, plaidAccountId: "card"),
+            Row(9, categoryId: 9, pending: true, amount: -1m, plaidAccountId: null),     // manual row: no account key
+            Row(10, categoryId: 9, pending: true, amount: -99m, plaidAccountId: "chk", accountId: 3)); // someone else's
+
+        var summary = await BuildSut().GetSummaryAsync(UserId);
+
+        Assert.Equal(2, summary.UncategorizedCount);
+        Assert.Equal(
+            [new PendingAccountTotal("card", 100m), new PendingAccountTotal("chk", -19.75m)],
+            summary.PendingByAccount);
+    }
+
+    [Fact]
+    public async Task GetSummary_EmptyLedger_IsZeroAndNoAccounts()
+    {
+        var summary = await BuildSut().GetSummaryAsync(UserId);
+
+        Assert.Equal(0, summary.UncategorizedCount);
+        Assert.Empty(summary.PendingByAccount);
+    }
+
+    // ── GetCategoryUsageAsync ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetCategoryUsage_CountsAllTime_AndSplitsFlowsSinceTheInstant()
+    {
+        var since = new DateTime(2026, 9, 1, 12, 0, 0);
+        await SeedAsync(
+            At(Row(1, categoryId: 3, amount: -10m), since.AddDays(-30)),   // before since: count only
+            At(Row(2, categoryId: 3, amount: -20m), since),                // on since: outflow
+            At(Row(3, categoryId: 3, amount: 5m), since.AddDays(1)),       // inflow
+            At(Row(4, categoryId: 3, amount: 50m), since.AddMinutes(-1)),  // before since
+            At(Row(5, categoryId: 4, amount: 7m), since.AddDays(-400)),    // only old rows
+            At(Row(6, amount: -3m), since.AddDays(2)),                     // uncategorized: no entry
+            At(Row(7, categoryId: 3, amount: -1000m, accountId: 3), since.AddDays(3))); // someone else's
+
+        var usage = await BuildSut().GetCategoryUsageAsync(UserId, since);
+
+        Assert.Equal(
+            [new CategoryUsage(3, 4, 5m, -20m), new CategoryUsage(4, 1, 0m, 0m)],
+            usage);
+    }
+
+    [Fact]
+    public async Task GetCategoryUsage_NoRows_IsEmpty()
+    {
+        Assert.Empty(await BuildSut().GetCategoryUsageAsync(UserId, new DateTime(2026, 1, 1)));
+    }
+
+    // ── GetCategoryIdsInUseAsync ────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetCategoryIdsInUse_IsEveryDistinctCategoryIncludingUncategorized_ForThisUserOnly()
+    {
+        await SeedAsync(Row(1, categoryId: 3), Row(2, categoryId: 3), Row(3), Row(4, categoryId: 5), Row(5, accountId: 3, categoryId: 9));
+
+        var ids = await BuildSut().GetCategoryIdsInUseAsync(UserId);
+
+        Assert.Equal(new int?[] { null, 3, 5 }, ids.Order());
+    }
+
+    // ── GetPostedSumByPlaidAccountAfterAsync ────────────────────────────────
+
+    [Fact]
+    public async Task GetPostedSumByPlaidAccountAfter_SumsPostedRowsOnLaterDays_PerAccount()
+    {
+        var to = new DateTime(2026, 10, 15);
+        await SeedAsync(
+            At(Row(1, amount: -10m, plaidAccountId: "chk"), to.AddHours(23)),             // on To: excluded
+            At(Row(2, amount: -20m, plaidAccountId: "chk"), to.AddDays(1)),
+            At(Row(3, amount: 5m, plaidAccountId: "chk"), to.AddDays(9)),
+            At(Row(4, amount: -7m, plaidAccountId: "card", type: "Transfer", transferAccountId: 2), to.AddDays(2)),
+            At(Row(5, amount: -99m, plaidAccountId: "chk", pending: true), to.AddDays(2)), // pending: excluded
+            At(Row(6, amount: -1m, plaidAccountId: null), to.AddDays(2)),                  // manual: excluded
+            At(Row(7, amount: -50m, plaidAccountId: "chk", accountId: 3), to.AddDays(2))); // someone else's
+
+        var sums = await BuildSut().GetPostedSumByPlaidAccountAfterAsync(UserId, to);
+
+        Assert.Equal(2, sums.Count);
+        Assert.Equal(-15m, sums["chk"]);
+        Assert.Equal(-7m, sums["card"]);
+    }
+
+    [Fact]
+    public async Task GetPostedSumByPlaidAccountAfter_TheLastRepresentableDay_IsEmpty()
+    {
+        await SeedAsync(At(Row(1, amount: -10m), new DateTime(9999, 12, 31)));
+
+        Assert.Empty(await BuildSut().GetPostedSumByPlaidAccountAfterAsync(UserId, new DateTime(9999, 12, 31)));
+    }
+
+    // ── GetNewestIncomeAsync ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetNewestIncome_IsNewestFirstIncomeInTheCategoriesOnOrBeforeTheDay()
+    {
+        var today = new DateTime(2026, 10, 15);
+        await SeedAsync(
+            At(Row(1, type: "Income", amount: 2000m, categoryId: 7), today.AddDays(-28)),
+            At(Row(2, type: "Income", amount: 2000m, categoryId: 7), today.AddDays(-14)),
+            At(Row(3, type: "Income", amount: 2000m, categoryId: 7), today.AddHours(20)),     // on today: included
+            At(Row(4, type: "Income", amount: 2000m, categoryId: 7), today.AddDays(1)),       // future: excluded
+            At(Row(5, type: "Income", amount: 2000m, categoryId: 8), today.AddDays(-1)),      // other category
+            At(Row(6, type: "Expense", amount: 2000m, categoryId: 7), today.AddDays(-2)),     // not income
+            At(Row(7, type: "Income", amount: 50m, categoryId: 7), today.AddDays(-3)),        // small
+            At(Row(8, type: "Income", amount: 2000m, categoryId: 7, accountId: 3), today));   // someone else's
+
+        var all = await BuildSut().GetNewestIncomeAsync(UserId, [7], today, minAmount: null, take: 10);
+        var top2 = await BuildSut().GetNewestIncomeAsync(UserId, [7], today, minAmount: null, take: 2);
+        var large = await BuildSut().GetNewestIncomeAsync(UserId, [7], today, minAmount: 1000m, take: 10);
+
+        Assert.Equal([3, 7, 2, 1], all.Select(r => r.Id));
+        Assert.Equal([3, 7], top2.Select(r => r.Id));
+        Assert.Equal([3, 2, 1], large.Select(r => r.Id));
+    }
+
+    [Fact]
+    public async Task GetNewestIncome_NoCategories_IsEmpty()
+    {
+        await SeedAsync(Row(1, type: "Income", amount: 10m, categoryId: 7));
+
+        Assert.Empty(await BuildSut().GetNewestIncomeAsync(UserId, [], new DateTime(2026, 12, 1), null, 10));
     }
 
     // ── UpsertImportedAsync ─────────────────────────────────────────────────
@@ -157,6 +428,23 @@ public class TransactionAccessorTests : IDisposable
         var rows = await BuildSut().GetTransferCandidatesAsync(UserId, ["TRANSFER_IN", "TRANSFER_OUT"]);
 
         Assert.Equal([1, 2, 4], rows.Select(r => r.Id).Order());
+    }
+
+    [Fact]
+    public async Task GetTransferCandidates_CoverTheWholeHistory_WithTheFieldsPairingReads()
+    {
+        var old = At(Row(1, plaidCategory: "TRANSFER_OUT", amount: -500m, categoryId: 7, type: "Transfer", transferAccountId: 2), new DateTime(2019, 3, 4));
+        await SeedAsync(old, At(Row(2, plaidCategory: "TRANSFER_IN", amount: 500m, accountId: 2, plaidAccountId: "sav"), new DateTime(2026, 10, 30)));
+
+        var rows = (await BuildSut().GetTransferCandidatesAsync(UserId, ["TRANSFER_IN", "TRANSFER_OUT"])).OrderBy(r => r.Id).ToList();
+
+        Assert.Equal([1, 2], rows.Select(r => r.Id));
+        var first = rows[0];
+        Assert.Equal(
+            (1, "chk", -500m, new DateTime(2019, 3, 4), "TRANSFER_OUT", false, "Transfer", (int?)2, (int?)7),
+            (first.AccountId, first.PlaidAccountId, first.Amount, first.OccurredAt, first.PlaidCategoryPrimary, first.IsPending,
+                first.TransactionType, first.TransferAccountId, first.CategoryId));
+        Assert.Empty(_context.ChangeTracker.Entries());
     }
 
     // ── Writes ──────────────────────────────────────────────────────────────

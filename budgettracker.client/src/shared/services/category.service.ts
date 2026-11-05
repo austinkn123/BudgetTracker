@@ -1,5 +1,5 @@
 import api from '../api';
-import type { Category } from '../types/api';
+import type { Category, CategoryUsage } from '../types/api';
 
 export const categoryService = {
   getById: async (id: number): Promise<Category> => {
@@ -9,6 +9,12 @@ export const categoryService = {
 
   getCurrentUserCategories: async (): Promise<Category[]> => {
     const response = await api.get<Category[]>('/categories');
+    return response.data;
+  },
+
+  /** Per-category transaction count (all time) and in/out sums from `since` (a `yyyy-MM-dd` date). */
+  getUsage: async (since: string): Promise<CategoryUsage[]> => {
+    const response = await api.get<CategoryUsage[]>('/categories/usage', { params: { since } });
     return response.data;
   },
 

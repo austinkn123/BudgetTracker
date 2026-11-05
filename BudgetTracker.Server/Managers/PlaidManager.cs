@@ -528,10 +528,12 @@ public class PlaidManager(
             : (await transactionAccessor.GetByPlaidTransactionIdsAsync(changes.Select(t => t.TransactionId)))
                 .ToDictionary(t => t.PlaidTransactionId!);
 
-        // A row still uncategorized follows how the user last filed its payee, ahead of Plaid's suggestion.
+        // A row still uncategorized follows how the user last filed its payee, ahead of Plaid's suggestion. Only this
+        // batch's payees are looked up.
         IReadOnlyDictionary<string, int> categoryByPayee = changes.Count == 0
             ? new Dictionary<string, int>()
-            : await transactionAccessor.GetLatestCategoryByPayeeAsync(userId);
+            : await transactionAccessor.GetLatestCategoryByPayeeAsync(
+                userId, changes.Select(engine.ResolvePayee).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
 
         foreach (var plaidTxn in changes)
         {
@@ -577,8 +579,10 @@ public class PlaidManager(
 
     /// <summary>
     /// Re-pair every money movement between the user's own linked cash accounts from scratch, so a leg that lands in a
-    /// later sync (or on another bank) still pairs, older history is back-filled, and a leg whose partner Plaid removed
-    /// reverts. Best-effort: the sync itself has already been saved, and the next sync retries.
+    /// later sync (or on another bank) still pairs, older history is back-filled, and a leg whose partner Plaid removed,
+    /// or another leg took, reverts. Pairing is one oldest-first walk over the whole history, so it cannot be narrowed to
+    /// the days a sync touched without risking an orphaned Transfer leg. Best-effort: the sync itself has already been
+    /// saved, and the next sync retries.
     /// </summary>
     private async Task PairOwnAccountTransfersAsync(int userId, IReadOnlyList<Category> userCategories)
     {

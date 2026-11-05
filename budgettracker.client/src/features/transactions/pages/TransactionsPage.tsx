@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { PageHeader } from '../../../shared/components/ui';
-import { useTransactions } from '../hooks/useTransactions';
+import { useTransactionSummary } from '../hooks/useTransactionSummary';
 import StatusBanner from '../../../shared/components/StatusBanner';
 import TransactionsSection from '../TransactionsSection';
 
 const TransactionsPage = () => {
-  const { isLoading } = useTransactions();
+  // The section's first paint waits on the ledger summary: small, shared with the section's own
+  // backlog count, and the one read every view needs. Each view's rows then load on their own.
+  const { isLoading } = useTransactionSummary();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
 

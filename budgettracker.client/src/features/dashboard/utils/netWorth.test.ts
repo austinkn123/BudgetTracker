@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PlaidConnectionView, Transaction, WebullBalance } from '../../../shared/types/api';
+import type { PlaidConnectionView, WebullBalance } from '../../../shared/types/api';
 import { summarizeNetWorth } from './netWorth';
 
 const bank = (accounts: PlaidConnectionView['accounts']): PlaidConnectionView => ({
@@ -42,18 +42,7 @@ describe('summarizeNetWorth', () => {
   });
 
   it('counts pending activity, so a paycheck shows before it posts', () => {
-    const pending = (plaidAccountId: string, amount: number): Transaction => ({
-      id: amount,
-      accountId: 1,
-      transactionType: 'Income',
-      categoryId: null,
-      amount,
-      occurredAt: '2026-10-30T00:00:00',
-      createdAt: '2026-10-30T00:00:00',
-      plaidAccountId,
-      isPending: true,
-    });
-
+    // Server-side per-account sums of pending rows (posted rows are already in the balance).
     const result = summarizeNetWorth(
       [
         bank([
@@ -63,16 +52,33 @@ describe('summarizeNetWorth', () => {
       ],
       [],
       [
-        pending('chk', 3262.8),
-        pending('chk', -7.03),
-        pending('card', -93.4),
-        { ...pending('chk', -500), isPending: false }, // already in the posted balance
+        { plaidAccountId: 'chk', amount: 3262.8 - 7.03 },
+        { plaidAccountId: 'card', amount: -93.4 },
       ],
     );
 
     expect(result?.cash).toBeCloseTo(9316.93, 2);
     expect(result?.owed).toBeCloseTo(191.98, 2);
     expect(result?.pending).toBeCloseTo(3162.37, 2);
+  });
+
+  it('adds pending to investments and ignores accounts with no balance or no connection', () => {
+    const result = summarizeNetWorth(
+      [
+        bank([
+          { plaidAccountId: 'brk', name: 'Brokerage', accountType: 'investment', currentBalance: 1000 },
+          { plaidAccountId: 'new', name: 'Not synced', accountType: 'depository', currentBalance: null },
+        ]),
+      ],
+      [],
+      [
+        { plaidAccountId: 'brk', amount: 25 },
+        { plaidAccountId: 'new', amount: 400 }, // no balance yet, so nothing to fold it into
+        { plaidAccountId: 'gone', amount: -60 }, // account no longer linked
+      ],
+    );
+
+    expect(result).toEqual({ cash: 0, investments: 1025, owed: 0, total: 1025, pending: 25 });
   });
 
   it('is null until some account reports a balance', () => {
