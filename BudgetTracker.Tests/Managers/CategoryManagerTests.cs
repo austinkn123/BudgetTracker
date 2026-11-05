@@ -292,4 +292,19 @@ public class CategoryManagerTests
         Assert.False(result.IsSuccess);
         _txnAccessor.VerifyNoOtherCalls();
     }
+
+    // ── Usage ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Should_ReturnTheAccessorsUsage_ForTheUserAndInstant()
+    {
+        var since = new DateTime(2026, 9, 1);
+        IReadOnlyList<CategoryUsage> usage = [new CategoryUsage(3, 4, 5m, -20m)];
+        _txnAccessor.Setup(a => a.GetCategoryUsageAsync(5, since)).ReturnsAsync(usage);
+
+        var result = await BuildSut().GetUsageAsync(5, since);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(usage, result.Value);
+    }
 }

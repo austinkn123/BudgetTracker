@@ -41,9 +41,18 @@ public class CashFlowEngineTests
         CurrentBalance = balance
     };
 
+    /// <summary>
+    /// What the accessor sums for the engine: every posted row on an account dated after To. Every test row is handed
+    /// over as well, so a row after To counted twice, or not at all, shows up as a wrong balance.
+    /// </summary>
+    private static Dictionary<string, decimal> PostedAfter(DateTime to, IEnumerable<Transaction> rows) =>
+        rows.Where(t => !t.IsPending && t.PlaidAccountId is not null && t.OccurredAt.Date > to.Date)
+            .GroupBy(t => t.PlaidAccountId!)
+            .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
+
     private CashFlowReport Build(CashFlowQuery query, IReadOnlyList<Transaction> transactions, IReadOnlyList<PlaidAccount>? accounts = null)
     {
-        var result = _sut.BuildReport(query, transactions, accounts ?? [], Today);
+        var result = _sut.BuildReport(query, transactions, accounts ?? [], PostedAfter(query.To, transactions), Today);
         Assert.True(result.IsSuccess, result.Error);
         return result.Value!;
     }
@@ -157,7 +166,7 @@ public class CashFlowEngineTests
     [Fact]
     public void FromAfterTo_IsRejected()
     {
-        var result = _sut.BuildReport(new CashFlowQuery(D(10, 21), D(10, 20), CashFlowGrouping.Day), [], [], Today);
+        var result = _sut.BuildReport(new CashFlowQuery(D(10, 21), D(10, 20), CashFlowGrouping.Day), [], [], new Dictionary<string, decimal>(), Today);
 
         Assert.False(result.IsSuccess);
     }
@@ -404,5 +413,41 @@ public class CashFlowEngineTests
         Assert.Null(report.CurrentBalance);
         Assert.All(report.Periods, p => Assert.Null(p.Balance));
         Assert.Equal(77m, report.Totals.MoneyOut);
+    }
+
+    [Fact]
+    public void PeriodBalance_UndoesTheSummedTailAfterTo_WithoutTheRowsThemselves()
+    {
+        // The accessor no longer loads rows after To; their per-account sum alone must walk the balance back.
+        var query = new CashFlowQuery(D(9, 1), D(9, 30), CashFlowGrouping.Month);
+        var result = _sut.BuildReport(
+            query, [], [Account("chk", "depository", 1000m), Account("card", "credit", 300m)],
+            new Dictionary<string, decimal> { ["chk"] = -100m, ["card"] = -50m, ["brokerage"] = -9999m }, Today);
+
+        // Now: 1000 - 300 = 700. Undo -100 on checking and -50 on the card: 700 + 150 = 850.
+        Assert.Equal(850m, Assert.Single(result.Value!.Periods).Balance);
+    }
+
+    [Fact]
+    public void PeriodBalance_TailHonoursTheAccountFilter()
+    {
+        var query = new CashFlowQuery(D(9, 1), D(9, 30), CashFlowGrouping.Month, PlaidAccountId: "chk");
+        var result = _sut.BuildReport(
+            query, [], [Account("chk", "depository", 1000m), Account("sav", "depository", 500m)],
+            new Dictionary<string, decimal> { ["chk"] = -100m, ["sav"] = -70m }, Today);
+
+        Assert.Equal(1100m, Assert.Single(result.Value!.Periods).Balance);
+    }
+
+    [Fact]
+    public void PeriodBalance_RowsAfterToInTheFetch_AreNotCountedOnTopOfTheTail()
+    {
+        // A compare window after To makes the fetch include rows after To; the tail already covers them for balances.
+        var query = new CashFlowQuery(D(9, 1), D(9, 30), CashFlowGrouping.Month, D(10, 1), D(10, 15));
+        var rows = new[] { Expense(1, -100m, D(10, 5)) };
+        var result = _sut.BuildReport(query, rows, [Account("chk", "depository", 1000m)], PostedAfter(query.To, rows), Today);
+
+        Assert.Equal(1100m, Assert.Single(result.Value!.Periods).Balance);
+        Assert.Equal(100m, result.Value.PreviousTotals!.MoneyOut);
     }
 }

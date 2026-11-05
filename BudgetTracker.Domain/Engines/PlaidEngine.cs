@@ -19,6 +19,9 @@ public class PlaidEngine : IPlaidEngine
     private const string PlaidIncomeCategory = "INCOME";
     private const int TransferWindowDays = 5;
 
+    /// <summary>Read-only history before a windowed re-pair's apply range; see <see cref="GetTransferPairingWindow"/>.</summary>
+    private const int PairingContextDays = 8 * TransferWindowDays;
+
     // Plaid files card payments and transfers to unlinked accounts (Zelle rent, a car loan) under these too, so the
     // category only nominates candidates; a matching leg on another linked account is what makes it a transfer.
     private static readonly HashSet<string> TransferCategorySet = ["TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS"];
@@ -64,7 +67,10 @@ public class PlaidEngine : IPlaidEngine
 
     /// <inheritdoc />
     public IReadOnlyList<TransferUpdate> ReconcileOwnAccountTransfers(
-        IEnumerable<Transaction> candidates, IEnumerable<PlaidAccount> linkedAccounts, IEnumerable<Category> userCategories)
+        IEnumerable<Transaction> candidates,
+        IEnumerable<PlaidAccount> linkedAccounts,
+        IEnumerable<Category> userCategories,
+        TransferPairingWindow? window = null)
     {
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(linkedAccounts);
@@ -81,13 +87,22 @@ public class PlaidEngine : IPlaidEngine
             .Where(t => !t.IsPending && t.TransactionType != Adjustment &&
                         t.PlaidCategoryPrimary is not null && TransferCategorySet.Contains(t.PlaidCategoryPrimary))
             .ToList();
-        var counterpartAccountById = PairLegs(pool.Where(t => t.PlaidAccountId is not null && cashAccountIds.Contains(t.PlaidAccountId)));
+
+        bool InApplyRange(Transaction t) =>
+            window is null || (t.OccurredAt.Date >= window.ApplyFrom && t.OccurredAt.Date <= window.ApplyTo);
+
+        var counterpartById = PairLegs(pool.Where(t => t.PlaidAccountId is not null && cashAccountIds.Contains(t.PlaidAccountId)));
+
+        // A context row only changes when it is the partner an apply-range row now pairs with, so a pair never ends up
+        // half-written.
+        bool MayChange(Transaction t) =>
+            InApplyRange(t) || (counterpartById.TryGetValue(t.Id, out var partner) && InApplyRange(partner));
 
         var updates = new List<TransferUpdate>();
-        foreach (var row in pool.OrderBy(t => t.Id))
+        foreach (var row in pool.Where(MayChange).OrderBy(t => t.Id))
         {
-            TransferUpdate? update = counterpartAccountById.TryGetValue(row.Id, out var counterpartAccountId)
-                ? new(row.Id, Transfer, counterpartAccountId)
+            TransferUpdate? update = counterpartById.TryGetValue(row.Id, out var counterpart)
+                ? new(row.Id, Transfer, counterpart.AccountId)
                 : row.TransactionType == Transfer
                     ? new(row.Id, ClassifyTransactionType(row.PlaidCategoryPrimary, CategoryTypeOf(row, categoryTypeById)), null)
                     : null;
@@ -107,10 +122,10 @@ public class PlaidEngine : IPlaidEngine
     /// outflow takes the oldest unused inflow inside its window. With one window width for all legs that is a
     /// maximum matching, unlike closest-first, which can strand legs.
     /// </summary>
-    /// <returns>Each paired row's counterpart <see cref="Transaction.AccountId"/>, by row id.</returns>
-    private static Dictionary<int, int> PairLegs(IEnumerable<Transaction> legs)
+    /// <returns>Each paired row's counterpart row, by row id.</returns>
+    private static Dictionary<int, Transaction> PairLegs(IEnumerable<Transaction> legs)
     {
-        var counterpartAccountById = new Dictionary<int, int>();
+        var counterpartById = new Dictionary<int, Transaction>();
         foreach (var sameAmount in legs.GroupBy(t => Math.Abs(t.Amount)))
         {
             var outflows = sameAmount.Where(t => t.Amount < 0).OrderBy(t => t.OccurredAt.Date).ThenBy(t => t.Id).ToList();
@@ -134,14 +149,46 @@ public class PlaidEngine : IPlaidEngine
                         continue;
 
                     used[i] = true;
-                    counterpartAccountById[outflow.Id] = inflows[i].AccountId;
-                    counterpartAccountById[inflows[i].Id] = outflow.AccountId;
+                    counterpartById[outflow.Id] = inflows[i];
+                    counterpartById[inflows[i].Id] = outflow;
                     break;
                 }
             }
         }
 
-        return counterpartAccountById;
+        return counterpartById;
+    }
+
+    /// <inheritdoc />
+    public TransferPairingWindow? GetTransferPairingWindow(IEnumerable<DateTime> touchedDates)
+    {
+        ArgumentNullException.ThrowIfNull(touchedDates);
+
+        var days = touchedDates.Select(d => d.Date).ToList();
+        if (days.Count == 0)
+            return null;
+
+        // Apply: every row that could pair with a touched row. Fetch, after the apply range: legs that can take an
+        // apply-range inflow are dated at most one tolerance later, and pairing walks oldest first, so nothing later can
+        // change an apply-range result. Fetch, before it: pairing is one greedy walk over all history, so an earlier leg
+        // can shift which partner a later one gets; a long run of read-only context lets that settle before the apply
+        // range (randomised ledgers with dense same-amount transfers matched a from-scratch run every time at this depth).
+        var first = days.Min();
+        var last = days.Max();
+        var applyFrom = first.AddDays(-TransferWindowDays);
+        var applyTo = last.AddDays(TransferWindowDays);
+        return new TransferPairingWindow(
+            applyFrom,
+            applyTo,
+            applyFrom.AddDays(-PairingContextDays),
+            applyTo.AddDays(TransferWindowDays));
+    }
+
+    /// <inheritdoc />
+    public string ResolvePayee(PlaidTransactionDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        return PayeeOf(dto);
     }
 
     /// <inheritdoc />

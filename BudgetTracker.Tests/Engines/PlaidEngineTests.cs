@@ -972,4 +972,203 @@ public class PlaidEngineTests
 
         Assert.Equal([new TransferUpdate(1, "Expense", null), new TransferUpdate(2, "Expense", null)], updates.OrderBy(u => u.TransactionId));
     }
+
+    // ── ResolvePayee ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ResolvePayee_PrefersTheMerchantName_ElseTheRawName()
+    {
+        var withMerchant = new PlaidTransactionDto("t1", "a1", 4m, TransferDay, "Starbucks", "SBUX 1234", false, null);
+        var withoutMerchant = withMerchant with { MerchantName = "  " };
+
+        Assert.Equal("Starbucks", _sut.ResolvePayee(withMerchant));
+        Assert.Equal("SBUX 1234", _sut.ResolvePayee(withoutMerchant));
+    }
+
+    // ── GetTransferPairingWindow ────────────────────────────────────────────
+
+    [Fact]
+    public void PairingWindow_NothingTouched_IsNull()
+    {
+        Assert.Null(_sut.GetTransferPairingWindow([]));
+    }
+
+    [Fact]
+    public void PairingWindow_AppliesTheTouchedDaysPlusTolerance_AndReadsFortyDaysOfContextBeforeAndOneToleranceAfter()
+    {
+        var window = _sut.GetTransferPairingWindow([TransferDay.AddHours(15), TransferDay.AddDays(-3), TransferDay.AddDays(4).AddHours(1)]);
+
+        Assert.Equal(
+            new TransferPairingWindow(TransferDay.AddDays(-8), TransferDay.AddDays(9), TransferDay.AddDays(-48), TransferDay.AddDays(14)),
+            window);
+    }
+
+    // ── Windowed reconciliation ─────────────────────────────────────────────
+
+    private static List<Transaction> Applied(IEnumerable<Transaction> rows, IReadOnlyList<TransferUpdate> updates)
+    {
+        var byId = updates.ToDictionary(u => u.TransactionId);
+        return rows.Select(r =>
+        {
+            var copy = Leg(r.Id, r.Amount, r.PlaidAccountId!, r.AccountId, 0, r.PlaidCategoryPrimary!, r.IsPending, r.TransactionType, r.TransferAccountId, r.CategoryId);
+            copy.OccurredAt = r.OccurredAt;
+            if (byId.TryGetValue(r.Id, out var u))
+            {
+                copy.TransactionType = u.TransactionType;
+                copy.TransferAccountId = u.TransferAccountId;
+            }
+            return copy;
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Run one sync both ways over <paramref name="stored"/> (already reconciled) plus <paramref name="batch"/>: from
+    /// scratch over every row, and windowed over just the fetch range. Returns each final ledger state, by row id.
+    /// </summary>
+    private (Dictionary<int, (string, int?)> Full, Dictionary<int, (string, int?)> Windowed, TransferPairingWindow Window) RunBothWays(
+        IReadOnlyList<Transaction> stored, IReadOnlyList<Transaction> batch, IEnumerable<DateTime>? alsoTouched = null)
+    {
+        var ledger = stored.Concat(batch).ToList();
+        var window = _sut.GetTransferPairingWindow(batch.Select(t => t.OccurredAt).Concat(alsoTouched ?? []))!;
+
+        var full = Applied(ledger, _sut.ReconcileOwnAccountTransfers(ledger, Linked, []));
+        var candidates = ledger.Where(t => t.OccurredAt.Date >= window.FetchFrom && t.OccurredAt.Date <= window.FetchTo).ToList();
+        var windowed = Applied(ledger, _sut.ReconcileOwnAccountTransfers(candidates, Linked, [], window));
+
+        static Dictionary<int, (string, int?)> State(IEnumerable<Transaction> rows) =>
+            rows.ToDictionary(r => r.Id, r => (r.TransactionType, r.TransferAccountId));
+        return (State(full), State(windowed), window);
+    }
+
+    /// <summary>Reconcile from scratch until stable, the state every earlier sync left the ledger in.</summary>
+    private List<Transaction> Settled(IEnumerable<Transaction> rows)
+    {
+        var list = rows.ToList();
+        return Applied(list, _sut.ReconcileOwnAccountTransfers(list, Linked, []));
+    }
+
+    [Fact]
+    public void Windowed_APairStraddlingTheApplyEdge_StaysPaired()
+    {
+        // The batch is one unrelated row on day 0, so rows from day -5 are re-paired. The stored pair has its outflow on
+        // day -6 (context only) and its inflow on day -4: without the context margin the inflow would lose its partner.
+        var stored = Settled([Leg(1, -500m, "chk", 10, dayOffset: -6), Leg(2, 500m, "sav", 20, dayOffset: -4, plaidCategory: "TRANSFER_IN")]);
+        Assert.Equal("Transfer", stored[1].TransactionType);
+
+        var (full, windowed, _) = RunBothWays(stored, [Leg(3, -42m, "chk", 10)]);
+
+        Assert.Equal(full, windowed);
+        Assert.Equal(("Transfer", (int?)10), windowed[2]);
+        Assert.Equal(("Transfer", (int?)20), windowed[1]);
+    }
+
+    [Fact]
+    public void Windowed_RowsOutsideTheApplyRange_AreNeverChanged()
+    {
+        // A stale Transfer a month before the batch would revert in a from-scratch run; the windowed run leaves it alone.
+        var stale = Leg(1, -75m, "chk", 10, dayOffset: -30, type: "Transfer", transferAccountId: 20);
+
+        var (_, windowed, window) = RunBothWays([stale], [Leg(2, -500m, "chk", 10), Leg(3, 500m, "sav", 20, 1, "TRANSFER_IN")]);
+
+        Assert.True(stale.OccurredAt < window.ApplyFrom);
+        Assert.Equal(("Transfer", (int?)20), windowed[1]);
+        Assert.Equal(("Transfer", (int?)20), windowed[2]);
+        Assert.Equal(("Transfer", (int?)10), windowed[3]);
+    }
+
+    [Fact]
+    public void Windowed_ALegWhosePartnerWasRemoved_Reverts_WhenTheRemovedDateIsTouched()
+    {
+        var stored = new[] { Leg(2, 500m, "sav", 20, dayOffset: 1, plaidCategory: "TRANSFER_IN", type: "Transfer", transferAccountId: 10) };
+
+        var (full, windowed, _) = RunBothWays(stored, [], alsoTouched: [TransferDay]);
+
+        Assert.Equal(full, windowed);
+        Assert.Equal(("Expense", (int?)null), windowed[2]);
+    }
+
+    [Fact]
+    public void Windowed_ABatchLegPairsWithAStoredLegInTheWindow()
+    {
+        var stored = Settled([Leg(1, -500m, "chk", 10, dayOffset: -3)]);
+
+        var (full, windowed, _) = RunBothWays(stored, [Leg(2, 500m, "sav", 20, dayOffset: 0, plaidCategory: "TRANSFER_IN")]);
+
+        Assert.Equal(full, windowed);
+        Assert.Equal(("Transfer", (int?)20), windowed[1]);
+    }
+
+    /// <summary>
+    /// A year of history settled by earlier syncs, then a sync that lands one week mid-year. Recurring weekly transfers
+    /// of one amount (which compete for partners across the window edge), one-off transfers between all three cash
+    /// accounts, unpaired legs and a pending leg. "Dense" reuses four amounts with lags up to five days so legs of equal
+    /// amount overlap constantly; "everyday" uses varied amounts.
+    /// </summary>
+    private static (List<Transaction> History, List<Transaction> Batch) RandomLedger(int seed, bool dense)
+    {
+        var random = new Random(seed);
+        var rows = new List<Transaction>();
+        var id = 1;
+        string[] cash = ["chk", "sav", "card"];
+        static int AccountOf(string plaid) => plaid switch { "chk" => 10, "sav" => 20, _ => 30 };
+        void Transfer(decimal amount, int day, int lag, string from, string to)
+        {
+            rows.Add(Leg(id++, -amount, from, AccountOf(from), day));
+            rows.Add(Leg(id++, amount, to, AccountOf(to), day + lag, "TRANSFER_IN"));
+        }
+
+        for (var day = -365; day < 0; day += 7)
+            Transfer(500m, day, random.Next(0, 3), "chk", "sav");
+        for (var day = -365; day < 0; day += random.Next(1, dense ? 6 : 15))
+        {
+            var from = cash[random.Next(3)];
+            var to = cash.Where(c => c != from).ElementAt(random.Next(2));
+            var amount = dense ? new[] { 100m, 250m, 500m, 37.5m }[random.Next(4)] : random.Next(20, 3000);
+            if (random.Next(5) == 0)
+                rows.Add(Leg(id++, random.Next(2) == 0 ? -amount : amount, from, AccountOf(from), day, "TRANSFER_IN"));
+            else
+                Transfer(amount, day, random.Next(0, dense ? 6 : 3), from, to);
+        }
+        rows.Add(Leg(id, -250m, "chk", 10, -100, pending: true));
+
+        bool InBatch(Transaction t) => t.OccurredAt >= TransferDay.AddDays(-180) && t.OccurredAt <= TransferDay.AddDays(-173);
+        return (rows.Where(t => !InBatch(t)).ToList(), rows.Where(InBatch).ToList());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Windowed_MatchesTheFromScratchRun_AcrossRandomisedLedgers(bool dense)
+    {
+        var compared = 0;
+        for (var seed = 0; seed < 150; seed++)
+        {
+            var (history, batch) = RandomLedger(seed, dense);
+            var stored = Settled(history);
+            var storedState = stored.ToDictionary(r => r.Id, r => (r.TransactionType, r.TransferAccountId));
+
+            var (full, windowed, window) = RunBothWays(stored, batch);
+
+            bool InApply(Transaction t) => t.OccurredAt.Date >= window.ApplyFrom && t.OccurredAt.Date <= window.ApplyTo;
+            var ledger = stored.Concat(batch).ToList();
+
+            // Outside the apply range nothing changes, unless it is the new partner of an apply-range row.
+            foreach (var row in ledger.Where(r => !InApply(r) && storedState.ContainsKey(r.Id)))
+                if (windowed[row.Id] != storedState[row.Id])
+                    Assert.Equal(full[row.Id], windowed[row.Id]);
+
+            // A from-scratch walk can also re-shuffle pairs far from the batch, which the window deliberately leaves
+            // alone. Whenever it does not, every apply-range row must come out exactly as from scratch.
+            var fullReshufflesOutside = ledger.Any(r =>
+                !InApply(r) && storedState.TryGetValue(r.Id, out var before) && full[r.Id] != before && windowed[r.Id] != full[r.Id]);
+            if (fullReshufflesOutside)
+                continue;
+
+            compared++;
+            foreach (var row in ledger.Where(InApply))
+                Assert.True(full[row.Id] == windowed[row.Id], $"seed {seed}: row {row.Id} on {row.OccurredAt:yyyy-MM-dd}");
+        }
+
+        Assert.True(compared >= 100, $"only {compared} ledgers were comparable");
+    }
 }

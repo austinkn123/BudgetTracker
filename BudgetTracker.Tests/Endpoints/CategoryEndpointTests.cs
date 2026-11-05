@@ -74,4 +74,28 @@ public class CategoryEndpointTests
         Assert.Equal(StatusCodes.Status400BadRequest, EndpointAssert.StatusOf(result));
         Assert.Equal("ID mismatch", EndpointAssert.ErrorOf(result));
     }
+
+    // ── GET /api/categories/usage ───────────────────────────────────────────
+
+    [Fact]
+    public async Task Usage_WithoutSince_Returns400WithErrorBody()
+    {
+        var result = await CategoryEndpoints.GetUsageAsync(null, _manager.Object, _currentUser.Object);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, EndpointAssert.StatusOf(result));
+        Assert.Contains("since", EndpointAssert.ErrorOf(result));
+    }
+
+    [Fact]
+    public async Task Usage_WithSince_Returns200WithTheUsage()
+    {
+        var since = new DateTime(2026, 9, 1);
+        IReadOnlyList<CategoryUsage> usage = [new CategoryUsage(3, 1, 0m, -5m)];
+        _manager.Setup(m => m.GetUsageAsync(5, since)).ReturnsAsync(Result<IReadOnlyList<CategoryUsage>>.Success(usage));
+
+        var result = await CategoryEndpoints.GetUsageAsync(since, _manager.Object, _currentUser.Object);
+
+        Assert.Equal(StatusCodes.Status200OK, EndpointAssert.StatusOf(result));
+        Assert.Same(usage, Assert.IsAssignableFrom<IValueHttpResult>(result).Value);
+    }
 }

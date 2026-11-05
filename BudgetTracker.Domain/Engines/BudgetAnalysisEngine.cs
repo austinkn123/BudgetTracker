@@ -14,6 +14,9 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
     /// <summary>Spending is "off pace" once it drifts this far from elapsed time, in either direction.</summary>
     private const decimal PacingTolerance = 0.05m;
 
+    private const int MinTrendMonths = 1;
+    private const int MaxTrendMonths = 24;
+
     // Uncategorized transactions carry a null CategoryId. Grouping is done with LINQ
     // (ToLookup/GroupBy) rather than Dictionary throughout, because Dictionary rejects null keys.
 
@@ -97,7 +100,8 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
             .Select(g => new CategorySpend(g.Key, g.Sum(t => -t.Amount)))
             .ToList();
 
-    public IReadOnlyList<CategoryMonthSpend> SummarizeByMonth(IReadOnlyList<Transaction> transactions, DateTime now, int months)
+    public IReadOnlyList<CategoryMonthSpend> SummarizeByMonth(
+        IReadOnlyList<Transaction> transactions, DateTime now, int months, IEnumerable<int?>? seedCategoryIds = null)
     {
         if (months <= 0) return [];
 
@@ -106,20 +110,30 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
             .Select(offset => new DateTime(now.Year, now.Month, 1).AddMonths(offset))
             .ToList();
 
-        // Every category that appears anywhere gets the full window, so trend series are gap-free.
-        return transactions
-            .GroupBy(t => t.CategoryId)
-            .SelectMany(categoryGroup =>
+        // Every category that appears anywhere (in the rows or the seeds) gets the full window, so trend series are
+        // gap-free. Seeds go after the present categories so the output order is unchanged when they add nothing new.
+        var byCategory = transactions.ToLookup(t => t.CategoryId);
+        var categoryIds = byCategory.Select(g => g.Key).Concat(seedCategoryIds ?? []).Distinct();
+
+        return categoryIds
+            .SelectMany(categoryId =>
             {
-                var byMonth = categoryGroup.ToLookup(t => new DateTime(t.OccurredAt.Year, t.OccurredAt.Month, 1));
+                var byMonth = byCategory[categoryId].ToLookup(t => new DateTime(t.OccurredAt.Year, t.OccurredAt.Month, 1));
                 return window.Select(month => new CategoryMonthSpend(
-                    categoryGroup.Key,
+                    categoryId,
                     month,
                     byMonth[month].Where(t => t.TransactionType == Income).Sum(t => t.Amount),
                     byMonth[month].Where(t => t.TransactionType == Expense).Sum(t => -t.Amount)));
             })
             .ToList();
     }
+
+    public DateTime TrendStart(DateTime now, int months) => new DateTime(now.Year, now.Month, 1).AddMonths(1 - months);
+
+    public string? ValidateTrendMonths(int months) =>
+        months is < MinTrendMonths or > MaxTrendMonths
+            ? $"trendMonths must be between {MinTrendMonths} and {MaxTrendMonths}"
+            : null;
 
     private static PeriodPacing ComputePacing(DateTime month, decimal plannedExpenses, decimal actualExpenses, DateTime now)
     {

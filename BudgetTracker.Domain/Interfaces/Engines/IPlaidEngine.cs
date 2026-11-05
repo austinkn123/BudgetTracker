@@ -50,8 +50,30 @@ public interface IPlaidEngine
     /// <see cref="Transaction.AccountId"/>; a former Transfer that no longer pairs reverts to
     /// <see cref="ClassifyTransactionType"/> with no transfer account.
     /// </returns>
+    /// <param name="window">
+    /// When set, only rows dated in its apply range (and the partners they pair with) may change; rows elsewhere in
+    /// <paramref name="candidates"/> are context, so a row at the edge keeps a partner just outside the range. Null
+    /// re-pairs every candidate.
+    /// </param>
     IReadOnlyList<TransferUpdate> ReconcileOwnAccountTransfers(
-        IEnumerable<Transaction> candidates, IEnumerable<PlaidAccount> linkedAccounts, IEnumerable<Category> userCategories);
+        IEnumerable<Transaction> candidates,
+        IEnumerable<PlaidAccount> linkedAccounts,
+        IEnumerable<Category> userCategories,
+        TransferPairingWindow? window = null);
+
+    /// <summary>
+    /// The dates pairing must revisit after a sync touched rows on <paramref name="touchedDates"/>: the apply range is
+    /// the touched span widened by the pairing tolerance on each side (any row that could pair with a touched row), and
+    /// the fetch range widens that again so an apply-range row still sees every partner it could have.
+    /// </summary>
+    /// <param name="touchedDates">Old and new dates of every row the sync inserted, modified or removed.</param>
+    /// <returns>The window, or null when nothing was touched.</returns>
+    TransferPairingWindow? GetTransferPairingWindow(IEnumerable<DateTime> touchedDates);
+
+    /// <summary>The payee an imported row gets: Plaid's merchant name, falling back to its raw name.</summary>
+    /// <param name="dto">Plaid's raw transaction record.</param>
+    /// <returns>The payee.</returns>
+    string ResolvePayee(PlaidTransactionDto dto);
 
     /// <summary>
     /// Whether a Plaid transaction can be kept as a BudgetTracker <see cref="Transaction"/>. A $0 row carries

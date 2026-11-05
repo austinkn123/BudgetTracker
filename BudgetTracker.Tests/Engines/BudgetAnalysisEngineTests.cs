@@ -328,4 +328,51 @@ public class BudgetAnalysisEngineTests
 
         Assert.Equal(50m, Assert.Single(trend).Expenses);
     }
+
+    // ---- Trend window helpers ----
+
+    [Fact]
+    public void SummarizeByMonth_SeedCategories_GetZeroedMonthsAlongsideThePresentOnes()
+    {
+        var trend = _sut.SummarizeByMonth([Expense(1, -10m, MidJune)], MidJune, months: 2, seedCategoryIds: [42, null]);
+
+        Assert.Equal(6, trend.Count);
+        Assert.All(trend.Where(p => p.CategoryId != 1), p => Assert.Equal((0m, 0m), (p.Income, p.Expenses)));
+        Assert.Equal(new int?[] { null, 1, 42 }, trend.Select(p => p.CategoryId).Distinct().Order());
+    }
+
+    [Fact]
+    public void SummarizeByMonth_SeedCategoryAlsoPresent_IsNotDuplicated()
+    {
+        var categoryId = Expense(1, -10m, MidJune).CategoryId;
+
+        var trend = _sut.SummarizeByMonth([Expense(1, -10m, MidJune)], MidJune, months: 1, seedCategoryIds: [categoryId]);
+
+        Assert.Equal(10m, Assert.Single(trend).Expenses);
+    }
+
+    [Theory]
+    [InlineData(1, 2026, 6)]
+    [InlineData(3, 2026, 4)]
+    [InlineData(12, 2025, 7)]
+    [InlineData(24, 2024, 7)]
+    public void TrendStart_IsTheFirstDayOfTheOldestMonthInTheWindow(int months, int year, int month)
+    {
+        Assert.Equal(new DateTime(year, month, 1), _sut.TrendStart(MidJune, months));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(24)]
+    public void ValidateTrendMonths_AcceptsOneToTwentyFour(int months) =>
+        Assert.Null(_sut.ValidateTrendMonths(months));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    [InlineData(25)]
+    [InlineData(int.MaxValue)]
+    public void ValidateTrendMonths_RejectsOutOfRange(int months) =>
+        Assert.Equal("trendMonths must be between 1 and 24", _sut.ValidateTrendMonths(months));
 }

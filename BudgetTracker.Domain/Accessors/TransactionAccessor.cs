@@ -8,69 +8,177 @@ namespace BudgetTracker.Domain.Accessors;
 public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionAccessor
 {
     private const string TransferType = "Transfer";
+    private const string IncomeType = "Income";
 
-    public async Task<IEnumerable<Transaction>> GetByUserIdAsync(int userId)
+    /// <inheritdoc />
+    public async Task<IEnumerable<Transaction>> GetFilteredAsync(int userId, TransactionFilter filter)
     {
-        return await context.Transactions
-            .AsNoTracking()
-            .Where(t => t.Account.UserId == userId)
+        return await Filtered(userId, filter)
             .OrderByDescending(t => t.OccurredAt)
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Transaction>> GetFilteredAsync(int userId, TransactionFilter filter)
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Transaction>> GetPageAsync(int userId, TransactionFilter filter, TransactionCursor? after, int take)
+    {
+        var query = Filtered(userId, filter);
+
+        if (after is not null)
+        {
+            // Keyset seek on (OccurredAt DESC, Id DESC). The redundant OccurredAt <= bound is what makes the seek a range
+            // on IX_Transactions_AccountId_OccurredAt; the OR alone would leave the planner nothing to range-scan on.
+            var at = after.OccurredAt;
+            var id = after.Id;
+            query = query.Where(t => t.OccurredAt <= at && (t.OccurredAt < at || t.Id < id));
+        }
+
+        return await query
+            .OrderByDescending(t => t.OccurredAt)
+            .ThenByDescending(t => t.Id)
+            .Take(take)
+            .ToListAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<TransactionSummary> GetSummaryAsync(int userId)
+    {
+        var owned = context.Transactions.AsNoTracking().Where(t => t.Account.UserId == userId);
+
+        // Must match the client's needsCategory: a paired Transfer never waits on a category.
+        var uncategorized = await owned.CountAsync(t => t.CategoryId == null && t.TransactionType != TransferType);
+
+        var pending = await owned
+            .Where(t => t.IsPending && t.PlaidAccountId != null)
+            .GroupBy(t => t.PlaidAccountId!)
+            .OrderBy(g => g.Key)
+            .Select(g => new PendingAccountTotal(g.Key, g.Sum(t => t.Amount)))
+            .ToListAsync();
+
+        return new TransactionSummary(uncategorized, pending);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CategoryUsage>> GetCategoryUsageAsync(int userId, DateTime since)
+    {
+        return await context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId && t.CategoryId != null)
+            .GroupBy(t => t.CategoryId!.Value)
+            .OrderBy(g => g.Key)
+            .Select(g => new CategoryUsage(
+                g.Key,
+                g.Count(),
+                g.Sum(t => t.OccurredAt >= since && t.Amount > 0 ? t.Amount : 0m),
+                g.Sum(t => t.OccurredAt >= since && t.Amount < 0 ? t.Amount : 0m)))
+            .ToListAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<int?>> GetCategoryIdsInUseAsync(int userId)
+    {
+        return await context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId)
+            .Select(t => t.CategoryId)
+            .Distinct()
+            .ToListAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, decimal>> GetPostedSumByPlaidAccountAfterAsync(int userId, DateTime after)
+    {
+        if (after.Date == DateTime.MaxValue.Date)
+            return new Dictionary<string, decimal>();
+
+        var dayAfter = after.Date.AddDays(1);
+        return await context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId && !t.IsPending && t.PlaidAccountId != null && t.OccurredAt >= dayAfter)
+            .GroupBy(t => t.PlaidAccountId!)
+            .Select(g => new { PlaidAccountId = g.Key, Amount = g.Sum(t => t.Amount) })
+            .ToDictionaryAsync(x => x.PlaidAccountId, x => x.Amount);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Transaction>> GetNewestIncomeAsync(
+        int userId, IReadOnlyCollection<int> categoryIds, DateTime onOrBefore, decimal? minAmount, int take)
+    {
+        var ids = categoryIds.Distinct().ToList();
+        if (ids.Count == 0 || take <= 0)
+            return [];
+
+        var query = context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId && t.TransactionType == IncomeType &&
+                        t.CategoryId != null && ids.Contains(t.CategoryId.Value));
+
+        if (onOrBefore.Date < DateTime.MaxValue.Date)
+        {
+            var dayAfter = onOrBefore.Date.AddDays(1);
+            query = query.Where(t => t.OccurredAt < dayAfter);
+        }
+
+        if (minAmount is decimal min)
+            query = query.Where(t => t.Amount >= min);
+
+        return await query
+            .OrderByDescending(t => t.OccurredAt)
+            .ThenByDescending(t => t.Id)
+            .Take(take)
+            .ToListAsync();
+    }
+
+    /// <summary>The user's rows narrowed by <paramref name="filter"/>, unordered and untracked.</summary>
+    private IQueryable<Transaction> Filtered(int userId, TransactionFilter filter)
     {
         var query = context.Transactions
             .AsNoTracking()
             .Where(t => t.Account.UserId == userId);
 
+        // Compare on calendar days, matching BudgetAnalysisManager — otherwise the ledger and
+        // the analysis disagree about which rows are in the month. The end bound is an
+        // exclusive next-midnight rather than a CAST to date: it includes a row with any time
+        // component, and it stays sargable so IX_Transactions_AccountId_OccurredAt is still used.
+        if (filter.From is DateTime from)
         {
-            // Compare on calendar days, matching BudgetAnalysisManager — otherwise the ledger and
-            // the analysis disagree about which rows are in the month. The end bound is an
-            // exclusive next-midnight rather than a CAST to date: it includes a row with any time
-            // component, and it stays sargable so IX_Transactions_AccountId_OccurredAt is still used.
-            if (filter.From is DateTime from)
-            {
-                var fromDate = from.Date;
-                query = query.Where(t => t.OccurredAt >= fromDate);
-            }
-
-            if (filter.To is DateTime to)
-            {
-                var dayAfterTo = to.Date.AddDays(1);
-                query = query.Where(t => t.OccurredAt < dayAfterTo);
-            }
-
-            if (filter.Uncategorized is bool uncategorized)
-                query = uncategorized
-                    ? query.Where(t => t.CategoryId == null)
-                    : query.Where(t => t.CategoryId != null);
-
-            if (filter.IsImported is bool imported)
-                query = query.Where(t => t.IsImported == imported);
-
-            if (filter.IsPending is bool pending)
-                query = query.Where(t => t.IsPending == pending);
-
-            if (!string.IsNullOrWhiteSpace(filter.PlaidAccountId))
-                query = query.Where(t => t.PlaidAccountId == filter.PlaidAccountId);
-
-            if (filter.CategoryId is int categoryId)
-                query = query.Where(t => t.CategoryId == categoryId);
-
-            if (!string.IsNullOrWhiteSpace(filter.Search))
-            {
-                var pattern = LikePattern.Contains(filter.Search.Trim());
-                // Postgres LIKE is case-sensitive; ILIKE keeps the old SQL Server (CI collation) behaviour in-database.
-                query = query.Where(t =>
-                    (t.Payee != null && EF.Functions.ILike(t.Payee, pattern, LikePattern.EscapeCharacter)) ||
-                    (t.Notes != null && EF.Functions.ILike(t.Notes, pattern, LikePattern.EscapeCharacter)));
-            }
+            var fromDate = from.Date;
+            query = query.Where(t => t.OccurredAt >= fromDate);
         }
 
-        return await query
-            .OrderByDescending(t => t.OccurredAt)
-            .ToListAsync();
+        // The last representable day has no next midnight, and nothing can be dated after it anyway.
+        if (filter.To is DateTime to && to.Date < DateTime.MaxValue.Date)
+        {
+            var dayAfterTo = to.Date.AddDays(1);
+            query = query.Where(t => t.OccurredAt < dayAfterTo);
+        }
+
+        if (filter.Uncategorized is bool uncategorized)
+            query = uncategorized
+                ? query.Where(t => t.CategoryId == null)
+                : query.Where(t => t.CategoryId != null);
+
+        if (filter.IsImported is bool imported)
+            query = query.Where(t => t.IsImported == imported);
+
+        if (filter.IsPending is bool pending)
+            query = query.Where(t => t.IsPending == pending);
+
+        if (!string.IsNullOrWhiteSpace(filter.PlaidAccountId))
+            query = query.Where(t => t.PlaidAccountId == filter.PlaidAccountId);
+
+        if (filter.CategoryId is int categoryId)
+            query = query.Where(t => t.CategoryId == categoryId);
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var pattern = LikePattern.Contains(filter.Search.Trim());
+            // Postgres LIKE is case-sensitive; ILIKE keeps the old SQL Server (CI collation) behaviour in-database.
+            query = query.Where(t =>
+                (t.Payee != null && EF.Functions.ILike(t.Payee, pattern, LikePattern.EscapeCharacter)) ||
+                (t.Notes != null && EF.Functions.ILike(t.Notes, pattern, LikePattern.EscapeCharacter)));
+        }
+
+        return query;
     }
 
     public async Task<bool> SetNotesAsync(int id, string? notes, int userId)
@@ -125,35 +233,53 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyDictionary<string, int>> GetLatestCategoryByPayeeAsync(int userId)
+    public async Task<IReadOnlyDictionary<string, int>> GetLatestCategoryByPayeeAsync(int userId, IReadOnlyCollection<string> payees)
     {
-        // ponytail: pulls every categorized row's payee and picks in memory; fine for one user's ledger, a DISTINCT ON
-        // query if it ever gets big.
-        var rows = await context.Transactions
+        var keys = payees
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p.ToLowerInvariant())
+            .Distinct()
+            .ToList();
+        if (keys.Count == 0)
+            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        // Only the batch's payees, newest pick per payee chosen in the database (a per-group LIMIT 1), so a sync reads
+        // at most one row per payee instead of every categorized row the user has.
+        var latest = await context.Transactions
             .AsNoTracking()
-            .Where(t => t.Account.UserId == userId && t.CategoryId != null && t.Payee != null)
-            .OrderByDescending(t => t.OccurredAt)
-            .ThenByDescending(t => t.Id)
-            .Select(t => new { Payee = t.Payee!, CategoryId = t.CategoryId!.Value })
+            .Where(t => t.Account.UserId == userId && t.CategoryId != null && t.Payee != null && keys.Contains(t.Payee.ToLower()))
+            .GroupBy(t => t.Payee!.ToLower())
+            .Select(g => new
+            {
+                Payee = g.Key,
+                CategoryId = g.OrderByDescending(t => t.OccurredAt).ThenByDescending(t => t.Id).Select(t => t.CategoryId!.Value).First()
+            })
             .ToListAsync();
 
-        var latest = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var row in rows)
-            latest.TryAdd(row.Payee, row.CategoryId);
-        return latest;
+        return latest.ToDictionary(x => x.Payee, x => x.CategoryId, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Transaction>> GetTransferCandidatesAsync(int userId, IReadOnlyCollection<string> plaidCategoryPrimaries)
+    public async Task<IReadOnlyList<Transaction>> GetTransferCandidatesAsync(
+        int userId, IReadOnlyCollection<string> plaidCategoryPrimaries, DateTime from, DateTime to)
     {
         var categories = plaidCategoryPrimaries.ToList();
-        return await context.Transactions
+        var fromDate = from.Date;
+        var query = context.Transactions
             .AsNoTracking()
             .Where(t => t.Account.UserId == userId &&
                         !t.IsPending &&
                         t.PlaidCategoryPrimary != null &&
-                        categories.Contains(t.PlaidCategoryPrimary))
-            .ToListAsync();
+                        categories.Contains(t.PlaidCategoryPrimary) &&
+                        t.OccurredAt >= fromDate);
+
+        if (to.Date < DateTime.MaxValue.Date)
+        {
+            var dayAfterTo = to.Date.AddDays(1);
+            query = query.Where(t => t.OccurredAt < dayAfterTo);
+        }
+
+        return await query.ToListAsync();
     }
 
     /// <inheritdoc />

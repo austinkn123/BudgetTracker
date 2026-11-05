@@ -15,6 +15,8 @@ public static class CategoryEndpoints
             return Results.Ok(result.Value);
         });
 
+        categoryGroup.MapGet("/usage", GetUsageAsync);
+
         categoryGroup.MapGet("/{id}", async (int id, ICategoryManager manager, ICurrentUserProvider currentUser) =>
         {
             var result = await manager.GetByIdAsync(id, currentUser.UserId);
@@ -37,6 +39,24 @@ public static class CategoryEndpoints
         });
 
         return categoryGroup;
+    }
+
+    /// <summary>
+    /// <c>GET /api/categories/usage?since=</c> — per category with at least one of the user's transactions:
+    /// <c>{ categoryId, transactionCount, inflowSince, outflowSince }</c>. The count is all-time; the flows sum positive
+    /// and negative amounts dated on or after <paramref name="since"/>. 400 with <c>{ error }</c> when since is missing.
+    /// </summary>
+    /// <param name="since">ISO date-time the flow sums start at (inclusive). Required.</param>
+    /// <param name="manager">Category workflow.</param>
+    /// <param name="currentUser">The authenticated user.</param>
+    /// <returns>The HTTP result.</returns>
+    public static async Task<IResult> GetUsageAsync(DateTime? since, ICategoryManager manager, ICurrentUserProvider currentUser)
+    {
+        if (since is not DateTime start)
+            return Results.BadRequest(new { error = "since is required (ISO date-time)" });
+
+        var result = await manager.GetUsageAsync(currentUser.UserId, start);
+        return Results.Ok(result.Value);
     }
 
     /// <summary>

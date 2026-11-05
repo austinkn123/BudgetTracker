@@ -50,3 +50,11 @@ public enum UpcomingKind
 
 /// <summary>Something due or arriving in the next 12 months.</summary>
 public record UpcomingItem(DateTime Date, string Label, decimal Amount, UpcomingKind Kind);
+
+/// <summary>
+/// What ledger history <c>IMoneyMapEngine.Build</c> reads, so the caller can fetch just that.
+/// </summary>
+/// <param name="From">First day of the history the averages and bill projections read (inclusive).</param>
+/// <param name="PayCategoryIds">The governing plan's income categories; the paycheck projection may look further back in these.</param>
+/// <param name="RecentPaychecks">How many qualifying paychecks the projection reads, newest first.</param>
+public record MoneyMapHistory(DateTime From, IReadOnlyCollection<int> PayCategoryIds, int RecentPaychecks);

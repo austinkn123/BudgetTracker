@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BudgetTracker.Server.Managers;
 
+// TODO: CategoryManager violates IDesign layering (references Microsoft.EntityFrameworkCore for DbUpdateException) — consult tony.
 public class CategoryManager(
     ICategoryEngine engine,
     ICategoryAccessor accessor,
@@ -25,6 +26,13 @@ public class CategoryManager(
     {
         var categories = await accessor.GetByUserIdAsync(userId);
         return Result<IEnumerable<Category>>.Success(categories);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<CategoryUsage>>> GetUsageAsync(int userId, DateTime since)
+    {
+        var usage = await transactionAccessor.GetCategoryUsageAsync(userId, since);
+        return Result<IReadOnlyList<CategoryUsage>>.Success(usage);
     }
 
     public async Task<Result<int>> CreateAsync(Category category)

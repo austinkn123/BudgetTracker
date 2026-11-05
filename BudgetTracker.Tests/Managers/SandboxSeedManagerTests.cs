@@ -52,7 +52,8 @@ public class SandboxSeedManagerTests
         _categoryAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([new Category { Id = 1, UserId = UserId, Name = "Food" }]);
         _plaidAccessor.Setup(a => a.CreateSandboxPublicTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("public-sandbox-token");
-        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(
+                It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
             .ReturnsAsync([]);
     }
 

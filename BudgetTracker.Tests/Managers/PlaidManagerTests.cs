@@ -38,10 +38,11 @@ public class PlaidManagerTests
             .Setup(a => a.GetByPlaidTransactionIdsAsync(It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync([]);
         _txnAccessor
-            .Setup(a => a.GetTransferCandidatesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
+            .Setup(a => a.GetTransferCandidatesAsync(
+                It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
             .ReturnsAsync([]);
         _txnAccessor
-            .Setup(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>()))
+            .Setup(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
             .ReturnsAsync(new Dictionary<string, int>());
     }
 
@@ -1698,7 +1699,7 @@ public class PlaidManagerTests
         StubSyncWith(
             new PlaidSyncResult([ZelleIn()], [], [], "next-cursor"),
             [new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income" }]);
-        _txnAccessor.Setup(a => a.GetLatestCategoryByPayeeAsync(5))
+        _txnAccessor.Setup(a => a.GetLatestCategoryByPayeeAsync(5, It.Is<IReadOnlyCollection<string>>(p => p.SequenceEqual(new[] { "ZELLE FROM SAM" }))))
             .ReturnsAsync(new Dictionary<string, int> { ["ZELLE FROM SAM"] = 9 });
         List<Transaction>? captured = null;
         _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
@@ -1731,10 +1732,11 @@ public class PlaidManagerTests
     [Fact]
     public async Task Sync_PairsOwnAccountTransfersBetweenLinkedCashAccounts()
     {
-        var item = StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor"));
+        // The batch lands one row on Oct 1: pairing re-pairs Sep 26–Oct 6 and reads context from Aug 17 to Oct 11.
+        var item = StubSyncWith(new PlaidSyncResult([ZelleIn()], [], [], "next-cursor"));
         item.Accounts.Add(new PlaidAccount { PlaidAccountId = "chk", AccountType = "depository" });
         item.Accounts.Add(new PlaidAccount { PlaidAccountId = "sav", AccountType = "depository" });
-        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>(), new DateTime(2026, 8, 17), new DateTime(2026, 10, 11)))
             .ReturnsAsync(
             [
                 new Transaction { Id = 1, AccountId = 77, PlaidAccountId = "chk", Amount = -500m, OccurredAt = new DateTime(2026, 10, 1), PlaidCategoryPrimary = "TRANSFER_OUT", TransactionType = "Expense" },
@@ -1758,7 +1760,10 @@ public class PlaidManagerTests
             new PlaidSyncResult([], [], ["partner-leg"], "next-cursor"),
             [new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income" }]);
         _txnAccessor.Setup(a => a.DeleteByPlaidTransactionIdsAsync(It.IsAny<IEnumerable<string>>())).ReturnsAsync(1);
-        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+        // The removed leg's date, read before it is deleted, is what puts its surviving partner in the pairing window.
+        _txnAccessor.Setup(a => a.GetByPlaidTransactionIdsAsync(It.Is<IEnumerable<string>>(ids => ids.Contains("partner-leg"))))
+            .ReturnsAsync([new Transaction { Id = 1, PlaidTransactionId = "partner-leg", OccurredAt = new DateTime(2026, 10, 1) }]);
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>(), new DateTime(2026, 8, 17), new DateTime(2026, 10, 11)))
             .ReturnsAsync(
             [
                 new Transaction { Id = 2, AccountId = 78, PlaidAccountId = "sav", Amount = 500m, OccurredAt = new DateTime(2026, 10, 2), PlaidCategoryPrimary = "TRANSFER_IN", TransactionType = "Transfer", TransferAccountId = 77, CategoryId = 9 }
@@ -1777,14 +1782,43 @@ public class PlaidManagerTests
     public async Task Sync_TransferPairingFailure_StillReportsTheSync()
     {
         // Pairing re-runs on every sync, so a failure here is logged and retried next time, not surfaced.
-        StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor"));
-        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+        StubSyncWith(new PlaidSyncResult([ZelleIn()], [], [], "next-cursor"));
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(
+                5, It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
             .ThrowsAsync(new InvalidOperationException("db blip"));
 
         var result = await BuildSut().SyncAsync(5);
 
         Assert.True(result.IsSuccess);
         VerifyWarningLogged(Times.Once());
+    }
+
+    [Fact]
+    public async Task Sync_NothingTouched_SkipsTransferPairingAndPayeeLookups()
+    {
+        StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor"));
+
+        var result = await BuildSut().SyncAsync(5);
+
+        Assert.True(result.IsSuccess);
+        _txnAccessor.Verify(a => a.GetTransferCandidatesAsync(
+            It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()), Times.Never);
+        _txnAccessor.Verify(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Sync_ModifiedRow_WidensThePairingWindowToItsPreviousDate()
+    {
+        // Plaid moved a row from Sep 1 to Oct 1: a partner of the old date must be revisited too.
+        StubSyncWith(new PlaidSyncResult([], [ZelleIn()], [], "next-cursor"));
+        _txnAccessor.Setup(a => a.GetByPlaidTransactionIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync([new Transaction { Id = 40, PlaidTransactionId = "plaid-txn-1", OccurredAt = new DateTime(2026, 9, 1), TransactionType = "Expense" }]);
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>())).ReturnsAsync((0, 1));
+
+        await BuildSut().SyncAsync(5);
+
+        _txnAccessor.Verify(a => a.GetTransferCandidatesAsync(
+            5, It.IsAny<IReadOnlyCollection<string>>(), new DateTime(2026, 7, 18), new DateTime(2026, 10, 11)), Times.Once);
     }
 
     [Fact]

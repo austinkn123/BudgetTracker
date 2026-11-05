@@ -17,11 +17,16 @@ public partial class CashFlowEngine : ICashFlowEngine
 
     /// <inheritdoc />
     public Result<CashFlowReport> BuildReport(
-        CashFlowQuery query, IReadOnlyList<Transaction> transactions, IReadOnlyList<PlaidAccount> accounts, DateTime today)
+        CashFlowQuery query,
+        IReadOnlyList<Transaction> transactions,
+        IReadOnlyList<PlaidAccount> accounts,
+        IReadOnlyDictionary<string, decimal> postedAfterToByAccount,
+        DateTime today)
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(transactions);
         ArgumentNullException.ThrowIfNull(accounts);
+        ArgumentNullException.ThrowIfNull(postedAfterToByAccount);
 
         var to = query.To.Date;
         if (query.From?.Date > to)
@@ -40,7 +45,7 @@ public partial class CashFlowEngine : ICashFlowEngine
             : null;
 
         return Result<CashFlowReport>.Success(new CashFlowReport(
-            from is DateTime first ? Periods(query.GroupBy, first, to, posted, transactions, balanceAccounts, currentBalance, today.Date) : [],
+            from is DateTime first ? Periods(query.GroupBy, first, to, posted, transactions, postedAfterToByAccount, balanceAccounts, currentBalance, today.Date) : [],
             Totals(posted),
             compare,
             Totals(window.Where(t => t.IsPending)),
@@ -55,15 +60,21 @@ public partial class CashFlowEngine : ICashFlowEngine
 
     private static List<CashFlowPeriod> Periods(
         CashFlowGrouping groupBy, DateTime from, DateTime to, List<Transaction> posted,
-        IReadOnlyList<Transaction> allRows, List<PlaidAccount>? balanceAccounts, decimal? currentBalance, DateTime today)
+        IReadOnlyList<Transaction> allRows, IReadOnlyDictionary<string, decimal> postedAfterToByAccount,
+        List<PlaidAccount>? balanceAccounts, decimal? currentBalance, DateTime today)
     {
         var byBucket = posted.ToLookup(t => BucketStart(t.OccurredAt.Date, groupBy));
 
         // ponytail: balances are reconstructed backwards from the last synced balance, so one missing or mis-dated
         // transaction drifts every earlier bucket. Snapshotting balances per sync is the upgrade path.
+        // Every bucket's balance is as of To or earlier, so everything after To is undone in full: the database sums
+        // those rows per account rather than shipping them here. Rows after To that were fetched for a compare window are
+        // skipped so they are not undone twice.
         var balanceAccountIds = balanceAccounts?.Select(a => a.PlaidAccountId).ToHashSet() ?? [];
+        var postedAfterTo = balanceAccountIds.Sum(id => postedAfterToByAccount.GetValueOrDefault(id));
         var balanceRows = allRows
-            .Where(t => !t.IsPending && t.PlaidAccountId is not null && balanceAccountIds.Contains(t.PlaidAccountId))
+            .Where(t => !t.IsPending && t.PlaidAccountId is not null && balanceAccountIds.Contains(t.PlaidAccountId) &&
+                        t.OccurredAt.Date <= to)
             .ToList();
 
         var periods = new List<CashFlowPeriod>();
@@ -77,7 +88,7 @@ public partial class CashFlowEngine : ICashFlowEngine
                 bucket,
                 totals.MoneyIn,
                 totals.MoneyOut,
-                currentBalance - balanceRows.Where(t => t.OccurredAt.Date > asOf).Sum(t => t.Amount)));
+                currentBalance - postedAfterTo - balanceRows.Where(t => t.OccurredAt.Date > asOf).Sum(t => t.Amount)));
         }
 
         return periods;
