@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { addDays, format, startOfMonth, startOfWeek } from 'date-fns';
 import type { TransactionQuery } from '../../../shared/services/transaction.service';
 
 export type TransactionStatusFilter = 'all' | 'uncategorized' | 'pending';
@@ -38,3 +38,30 @@ export const buildListQuery = (
   from: format(monthStart, 'yyyy-MM-dd'),
   to: format(monthEnd, 'yyyy-MM-dd'),
 });
+
+/**
+ * The List feed's filters: status chip + search, and no dates. The feed is the whole history,
+ * newest first, so the month switcher has no say in it.
+ */
+export const buildFeedQuery = (
+  status: TransactionStatusFilter,
+  search: string,
+): TransactionQuery => ({
+  ...statusToQuery(status),
+  ...(search.trim() ? { search: search.trim() } : {}),
+});
+
+/** The Calendar's grid is always six weeks (`fixedWeeks`), Sunday first, as react-day-picker draws it. */
+const CALENDAR_GRID_DAYS = 42;
+
+/**
+ * Every day the calendar grid shows for the month containing `day`, outside days included, so a
+ * selected outside day still has its transactions. Calendar-date bounds, as in `buildListQuery`.
+ */
+export const buildCalendarQuery = (day: Date): TransactionQuery => {
+  const gridStart = startOfWeek(startOfMonth(day));
+  return {
+    from: format(gridStart, 'yyyy-MM-dd'),
+    to: format(addDays(gridStart, CALENDAR_GRID_DAYS - 1), 'yyyy-MM-dd'),
+  };
+};

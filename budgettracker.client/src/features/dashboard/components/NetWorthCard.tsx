@@ -3,7 +3,7 @@ import { Card } from '../../../shared/components/ui';
 import { currencyPrecise, localDateTime, signedCurrency } from '../../../shared/utils/format';
 import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
 import { useWebull } from '../../webull/hooks/useWebull';
-import { useTransactions } from '../../transactions/hooks/useTransactions';
+import { useTransactionSummary } from '../../transactions/hooks/useTransactionSummary';
 import { summarizeNetWorth } from '../utils/netWorth';
 
 const figureLabelClass = 'text-2xs font-semibold uppercase tracking-[0.08em] text-ink-muted';
@@ -15,12 +15,12 @@ const figureLabelClass = 'text-2xs font-semibold uppercase tracking-[0.08em] tex
 const NetWorthCard = () => {
   const { data: connections = [] } = usePlaidConnections();
   const { data: webull } = useWebull();
-  // Same query key as the dashboard's ledger, so this shares its cache rather than fetching again.
-  const { data: transactions = [] } = useTransactions();
+  // Pending sums per account, computed server-side; shares its cache with the uncategorized nudge.
+  const { data: summary } = useTransactionSummary();
 
   const netWorth = useMemo(
-    () => summarizeNetWorth(connections, webull?.balances ?? [], transactions),
-    [connections, webull, transactions],
+    () => summarizeNetWorth(connections, webull?.balances ?? [], summary?.pendingByAccount),
+    [connections, webull, summary],
   );
 
   if (!netWorth) return null;

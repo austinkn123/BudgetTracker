@@ -6,8 +6,7 @@ import { currency } from '../../../shared/utils/format';
 import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
 import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
 import ReconnectAlert from '../../linked-accounts/components/ReconnectAlert';
-import { useTransactions } from '../../transactions/hooks/useTransactions';
-import { needsCategory } from '../../transactions/utils/transactionGroups';
+import { useTransactionSummary } from '../../transactions/hooks/useTransactionSummary';
 import { useWebull, useWebullRefreshOnOpen } from '../../webull/hooks/useWebull';
 import { summarizeNetWorth } from '../../dashboard/utils/netWorth';
 import NetWorthCard from '../../dashboard/components/NetWorthCard';
@@ -110,14 +109,14 @@ const MoneyMapPage = () => {
   const { data: map, isPending, error } = useMoneyMap(Number(months));
   const { data: connections = [] } = usePlaidConnections();
   const { data: webull } = useWebull();
-  const { data: transactions = [] } = useTransactions();
+  const { data: summary } = useTransactionSummary();
 
   const cash = useMemo(
-    () => summarizeNetWorth(connections, webull?.balances ?? [], transactions)?.cash ?? null,
-    [connections, webull, transactions],
+    () => summarizeNetWorth(connections, webull?.balances ?? [], summary?.pendingByAccount)?.cash ?? null,
+    [connections, webull, summary],
   );
   const split = useMemo(() => (map ? splitMonth(map) : null), [map]);
-  const uncategorizedCount = useMemo(() => transactions.filter(needsCategory).length, [transactions]);
+  const uncategorizedCount = summary?.uncategorizedCount ?? 0;
 
   return (
     <div className="stagger-in space-y-6">

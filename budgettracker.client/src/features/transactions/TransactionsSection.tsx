@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { endOfMonth, isSameMonth, startOfDay, startOfMonth } from 'date-fns';
 import { Button, Card, InlineSelect, Skeleton, ToggleGroup } from '../../shared/components/ui';
 import { useTransactions } from './hooks/useTransactions';
+import { useTransactionFeed } from './hooks/useTransactionFeed';
+import { useTransactionSummary } from './hooks/useTransactionSummary';
 import { useTransactionReview } from './hooks/useTransactionReview';
 import { useCategories } from '../categories/hooks/useCategories';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
@@ -11,16 +13,17 @@ import type { TransactionQuery } from '../../shared/services/transaction.service
 import MonthHeader from './components/MonthHeader';
 import PayeeReview from './components/PayeeReview';
 import PlanGroupedView from './components/PlanGroupedView';
-import TransactionRows from './components/TransactionRows';
+import TransactionFeed from './components/TransactionFeed';
 import TransactionTable from './components/TransactionTable';
 import TransactionFilters from './components/TransactionFilters';
-import { buildListQuery, type TransactionStatusFilter } from './utils/transactionFilters';
-import { groupByPlan } from './utils/planGrouping';
 import {
-  buildTransactionDaySummaries,
-  getTransactionDaySummary,
-  needsCategory,
-} from './utils/transactionGroups';
+  buildCalendarQuery,
+  buildFeedQuery,
+  buildListQuery,
+  type TransactionStatusFilter,
+} from './utils/transactionFilters';
+import { groupByPlan } from './utils/planGrouping';
+import { buildTransactionDaySummaries, getTransactionDaySummary } from './utils/transactionGroups';
 
 type TransactionsSectionProps = {
   isLoading: boolean;
@@ -53,28 +56,41 @@ const TransactionsSection = ({
   const monthStart = useMemo(() => startOfMonth(month), [month]);
   const monthEnd = useMemo(() => endOfMonth(month), [month]);
 
-  // The calendar tints every day of its visible month, so it needs the unfiltered ledger.
-  const { data: allTransactions = [] } = useTransactions();
-
-  // Two month queries, deliberately.
+  // Three reads, each sized to its view, and none of them the whole ledger in one response.
   //
-  // The List view is a search tool, so its results carry the status chip and the search box.
+  // The List view is a search tool over all history: a newest-first feed, paged as you scroll, that
+  // carries the status chip and the search box but not the month. Changing either starts it over.
+  //
   // The Plan view is a reckoning: its buckets have to add up to the same month the header reports
   // from the server analysis, which knows nothing about the chips. Feeding it the filtered slice
   // produced contradictory totals with no visible cause, since the chips are not even rendered in
   // Plan view.
-  const listQuery = useMemo<TransactionQuery>(
-    () => buildListQuery(status, search, monthStart, monthEnd),
-    [status, search, monthStart, monthEnd],
-  );
+  //
+  // The Calendar tints its grid, so it reads exactly the days the grid draws.
+  const feedQuery = useMemo<TransactionQuery>(() => buildFeedQuery(status, search), [status, search]);
 
   const planQuery = useMemo<TransactionQuery>(
     () => buildListQuery('all', '', monthStart, monthEnd),
     [monthStart, monthEnd],
   );
 
-  const { data: listTransactions = [] } = useTransactions(listQuery);
+  // The calendar follows the selected day's month, which can sit in an outside day of the grid.
+  const calendarQuery = useMemo<TransactionQuery>(
+    () => buildCalendarQuery(selectedDate),
+    [selectedDate],
+  );
+
+  const feed = useTransactionFeed(feedQuery, { enabled: view === 'list' });
   const { data: planTransactions = [] } = useTransactions(planQuery);
+  const { data: calendarTransactions = [] } = useTransactions(calendarQuery, {
+    enabled: view === 'calendar',
+  });
+  // The payee backlog is every uncategorized row, any date: bounded by its filter, not by time.
+  const { data: backlogTransactions = [] } = useTransactions(
+    { uncategorized: true },
+    { enabled: view === 'review' },
+  );
+  const { data: summary } = useTransactionSummary();
   const { data: categories = [] } = useCategories();
   const { data: budgetPlans = [] } = useBudgetPlans();
 
@@ -99,9 +115,9 @@ const TransactionsSection = ({
   // Calendar has no checkboxes, so it selects nothing.
   const visibleTransactions = useMemo(() => {
     if (view === 'plan') return planTransactions;
-    if (view === 'list') return listTransactions;
+    if (view === 'list') return feed.transactions;
     return [];
-  }, [view, planTransactions, listTransactions]);
+  }, [view, planTransactions, feed.transactions]);
 
   const review = useTransactionReview(visibleTransactions, setStatusMessage, setStatusError);
 
@@ -135,16 +151,13 @@ const TransactionsSection = ({
     [planTransactions, governingPlan, categoryNames, analysis],
   );
 
-  // Counted across the whole ledger rather than the month on screen, so the number does not shift
-  // as you browse — it is the size of the backlog, not of this page.
-  const uncategorizedCount = useMemo(
-    () => allTransactions.filter(needsCategory).length,
-    [allTransactions],
-  );
+  // Counted server-side across the whole ledger rather than the month on screen, so the number
+  // does not shift as you browse — it is the size of the backlog, not of this page.
+  const uncategorizedCount = summary?.uncategorizedCount ?? 0;
 
   const daySummaries = useMemo(
-    () => buildTransactionDaySummaries(allTransactions),
-    [allTransactions],
+    () => buildTransactionDaySummaries(calendarTransactions),
+    [calendarTransactions],
   );
   const selectedDaySummary = useMemo(
     () => getTransactionDaySummary(daySummaries, selectedDate),
@@ -214,8 +227,8 @@ const TransactionsSection = ({
         )}
       </div>
 
-      {/* The backlog spans every month, so a month header would only mislead. */}
-      {view !== 'review' && (
+      {/* The backlog and the List feed span every month, so a month header would only mislead. */}
+      {view !== 'review' && view !== 'list' && (
         <MonthHeader
           month={monthStart}
           onMonthChange={handleMonthChange}
@@ -250,12 +263,13 @@ const TransactionsSection = ({
         </Card>
       )}
 
-      {/* Remounts per view (crossfade) and per month (directional slide). The calendar keeps its
-          mount across months: its own month buttons live inside it and would lose focus. */}
+      {/* Remounts per view (crossfade) and, for Plan, per month (directional slide). The calendar
+          keeps its mount across months: its own month buttons live inside it and would lose focus.
+          The List feed and the backlog are not month-scoped, so a month change must not remount them. */}
       <div
-        key={view === 'calendar' ? view : `${view}-${monthStart.getTime()}`}
+        key={view === 'plan' ? `${view}-${monthStart.getTime()}` : view}
         className={
-          view === 'calendar' || monthStep === null
+          view !== 'plan' || monthStep === null
             ? 'animate-fade-in'
             : monthStep === 'next'
               ? 'animate-slide-in-right-sm'
@@ -266,7 +280,7 @@ const TransactionsSection = ({
 
         {view === 'review' && (
           <PayeeReview
-            transactions={allTransactions}
+            transactions={backlogTransactions}
             categoryOptions={categoryOptions}
             onCategorize={review.setCategoryForIds}
             isBusy={review.isBusy}
@@ -282,24 +296,23 @@ const TransactionsSection = ({
               onSearchChange={setSearch}
               uncategorizedCount={uncategorizedCount}
             />
-            <Card padding="none">
-              <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-                <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                  {listTransactions.length}{' '}
-                  {listTransactions.length === 1 ? 'transaction' : 'transactions'}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => review.toggleAll(review.selectedIds.size !== listTransactions.length)}
-                >
-                  {review.selectedIds.size === listTransactions.length && listTransactions.length > 0
-                    ? 'Deselect all'
-                    : 'Select all'}
-                </Button>
-              </div>
-              <TransactionRows transactions={listTransactions} {...rowProps} />
-            </Card>
+            <TransactionFeed
+              transactions={feed.transactions}
+              isLoading={feed.isLoading}
+              isError={feed.isError}
+              hasNextPage={feed.hasNextPage}
+              isFetchingNextPage={feed.isFetchingNextPage}
+              isFetchNextPageError={feed.isFetchNextPageError}
+              fetchNextPage={() => void feed.fetchNextPage()}
+              onRetry={() => void (feed.isFetchNextPageError ? feed.fetchNextPage() : feed.refetch())}
+              allSelected={
+                feed.transactions.length > 0 &&
+                review.selectedIds.size === feed.transactions.length
+              }
+              onToggleAll={review.toggleAll}
+              isFiltered={Object.keys(feedQuery).length > 0}
+              rowProps={rowProps}
+            />
           </div>
         )}
 
