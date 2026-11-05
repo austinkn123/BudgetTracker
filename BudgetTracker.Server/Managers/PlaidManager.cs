@@ -522,13 +522,11 @@ public class PlaidManager(
         var userCategories = (await categoryAccessor.GetByUserIdAsync(userId)).ToList();
 
         // A category the user picked sticks across syncs (the accessor never overwrites it), so a re-delivered row is
-        // classified against that category rather than Plaid's suggestion. Rows about to be deleted are read too: their
-        // dates, like a modified row's previous date, tell transfer pairing which days to revisit.
-        var touchedPlaidIds = changes.Select(t => t.TransactionId).Concat(idsToDelete).Distinct().ToList();
-        var existingRows = touchedPlaidIds.Count == 0
+        // classified against that category rather than Plaid's suggestion.
+        var existingByPlaidId = changes.Count == 0
             ? []
-            : await transactionAccessor.GetByPlaidTransactionIdsAsync(touchedPlaidIds);
-        var existingByPlaidId = existingRows.ToDictionary(t => t.PlaidTransactionId!);
+            : (await transactionAccessor.GetByPlaidTransactionIdsAsync(changes.Select(t => t.TransactionId)))
+                .ToDictionary(t => t.PlaidTransactionId!);
 
         // A row still uncategorized follows how the user last filed its payee, ahead of Plaid's suggestion. Only this
         // batch's payees are looked up.
@@ -574,39 +572,34 @@ public class PlaidManager(
         var syncedAt = DateTime.UtcNow;
         await itemAccessor.UpdateSyncStateAsync(plaidItemId, syncResult.NextCursor, syncedAt);
 
-        var touchedDates = mapped.Select(t => t.OccurredAt).Concat(existingRows.Select(t => t.OccurredAt));
-        await PairOwnAccountTransfersAsync(userId, userCategories, touchedDates);
+        await PairOwnAccountTransfersAsync(userId, userCategories);
 
         return Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, syncedAt));
     }
 
     /// <summary>
-    /// Re-pair money movements between the user's own linked cash accounts around the days this sync touched, so a leg
-    /// that lands in a later sync (or on another bank) still pairs, and a leg whose partner Plaid removed or moved
-    /// reverts. Rows dated away from the batch keep their pairing untouched. Best-effort: the sync itself has already
-    /// been saved; a later sync touching the same days re-pairs them.
+    /// Re-pair every money movement between the user's own linked cash accounts from scratch, so a leg that lands in a
+    /// later sync (or on another bank) still pairs, older history is back-filled, and a leg whose partner Plaid removed,
+    /// or another leg took, reverts. Pairing is one oldest-first walk over the whole history, so it cannot be narrowed to
+    /// the days a sync touched without risking an orphaned Transfer leg. Best-effort: the sync itself has already been
+    /// saved, and the next sync retries.
     /// </summary>
-    private async Task PairOwnAccountTransfersAsync(int userId, IReadOnlyList<Category> userCategories, IEnumerable<DateTime> touchedDates)
+    private async Task PairOwnAccountTransfersAsync(int userId, IReadOnlyList<Category> userCategories)
     {
         try
         {
-            var window = engine.GetTransferPairingWindow(touchedDates);
-            if (window is null)
-                return;
-
-            var candidates = await transactionAccessor.GetTransferCandidatesAsync(
-                userId, engine.TransferCategories, window.FetchFrom, window.FetchTo);
+            var candidates = await transactionAccessor.GetTransferCandidatesAsync(userId, engine.TransferCategories);
             if (candidates.Count == 0)
                 return;
 
             var linkedAccounts = (await itemAccessor.GetAllActiveByUserIdAsync(userId)).SelectMany(i => i.Accounts).ToList();
-            var updates = engine.ReconcileOwnAccountTransfers(candidates, linkedAccounts, userCategories, window);
+            var updates = engine.ReconcileOwnAccountTransfers(candidates, linkedAccounts, userCategories);
             if (updates.Count > 0)
                 await transactionAccessor.ApplyTransferUpdatesAsync(updates);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Transfer pairing failed for user {UserId}; a later sync touching the same days will re-pair them.", userId);
+            logger.LogWarning(ex, "Transfer pairing failed for user {UserId}; it will retry on the next sync.", userId);
         }
     }
 }

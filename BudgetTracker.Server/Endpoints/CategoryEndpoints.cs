@@ -46,7 +46,7 @@ public static class CategoryEndpoints
     /// <c>{ categoryId, transactionCount, inflowSince, outflowSince }</c>. The count is all-time; the flows sum positive
     /// and negative amounts dated on or after <paramref name="since"/>. 400 with <c>{ error }</c> when since is missing.
     /// </summary>
-    /// <param name="since">ISO date-time the flow sums start at (inclusive). Required.</param>
+    /// <param name="since">ISO date-time the flow sums start at (inclusive). Required. Any zone suffix is ignored.</param>
     /// <param name="manager">Category workflow.</param>
     /// <param name="currentUser">The authenticated user.</param>
     /// <returns>The HTTP result.</returns>
@@ -55,7 +55,9 @@ public static class CategoryEndpoints
         if (since is not DateTime start)
             return Results.BadRequest(new { error = "since is required (ISO date-time)" });
 
-        var result = await manager.GetUsageAsync(currentUser.UserId, start);
+        // Transaction dates are stored without a time zone (Npgsql rejects a Utc/Local DateTime against them), so the
+        // given wall-clock time is used as-is.
+        var result = await manager.GetUsageAsync(currentUser.UserId, DateTime.SpecifyKind(start, DateTimeKind.Unspecified));
         return Results.Ok(result.Value);
     }
 

@@ -98,4 +98,22 @@ public class CategoryEndpointTests
         Assert.Equal(StatusCodes.Status200OK, EndpointAssert.StatusOf(result));
         Assert.Same(usage, Assert.IsAssignableFrom<IValueHttpResult>(result).Value);
     }
+
+    [Theory]
+    [InlineData(DateTimeKind.Utc)]
+    [InlineData(DateTimeKind.Local)]
+    public async Task Usage_WithAZonedSince_PassesTheSameWallClockAsUnspecifiedKind(DateTimeKind kind)
+    {
+        // "2026-09-01T00:00:00Z" binds as Kind=Utc, which Npgsql refuses against a timestamp-without-time-zone column.
+        var since = new DateTime(2026, 9, 1, 0, 0, 0, kind);
+        DateTime? passed = null;
+        _manager.Setup(m => m.GetUsageAsync(5, It.IsAny<DateTime>()))
+            .Callback<int, DateTime>((_, d) => passed = d)
+            .ReturnsAsync(Result<IReadOnlyList<CategoryUsage>>.Success([]));
+
+        var result = await CategoryEndpoints.GetUsageAsync(since, _manager.Object, _currentUser.Object);
+
+        Assert.Equal(StatusCodes.Status200OK, EndpointAssert.StatusOf(result));
+        Assert.Equal((new DateTime(2026, 9, 1), DateTimeKind.Unspecified), (passed!.Value, passed.Value.Kind));
+    }
 }

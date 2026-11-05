@@ -42,7 +42,11 @@ public interface IPlaidEngine
     /// Adjustment rows never do. The pairing maximises the number of pairs, each row is used at most once, and the result
     /// is deterministic.
     /// </summary>
-    /// <param name="candidates">Every posted row in <see cref="TransferCategories"/>, including current Transfer legs.</param>
+    /// <param name="candidates">
+    /// Every posted row in <see cref="TransferCategories"/> across the user's whole history, including current Transfer
+    /// legs. Pairing is one oldest-first walk, so a new leg can shift partners arbitrarily far along a run of same-amount
+    /// legs; a partial history can leave a Transfer whose partner was taken.
+    /// </param>
     /// <param name="linkedAccounts">The user's linked Plaid accounts; only depository and credit accounts can hold a leg.</param>
     /// <param name="userCategories">The user's categories, to re-classify a leg that no longer pairs.</param>
     /// <returns>
@@ -50,25 +54,10 @@ public interface IPlaidEngine
     /// <see cref="Transaction.AccountId"/>; a former Transfer that no longer pairs reverts to
     /// <see cref="ClassifyTransactionType"/> with no transfer account.
     /// </returns>
-    /// <param name="window">
-    /// When set, only rows dated in its apply range (and the partners they pair with) may change; rows elsewhere in
-    /// <paramref name="candidates"/> are context, so a row at the edge keeps a partner just outside the range. Null
-    /// re-pairs every candidate.
-    /// </param>
     IReadOnlyList<TransferUpdate> ReconcileOwnAccountTransfers(
         IEnumerable<Transaction> candidates,
         IEnumerable<PlaidAccount> linkedAccounts,
-        IEnumerable<Category> userCategories,
-        TransferPairingWindow? window = null);
-
-    /// <summary>
-    /// The dates pairing must revisit after a sync touched rows on <paramref name="touchedDates"/>: the apply range is
-    /// the touched span widened by the pairing tolerance on each side (any row that could pair with a touched row), and
-    /// the fetch range widens that again so an apply-range row still sees every partner it could have.
-    /// </summary>
-    /// <param name="touchedDates">Old and new dates of every row the sync inserted, modified or removed.</param>
-    /// <returns>The window, or null when nothing was touched.</returns>
-    TransferPairingWindow? GetTransferPairingWindow(IEnumerable<DateTime> touchedDates);
+        IEnumerable<Category> userCategories);
 
     /// <summary>The payee an imported row gets: Plaid's merchant name, falling back to its raw name.</summary>
     /// <param name="dto">Plaid's raw transaction record.</param>

@@ -260,26 +260,31 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Transaction>> GetTransferCandidatesAsync(
-        int userId, IReadOnlyCollection<string> plaidCategoryPrimaries, DateTime from, DateTime to)
+    public async Task<IReadOnlyList<Transaction>> GetTransferCandidatesAsync(int userId, IReadOnlyCollection<string> plaidCategoryPrimaries)
     {
         var categories = plaidCategoryPrimaries.ToList();
-        var fromDate = from.Date;
-        var query = context.Transactions
+
+        // Pairing reads every candidate the user has, so only the columns it uses come back.
+        return await context.Transactions
             .AsNoTracking()
             .Where(t => t.Account.UserId == userId &&
                         !t.IsPending &&
                         t.PlaidCategoryPrimary != null &&
-                        categories.Contains(t.PlaidCategoryPrimary) &&
-                        t.OccurredAt >= fromDate);
-
-        if (to.Date < DateTime.MaxValue.Date)
-        {
-            var dayAfterTo = to.Date.AddDays(1);
-            query = query.Where(t => t.OccurredAt < dayAfterTo);
-        }
-
-        return await query.ToListAsync();
+                        categories.Contains(t.PlaidCategoryPrimary))
+            .Select(t => new Transaction
+            {
+                Id = t.Id,
+                AccountId = t.AccountId,
+                PlaidAccountId = t.PlaidAccountId,
+                Amount = t.Amount,
+                OccurredAt = t.OccurredAt,
+                PlaidCategoryPrimary = t.PlaidCategoryPrimary,
+                IsPending = t.IsPending,
+                TransactionType = t.TransactionType,
+                TransferAccountId = t.TransferAccountId,
+                CategoryId = t.CategoryId
+            })
+            .ToListAsync();
     }
 
     /// <inheritdoc />

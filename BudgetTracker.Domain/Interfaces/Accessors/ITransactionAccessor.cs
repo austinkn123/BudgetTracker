@@ -86,12 +86,11 @@ public interface ITransactionAccessor
     Task<int> SetCategoryAsync(IReadOnlyDictionary<int, string> transactionTypes, int? categoryId, int userId);
 
     /// <summary>
-    /// The user's posted rows carrying one of <paramref name="plaidCategoryPrimaries"/>, Transfer legs included, dated
-    /// from <paramref name="from"/>'s day through <paramref name="to"/>'s day: the pool own-account transfer pairing
-    /// re-pairs after a sync.
+    /// Every posted row of the user's carrying one of <paramref name="plaidCategoryPrimaries"/>, Transfer legs included:
+    /// the pool own-account transfer pairing re-pairs from scratch after a sync. Read-only and projected to the columns
+    /// pairing uses (id, accounts, amount, date, Plaid category, pending, type, transfer account, category).
     /// </summary>
-    Task<IReadOnlyList<Transaction>> GetTransferCandidatesAsync(
-        int userId, IReadOnlyCollection<string> plaidCategoryPrimaries, DateTime from, DateTime to);
+    Task<IReadOnlyList<Transaction>> GetTransferCandidatesAsync(int userId, IReadOnlyCollection<string> plaidCategoryPrimaries);
 
     /// <summary>Set each row's type and transfer account as given, in one save.</summary>
     Task ApplyTransferUpdatesAsync(IReadOnlyList<TransferUpdate> updates);

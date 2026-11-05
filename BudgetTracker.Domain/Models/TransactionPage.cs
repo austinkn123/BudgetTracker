@@ -29,10 +29,3 @@ public record PendingAccountTotal(string PlaidAccountId, decimal Amount);
 /// <param name="InflowSince">Sum of positive amounts dated on or after the requested instant.</param>
 /// <param name="OutflowSince">Sum of negative amounts dated on or after the requested instant (zero or negative).</param>
 public record CategoryUsage(int CategoryId, int TransactionCount, decimal InflowSince, decimal OutflowSince);
-
-/// <summary>
-/// The dates own-account transfer pairing looks at after a sync. Rows dated in the apply range are re-paired; rows in
-/// the wider fetch range are read only so an apply-range row can still find (or keep) a partner just outside it.
-/// All four bounds are whole days, inclusive.
-/// </summary>
-public record TransferPairingWindow(DateTime ApplyFrom, DateTime ApplyTo, DateTime FetchFrom, DateTime FetchTo);

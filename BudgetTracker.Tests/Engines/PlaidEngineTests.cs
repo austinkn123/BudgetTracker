@@ -985,25 +985,7 @@ public class PlaidEngineTests
         Assert.Equal("SBUX 1234", _sut.ResolvePayee(withoutMerchant));
     }
 
-    // ── GetTransferPairingWindow ────────────────────────────────────────────
-
-    [Fact]
-    public void PairingWindow_NothingTouched_IsNull()
-    {
-        Assert.Null(_sut.GetTransferPairingWindow([]));
-    }
-
-    [Fact]
-    public void PairingWindow_AppliesTheTouchedDaysPlusTolerance_AndReadsFortyDaysOfContextBeforeAndOneToleranceAfter()
-    {
-        var window = _sut.GetTransferPairingWindow([TransferDay.AddHours(15), TransferDay.AddDays(-3), TransferDay.AddDays(4).AddHours(1)]);
-
-        Assert.Equal(
-            new TransferPairingWindow(TransferDay.AddDays(-8), TransferDay.AddDays(9), TransferDay.AddDays(-48), TransferDay.AddDays(14)),
-            window);
-    }
-
-    // ── Windowed reconciliation ─────────────────────────────────────────────
+    // ── Reconciliation over a sync ──────────────────────────────────────────
 
     private static List<Transaction> Applied(IEnumerable<Transaction> rows, IReadOnlyList<TransferUpdate> updates)
     {
@@ -1021,23 +1003,11 @@ public class PlaidEngineTests
         }).ToList();
     }
 
-    /// <summary>
-    /// Run one sync both ways over <paramref name="stored"/> (already reconciled) plus <paramref name="batch"/>: from
-    /// scratch over every row, and windowed over just the fetch range. Returns each final ledger state, by row id.
-    /// </summary>
-    private (Dictionary<int, (string, int?)> Full, Dictionary<int, (string, int?)> Windowed, TransferPairingWindow Window) RunBothWays(
-        IReadOnlyList<Transaction> stored, IReadOnlyList<Transaction> batch, IEnumerable<DateTime>? alsoTouched = null)
+    /// <summary>One sync as production runs it: the batch lands on the stored ledger, then pairing re-runs over all of it.</summary>
+    private List<Transaction> SyncOnce(IReadOnlyList<Transaction> stored, IReadOnlyList<Transaction> batch)
     {
         var ledger = stored.Concat(batch).ToList();
-        var window = _sut.GetTransferPairingWindow(batch.Select(t => t.OccurredAt).Concat(alsoTouched ?? []))!;
-
-        var full = Applied(ledger, _sut.ReconcileOwnAccountTransfers(ledger, Linked, []));
-        var candidates = ledger.Where(t => t.OccurredAt.Date >= window.FetchFrom && t.OccurredAt.Date <= window.FetchTo).ToList();
-        var windowed = Applied(ledger, _sut.ReconcileOwnAccountTransfers(candidates, Linked, [], window));
-
-        static Dictionary<int, (string, int?)> State(IEnumerable<Transaction> rows) =>
-            rows.ToDictionary(r => r.Id, r => (r.TransactionType, r.TransferAccountId));
-        return (State(full), State(windowed), window);
+        return Applied(ledger, _sut.ReconcileOwnAccountTransfers(ledger, Linked, []));
     }
 
     /// <summary>Reconcile from scratch until stable, the state every earlier sync left the ledger in.</summary>
@@ -1045,57 +1015,6 @@ public class PlaidEngineTests
     {
         var list = rows.ToList();
         return Applied(list, _sut.ReconcileOwnAccountTransfers(list, Linked, []));
-    }
-
-    [Fact]
-    public void Windowed_APairStraddlingTheApplyEdge_StaysPaired()
-    {
-        // The batch is one unrelated row on day 0, so rows from day -5 are re-paired. The stored pair has its outflow on
-        // day -6 (context only) and its inflow on day -4: without the context margin the inflow would lose its partner.
-        var stored = Settled([Leg(1, -500m, "chk", 10, dayOffset: -6), Leg(2, 500m, "sav", 20, dayOffset: -4, plaidCategory: "TRANSFER_IN")]);
-        Assert.Equal("Transfer", stored[1].TransactionType);
-
-        var (full, windowed, _) = RunBothWays(stored, [Leg(3, -42m, "chk", 10)]);
-
-        Assert.Equal(full, windowed);
-        Assert.Equal(("Transfer", (int?)10), windowed[2]);
-        Assert.Equal(("Transfer", (int?)20), windowed[1]);
-    }
-
-    [Fact]
-    public void Windowed_RowsOutsideTheApplyRange_AreNeverChanged()
-    {
-        // A stale Transfer a month before the batch would revert in a from-scratch run; the windowed run leaves it alone.
-        var stale = Leg(1, -75m, "chk", 10, dayOffset: -30, type: "Transfer", transferAccountId: 20);
-
-        var (_, windowed, window) = RunBothWays([stale], [Leg(2, -500m, "chk", 10), Leg(3, 500m, "sav", 20, 1, "TRANSFER_IN")]);
-
-        Assert.True(stale.OccurredAt < window.ApplyFrom);
-        Assert.Equal(("Transfer", (int?)20), windowed[1]);
-        Assert.Equal(("Transfer", (int?)20), windowed[2]);
-        Assert.Equal(("Transfer", (int?)10), windowed[3]);
-    }
-
-    [Fact]
-    public void Windowed_ALegWhosePartnerWasRemoved_Reverts_WhenTheRemovedDateIsTouched()
-    {
-        var stored = new[] { Leg(2, 500m, "sav", 20, dayOffset: 1, plaidCategory: "TRANSFER_IN", type: "Transfer", transferAccountId: 10) };
-
-        var (full, windowed, _) = RunBothWays(stored, [], alsoTouched: [TransferDay]);
-
-        Assert.Equal(full, windowed);
-        Assert.Equal(("Expense", (int?)null), windowed[2]);
-    }
-
-    [Fact]
-    public void Windowed_ABatchLegPairsWithAStoredLegInTheWindow()
-    {
-        var stored = Settled([Leg(1, -500m, "chk", 10, dayOffset: -3)]);
-
-        var (full, windowed, _) = RunBothWays(stored, [Leg(2, 500m, "sav", 20, dayOffset: 0, plaidCategory: "TRANSFER_IN")]);
-
-        Assert.Equal(full, windowed);
-        Assert.Equal(("Transfer", (int?)20), windowed[1]);
     }
 
     /// <summary>
@@ -1135,40 +1054,89 @@ public class PlaidEngineTests
         return (rows.Where(t => !InBatch(t)).ToList(), rows.Where(InBatch).ToList());
     }
 
+    /// <summary>
+    /// Every Transfer row has a partner: for each amount, Transfer outflows and inflows can be matched one to one, each
+    /// pair being opposite legs on different accounts within the tolerance that name each other's account.
+    /// </summary>
+    private static void AssertTransferLegsBalanced(IReadOnlyList<Transaction> ledger, string context)
+    {
+        var transfers = ledger.Where(t => t.TransactionType == "Transfer").ToList();
+        foreach (var leg in transfers)
+            Assert.True(leg.TransferAccountId is int other && other != leg.AccountId, $"{context}: row {leg.Id} has no transfer account");
+
+        foreach (var sameAmount in transfers.GroupBy(t => Math.Abs(t.Amount)))
+        {
+            var outflows = sameAmount.Where(t => t.Amount < 0).ToList();
+            var inflows = sameAmount.Where(t => t.Amount > 0).ToList();
+            Assert.True(outflows.Count == inflows.Count,
+                $"{context}: {outflows.Count} Transfer outflows vs {inflows.Count} inflows of {sameAmount.Key}");
+
+            bool Partners(Transaction o, Transaction i) =>
+                o.PlaidAccountId != i.PlaidAccountId && o.TransferAccountId == i.AccountId && i.TransferAccountId == o.AccountId &&
+                Math.Abs((o.OccurredAt.Date - i.OccurredAt.Date).TotalDays) <= 5;
+
+            // Kuhn's augmenting paths: a perfect matching exists iff every outflow can be matched.
+            var inflowOwner = new int[inflows.Count];
+            Array.Fill(inflowOwner, -1);
+            bool TryMatch(int o, bool[] seen)
+            {
+                for (var i = 0; i < inflows.Count; i++)
+                {
+                    if (seen[i] || !Partners(outflows[o], inflows[i]))
+                        continue;
+                    seen[i] = true;
+                    if (inflowOwner[i] < 0 || TryMatch(inflowOwner[i], seen))
+                    {
+                        inflowOwner[i] = o;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            for (var o = 0; o < outflows.Count; o++)
+                Assert.True(TryMatch(o, new bool[inflows.Count]), $"{context}: Transfer row {outflows[o].Id} has no valid partner");
+        }
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void Windowed_MatchesTheFromScratchRun_AcrossRandomisedLedgers(bool dense)
+    public void Sync_LeavesEveryTransferLegWithAPartner_AcrossRandomisedLedgers(bool dense)
     {
-        var compared = 0;
         for (var seed = 0; seed < 150; seed++)
         {
             var (history, batch) = RandomLedger(seed, dense);
             var stored = Settled(history);
-            var storedState = stored.ToDictionary(r => r.Id, r => (r.TransactionType, r.TransferAccountId));
+            AssertTransferLegsBalanced(stored, $"seed {seed} before sync");
 
-            var (full, windowed, window) = RunBothWays(stored, batch);
+            var after = SyncOnce(stored, batch);
+            AssertTransferLegsBalanced(after, $"seed {seed} after sync");
 
-            bool InApply(Transaction t) => t.OccurredAt.Date >= window.ApplyFrom && t.OccurredAt.Date <= window.ApplyTo;
-            var ledger = stored.Concat(batch).ToList();
-
-            // Outside the apply range nothing changes, unless it is the new partner of an apply-range row.
-            foreach (var row in ledger.Where(r => !InApply(r) && storedState.ContainsKey(r.Id)))
-                if (windowed[row.Id] != storedState[row.Id])
-                    Assert.Equal(full[row.Id], windowed[row.Id]);
-
-            // A from-scratch walk can also re-shuffle pairs far from the batch, which the window deliberately leaves
-            // alone. Whenever it does not, every apply-range row must come out exactly as from scratch.
-            var fullReshufflesOutside = ledger.Any(r =>
-                !InApply(r) && storedState.TryGetValue(r.Id, out var before) && full[r.Id] != before && windowed[r.Id] != full[r.Id]);
-            if (fullReshufflesOutside)
-                continue;
-
-            compared++;
-            foreach (var row in ledger.Where(InApply))
-                Assert.True(full[row.Id] == windowed[row.Id], $"seed {seed}: row {row.Id} on {row.OccurredAt:yyyy-MM-dd}");
+            // A later sync in which Plaid removes some rows, paired legs among them.
+            var random = new Random(seed);
+            var afterRemoval = SyncOnce(after.Where(_ => random.Next(10) != 0).ToList(), []);
+            AssertTransferLegsBalanced(afterRemoval, $"seed {seed} after removals");
         }
+    }
 
-        Assert.True(compared >= 100, $"only {compared} ledgers were comparable");
+    [Fact]
+    public void Sync_ALegThatStealsAnInflow_RevertsTheLegItsOldPartnerLeftBehind()
+    {
+        // Settled: day+5 out pairs day+3 in, day+12 out pairs day+9 in. A new day 0 outflow takes day+3, day+5 then takes
+        // day+9, and day+12, two weeks after the batch, is left with no partner.
+        var stored = Settled(
+        [
+            Leg(1, 100m, "sav", 20, dayOffset: 3, plaidCategory: "TRANSFER_IN"),
+            Leg(2, -100m, "chk", 10, dayOffset: 5),
+            Leg(3, 100m, "sav", 20, dayOffset: 9, plaidCategory: "TRANSFER_IN"),
+            Leg(4, -100m, "chk", 10, dayOffset: 12)
+        ]);
+        Assert.Equal(("Transfer", (int?)20), (stored[3].TransactionType, stored[3].TransferAccountId));
+
+        var after = SyncOnce(stored, [Leg(5, -100m, "chk", 10, dayOffset: 0)]).ToDictionary(r => r.Id);
+
+        Assert.Equal(("Expense", (int?)null), (after[4].TransactionType, after[4].TransferAccountId));
+        AssertTransferLegsBalanced(after.Values.ToList(), "repro");
     }
 }

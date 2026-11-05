@@ -425,26 +425,26 @@ public class TransactionAccessorTests : IDisposable
             Row(5, plaidCategory: "FOOD_AND_DRINK"),
             Row(6, plaidCategory: "TRANSFER_OUT", accountId: 3));
 
-        var rows = await BuildSut().GetTransferCandidatesAsync(
-            UserId, ["TRANSFER_IN", "TRANSFER_OUT"], new DateTime(2026, 1, 1), new DateTime(2026, 12, 31));
+        var rows = await BuildSut().GetTransferCandidatesAsync(UserId, ["TRANSFER_IN", "TRANSFER_OUT"]);
 
         Assert.Equal([1, 2, 4], rows.Select(r => r.Id).Order());
     }
 
     [Fact]
-    public async Task GetTransferCandidates_AreLimitedToTheWholeDaysOfTheRange()
+    public async Task GetTransferCandidates_CoverTheWholeHistory_WithTheFieldsPairingReads()
     {
-        var from = new DateTime(2026, 10, 10);
-        var to = new DateTime(2026, 10, 20);
-        await SeedAsync(
-            At(Row(1, plaidCategory: "TRANSFER_OUT"), from.AddMinutes(-1)),
-            At(Row(2, plaidCategory: "TRANSFER_OUT"), from),
-            At(Row(3, plaidCategory: "TRANSFER_OUT"), to.AddHours(23).AddMinutes(59)),
-            At(Row(4, plaidCategory: "TRANSFER_OUT"), to.AddDays(1)));
+        var old = At(Row(1, plaidCategory: "TRANSFER_OUT", amount: -500m, categoryId: 7, type: "Transfer", transferAccountId: 2), new DateTime(2019, 3, 4));
+        await SeedAsync(old, At(Row(2, plaidCategory: "TRANSFER_IN", amount: 500m, accountId: 2, plaidAccountId: "sav"), new DateTime(2026, 10, 30)));
 
-        var rows = await BuildSut().GetTransferCandidatesAsync(UserId, ["TRANSFER_OUT"], from.AddHours(15), to.AddHours(1));
+        var rows = (await BuildSut().GetTransferCandidatesAsync(UserId, ["TRANSFER_IN", "TRANSFER_OUT"])).OrderBy(r => r.Id).ToList();
 
-        Assert.Equal([2, 3], rows.Select(r => r.Id).Order());
+        Assert.Equal([1, 2], rows.Select(r => r.Id));
+        var first = rows[0];
+        Assert.Equal(
+            (1, "chk", -500m, new DateTime(2019, 3, 4), "TRANSFER_OUT", false, "Transfer", (int?)2, (int?)7),
+            (first.AccountId, first.PlaidAccountId, first.Amount, first.OccurredAt, first.PlaidCategoryPrimary, first.IsPending,
+                first.TransactionType, first.TransferAccountId, first.CategoryId));
+        Assert.Empty(_context.ChangeTracker.Entries());
     }
 
     // ── Writes ──────────────────────────────────────────────────────────────
