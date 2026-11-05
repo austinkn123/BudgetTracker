@@ -7,7 +7,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **Frontend**: React + TypeScript + Vite
 - **Styling**: Tailwind CSS + Radix primitives (design tokens in `budgettracker.client/src/shared/theme/`)
 - **Forms/Validation**: React Hook Form + Zod (`@hookform/resolvers`)
-- **Database**: Microsoft SQL Server
+- **Database**: PostgreSQL (Neon) via Npgsql (`Npgsql.EntityFrameworkCore.PostgreSQL`)
 - **ORM**: Entity Framework Core (Code-first with Fluent API configurations)
 - **Authentication**: AWS Cognito (In progress)
 
