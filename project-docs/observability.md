@@ -116,10 +116,6 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 - Correlation-ID middleware. Each log scope includes `CorrelationId`, the Lambda request ID, and
   `UserId`. The client sends `X-Correlation-ID`.
 - `/health`.
-- CloudWatch alarms on the Lambda `Errors` metric and on a 5xx metric filter, notifying through an SNS
-  topic with an **email** subscription.
-- An AWS Budgets cost budget on the account with **email** alerts at 80% of actual and 100% of
-  forecast spend. This catches runaway log volume before the bill does.
 - Log failed sign-ins and denied (401/403) requests with `UserId` where known. This becomes the
   security signal once other people have accounts.
 
@@ -141,6 +137,15 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 - Saved CloudWatch Logs Insights queries.
 
 **Tests:** one for each item above.
+
+### Deferred: email alerts
+
+Not set up yet; until then, problems are found by checking the CloudWatch logs. When added:
+
+- CloudWatch alarms on the Lambda `Errors` metric and on a 5xx metric filter, notifying through an
+  SNS topic with an **email** subscription.
+- Optional: an AWS Budgets cost alert by email, to catch runaway costs from a bug or from abuse of
+  the public Function URL.
 
 ### Phase 3
 
@@ -173,9 +178,9 @@ don't wait for this list.
 
 1. ~~Is BudgetTracker single-user or multi-user?~~ **Answered:** single-user now, very likely
    multi-user later (see §8).
-2. ~~What is the monthly monitoring budget?~~ **Answered:** no fixed budget; monitor actual
-   spend with AWS Budgets email alerts (Phase 1). Threshold amount still to be set.
+2. ~~What is the monthly monitoring budget?~~ **Answered:** no fixed budget. A cost alert is
+   deferred with the other email alerts (see Phases).
 3. Is Lambda + Neon the long-term setup?
 4. What log retention is right, given Plaid data? 14 days today; at least 30 once multi-user.
-5. ~~Where should alerts go?~~ **Answered:** email, via SNS.
+5. ~~Where should alerts go?~~ **Answered:** email, via SNS, once alerts are set up (deferred).
 6. How much added cold-start time is acceptable?
