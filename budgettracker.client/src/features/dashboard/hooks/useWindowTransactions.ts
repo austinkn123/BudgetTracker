@@ -1,31 +1,37 @@
-import { useMemo } from 'react';
 import { format } from 'date-fns';
-import { useLatestTransactions, useTransactions } from '../../transactions/hooks/useTransactions';
+import type { TransactionQuery } from '../../../shared/services/transaction.service';
+import { useTransactionPage } from '../../transactions/hooks/useTransactions';
 import type { DateRangeKey } from './useDateRange';
 
 /**
- * "All time" on the dashboard reads the newest rows, not the ledger. Recent activity shows 8 and
- * each category card 10, so 200 (the server's page cap) fills both for anyone but a category that
- * has gone quiet for hundreds of transactions.
+ * The dashboard range as a server filter. A bounded range is read by calendar date, inclusive.
+ * "All time" has no real bound — its 1970–9999 window would only restate "everything" — so it
+ * sends no dates at all.
  */
-export const ALL_TIME_LATEST_LIMIT = 200;
+export const windowFilter = (range: DateRangeKey, start: Date, end: Date): TransactionQuery =>
+  range === 'all' ? {} : { from: format(start, 'yyyy-MM-dd'), to: format(end, 'yyyy-MM-dd') };
 
 /**
- * The transactions behind the dashboard's range-scoped lists (recent activity, category drills).
- *
- * A bounded range is read server-side by calendar date, inclusive, as the client filter it
- * replaces was. "All time" has no real bound — its 1970–9999 window would be the whole ledger —
- * so it reads the newest page instead.
+ * The newest `limit` rows in the dashboard range, for recent activity. Only what is shown is read:
+ * one capped page, newest first, whatever the range.
  */
-export const useWindowTransactions = (range: DateRangeKey, start: Date, end: Date) => {
-  const bounded = range !== 'all';
-  const query = useMemo(
-    () => ({ from: format(start, 'yyyy-MM-dd'), to: format(end, 'yyyy-MM-dd') }),
-    [start, end],
+export const useWindowTransactions = (range: DateRangeKey, start: Date, end: Date, limit: number) =>
+  useTransactionPage(windowFilter(range, start, end), limit);
+
+/**
+ * One category's newest `limit` rows in the dashboard range, for its drill card. Each card reads
+ * its own rows, so a quiet category still finds its last purchases however far back they sit —
+ * a shared "newest N" page would show it empty beside a non-zero spend. A null category is the
+ * uncategorized card.
+ */
+export const useCategoryDrillTransactions = (
+  categoryId: number | null,
+  rangeFilter: TransactionQuery,
+  limit: number,
+  { enabled = true }: { enabled?: boolean } = {},
+) =>
+  useTransactionPage(
+    categoryId === null ? { ...rangeFilter, uncategorized: true } : { ...rangeFilter, categoryId },
+    limit,
+    { enabled },
   );
-
-  const windowed = useTransactions(query, { enabled: bounded });
-  const latest = useLatestTransactions(ALL_TIME_LATEST_LIMIT, { enabled: !bounded });
-
-  return bounded ? windowed : latest;
-};

@@ -81,7 +81,9 @@ const TransactionsSection = ({
   );
 
   const feed = useTransactionFeed(feedQuery, { enabled: view === 'list' });
-  const { data: planTransactions = [] } = useTransactions(planQuery);
+  // Only the Plan view reads these rows: the month header reads the analysis, the counts the
+  // summary, and governingPlan the plans.
+  const { data: planTransactions = [] } = useTransactions(planQuery, { enabled: view === 'plan' });
   const { data: calendarTransactions = [] } = useTransactions(calendarQuery, {
     enabled: view === 'calendar',
   });

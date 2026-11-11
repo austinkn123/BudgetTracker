@@ -24,7 +24,7 @@ vi.mock('../../categories/hooks/useCategories', () => ({
 }));
 vi.mock('../../transactions/hooks/useTransactions', () => ({
   useTransactions: () => ({ data: [], isLoading: false, error: null }),
-  useLatestTransactions: () => ({ data: [], isLoading: false, error: null }),
+  useTransactionPage: () => ({ data: [], isLoading: false, error: null }),
 }));
 vi.mock('../../transactions/hooks/useTransactionSummary', () => ({
   useTransactionSummary: () => ({ data: { uncategorizedCount: 0, pendingByAccount: [] } }),

@@ -31,13 +31,18 @@ export const useTransactions = (query: TransactionQuery, { enabled = true }: Rea
 };
 
 /**
- * The newest `limit` rows across all history, as one page. For a screen that wants "the latest"
- * with no natural date bound, rather than the ledger.
+ * The newest `limit` rows matching `query`, as one page (GET /transactions/page, newest first). For
+ * a screen that wants "the latest few" — of a range, a category, or all history — rather than every
+ * row a filter matches. An empty query is allowed here: one capped page is never the whole ledger.
  */
-export const useLatestTransactions = (limit: number, { enabled = true }: ReadOptions = {}) => {
+export const useTransactionPage = (
+  query: TransactionQuery,
+  limit: number,
+  { enabled = true }: ReadOptions = {},
+) => {
   return useQuery<Transaction[], Error>({
-    queryKey: ['transactions', 'latest', limit],
-    queryFn: async () => (await transactionService.getPage({}, { limit })).items,
+    queryKey: ['transactions', 'page', query, limit],
+    queryFn: async () => (await transactionService.getPage(query, { limit })).items,
     enabled,
     retry: 1,
     refetchInterval: TRANSACTIONS_REFETCH_INTERVAL_MS,

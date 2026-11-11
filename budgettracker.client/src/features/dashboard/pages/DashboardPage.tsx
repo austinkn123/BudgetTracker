@@ -23,7 +23,7 @@ import UncategorizedNudge from '../components/UncategorizedNudge';
 import type { Stat } from '../components/StatStrip';
 import { useDateRange } from '../hooks/useDateRange';
 import { useBudgetAnalysis } from '../hooks/useBudgetAnalysis';
-import { useWindowTransactions } from '../hooks/useWindowTransactions';
+import { useWindowTransactions, windowFilter } from '../hooks/useWindowTransactions';
 import { getStatusHeadline } from '../utils/planCopy';
 import {
   selectCategoryCards,
@@ -56,7 +56,9 @@ const DashboardPage = () => {
     data: windowTransactions = [],
     isLoading: loadingTransactions,
     error: transactionsError,
-  } = useWindowTransactions(range, start, end);
+  } = useWindowTransactions(range, start, end, RECENT_ACTIVITY_ITEMS);
+  // Each category drill reads its own rows, by this filter, when opened.
+  const drillFilter = useMemo(() => windowFilter(range, start, end), [range, start, end]);
   const { data: summary } = useTransactionSummary();
   const { data: analysis, isLoading: loadingAnalysis, error: analysisError } =
     useBudgetAnalysis(start, end, TREND_MONTHS);
@@ -93,12 +95,10 @@ const DashboardPage = () => {
         ? selectCategoryCards(
             planMonth,
             analysis?.monthlyTrend ?? [],
-            windowTransactions,
             categoryNames,
-            DRILL_TRANSACTIONS,
           )
         : [],
-    [planMonth, analysis?.monthlyTrend, windowTransactions, categoryNames],
+    [planMonth, analysis?.monthlyTrend, categoryNames],
   );
 
   const topSpend = useMemo(
@@ -214,7 +214,11 @@ const DashboardPage = () => {
             <WhereItWent rows={topSpend} />
           </div>
 
-          <CategoryDrillGrid cards={categoryCards} />
+          <CategoryDrillGrid
+            cards={categoryCards}
+            rangeFilter={drillFilter}
+            transactionLimit={DRILL_TRANSACTIONS}
+          />
 
           {/* Bucket breakdown + recent activity */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

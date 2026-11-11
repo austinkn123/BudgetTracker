@@ -42,12 +42,13 @@ export interface SpendSlice {
 
 export interface CategoryCard {
   key: string;
+  /** What the card's drill reads its rows by; null is the uncategorized card. */
+  categoryId: number | null;
   name: string;
   planned: number;
   actual: number;
   /** Expense magnitudes, oldest -> newest. */
   monthly: number[];
-  transactions: Transaction[];
 }
 
 export type CategoryNames = Map<number, string>;
@@ -59,9 +60,6 @@ export const categoryLabel = (names: CategoryNames, categoryId: number | null): 
   if (categoryId === null) return 'Uncategorized';
   return names.get(categoryId) ?? `Category ${categoryId}`;
 };
-
-const transactionCategoryId = (transaction: Transaction): number | null =>
-  transaction.categoryId ?? null;
 
 const byOccurredAtDesc = (a: Transaction, b: Transaction) =>
   b.occurredAt.localeCompare(a.occurredAt);
@@ -137,13 +135,15 @@ export const selectWaterfall = (
   return bars;
 };
 
-/** Per-category cards: planned vs actual, a sparkline series, and the window's transactions. */
+/**
+ * Per-category cards: planned vs actual and a sparkline series. Each card's transactions are not
+ * attached here: the drill reads its own rows on demand, so a quiet category is never starved by
+ * a shared "newest N" slice.
+ */
 export const selectCategoryCards = (
   planMonth: PlanPerformance,
   monthlyTrend: CategoryMonthSpend[],
-  windowTransactions: Transaction[],
   names: CategoryNames,
-  transactionLimit: number,
 ): CategoryCard[] => {
   const trendByCategory = new Map<string, CategoryMonthSpend[]>();
   for (const point of monthlyTrend) {
@@ -153,20 +153,13 @@ export const selectCategoryCards = (
     trendByCategory.set(key, series);
   }
 
-  const transactionsByCategory = new Map<string, Transaction[]>();
-  for (const transaction of windowTransactions) {
-    const key = categoryKey(transactionCategoryId(transaction));
-    const list = transactionsByCategory.get(key) ?? [];
-    list.push(transaction);
-    transactionsByCategory.set(key, list);
-  }
-
   return [...planMonth.byCategory]
     .sort((a, b) => b.planned - a.planned || b.actual - a.actual)
     .map((c) => {
       const key = categoryKey(c.categoryId);
       return {
         key,
+        categoryId: c.categoryId,
         name: categoryLabel(names, c.categoryId),
         planned: c.planned,
         actual: c.actual,
@@ -174,10 +167,6 @@ export const selectCategoryCards = (
           .slice()
           .sort((a, b) => a.month.localeCompare(b.month))
           .map((point) => point.expenses),
-        transactions: (transactionsByCategory.get(key) ?? [])
-          .slice()
-          .sort(byOccurredAtDesc)
-          .slice(0, transactionLimit),
       };
     });
 };

@@ -153,43 +153,20 @@ describe('selectCategoryCards', () => {
     const result = selectCategoryCards(
       plan([perf(1, 100, 10), perf(2, 100, 90), perf(3, 50, 0)]),
       trend,
-      [],
       names,
-      10,
     );
 
     expect(result.map((c) => c.name)).toEqual(['Rent', 'Groceries', 'Fun']);
     expect(result.find((c) => c.name === 'Groceries')?.monthly).toEqual([10, 20, 30]);
   });
 
-  it('attaches only its own transactions, newest first and capped', () => {
-    const result = selectCategoryCards(
-      plan([perf(1, 100, 10)]),
-      [],
-      [
-        txn(1, 1, '2026-06-01'),
-        txn(2, 1, '2026-06-05'),
-        txn(3, 1, '2026-06-03'),
-        txn(4, 2, '2026-06-09'),
-      ],
-      names,
-      2,
-    );
+  it('carries the category id the drill reads its own rows by', () => {
+    const result = selectCategoryCards(plan([perf(1, 100, 10), perf(null, 0, 25)]), [], names);
 
-    expect(result[0].transactions.map((t) => t.id)).toEqual([2, 3]);
-  });
-
-  it('groups uncategorized transactions under the uncategorized card', () => {
-    const result = selectCategoryCards(
-      plan([perf(null, 0, 25)]),
-      [],
-      [txn(1, null, '2026-06-01')],
-      names,
-      10,
-    );
-
-    expect(result[0].name).toBe('Uncategorized');
-    expect(result[0].transactions).toHaveLength(1);
+    expect(result.map((c) => [c.name, c.categoryId])).toEqual([
+      ['Groceries', 1],
+      ['Uncategorized', null],
+    ]);
   });
 });
 
