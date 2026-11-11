@@ -120,7 +120,7 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 
 - A ProblemDetails response has a correlation ID and no stack trace.
 - `/health` returns 200 without sign-in.
-- A `FakeLogger` test checks that the correlation fields are present and that no PII appears.
+- A `FakeLogger` test (from `Microsoft.Extensions.Diagnostics.Testing`) checks that the correlation fields are present and that no PII appears.
 
 ### Phase 2
 

@@ -44,7 +44,6 @@ BudgetTracker/
 |-- budgettracker.client/      React SPA
 |-- BudgetTracker.Domain/      Domain models, interfaces, engines, accessors
 |-- BudgetTracker.Server/      API host, endpoints, managers, utilities
-|-- DatabaseSetup.sql          Database bootstrap script
 `-- BudgetTracker.sln          Solution file
 ```
 
@@ -55,6 +54,7 @@ BudgetTracker/
 - .NET 9 SDK
 - Node.js 18+
 - PostgreSQL
+- EF Core CLI: `dotnet tool install --global dotnet-ef`
 
 ### 1. Configure the database
 
@@ -142,7 +142,7 @@ Authentication is not documented as active in the current setup. Treat the app a
 - `BudgetTracker.Server/Program.cs`
 - `BudgetTracker.Server/Endpoints/`
 - `BudgetTracker.Domain/Interfaces/`
-- `DatabaseSetup.sql`
+- `BudgetTracker.Domain/Migrations/`
 - `budgettracker.client/README.md`
 
 ## Contributing
