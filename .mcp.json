@@ -12,16 +12,12 @@
       "command": "uvx",
       "args": ["mcp-server-git", "--repository", "c:\\Users\\Austin\\Projects\\BudgetTracker"]
     },
-    "mssql": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@smithery/cli@latest",
-        "run",
-        "@davesbingtranslator/mssql-mcp-server",
-        "--connection-string",
-        "Server=(localdb)\\MSSQLLocalDB;Database=BudgetTracker;Trusted_Connection=True;TrustServerCertificate=True;"
-      ]
+    "postgres": {
+      "command": "uvx",
+      "args": ["postgres-mcp", "--access-mode=restricted"],
+      "env": {
+        "DATABASE_URI": "${BUDGETTRACKER_DATABASE_URI:-postgresql://postgres:postgres@localhost:5432/budgettracker}"
+      }
     }
   }
 }

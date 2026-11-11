@@ -110,6 +110,6 @@
                                   "atlassian",
                                   "playwright",
                                   "git",
-                                  "mssql"
+                                  "postgres"
                               ]
 }
