@@ -97,11 +97,13 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 
 ## 6. Frontend
 
-- **Error capture:** an `ErrorBoundary` plus a `window` error handler that POSTs to
-  `/api/client-errors`. The endpoint accepts signed-in users only, caps payload size, and is
-  rate-limited.
-- **Sentry: deferred.** Session replay would capture balances. Reconsider only if the app becomes
-  multi-user, and then with session replay and PII capture turned off.
+- **While single-user:** an `ErrorBoundary` that shows a fallback screen. Errors stay in the
+  browser console. No home-grown `/api/client-errors` endpoint: it would be replaced by Sentry
+  once the app is multi-user, so it isn't worth building.
+- **Before multi-user launch: Sentry, errors only.**
+  - Session replay **off**: it would capture balances.
+  - `sendDefaultPii: false`.
+  - A `beforeSend` scrubber that drops amounts, payees, account names, and emails.
 
 ---
 
@@ -115,6 +117,8 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
   `UserId`. The client sends `X-Correlation-ID`.
 - `/health`.
 - CloudWatch alarms on the Lambda `Errors` metric and on a 5xx metric filter, notifying through SNS.
+- Log failed sign-ins and denied (401/403) requests with `UserId` where known. This becomes the
+  security signal once other people have accounts.
 
 **Tests**
 
@@ -129,7 +133,7 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 - `/health/ready`.
 - An EF Core slow-query interceptor.
 - AWS X-Ray tracing.
-- `/api/client-errors` plus the `ErrorBoundary`.
+- The `ErrorBoundary` (fallback screen only; see §6).
 - Plaid and Webull sync metrics.
 - Saved CloudWatch Logs Insights queries.
 
@@ -139,18 +143,35 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 
 - OpenTelemetry export to Grafana or Datadog.
 - Dashboards and service-level targets.
-- Sentry, if the app becomes multi-user (see §6).
-- An audit log table, written through an Accessor. The schema is designed by the DBA.
+- Anything from the multi-user checklist (§8) not already done.
 
 ---
 
-## 8. Open questions
+## 8. Before multi-user launch
 
-These are unresolved. Answers may change the decisions above.
+BudgetTracker is **single-user today, and very likely multi-user later**. Don't build
+multi-user observability ahead of multi-user features. Instead, the multi-user launch is gated on
+this checklist:
 
-1. Is BudgetTracker single-user or multi-user?
+- [ ] Sentry for frontend errors, configured as in §6.
+- [ ] An audit log of who viewed or changed what (e.g. linked a bank, edited a transaction):
+      a table written through an Accessor, schema designed by the DBA.
+- [ ] Log retention raised from 14 to at least 30 days, for supporting other users.
+- [ ] Account deletion also covers that user's log data. Short retention is the simplest way to
+      meet this.
+- [ ] CloudWatch alarms on spikes in failed sign-ins and denied requests.
+
+Phase 1 work, `UserId` on every log line, and redaction already assume multiple users, so they
+don't wait for this list.
+
+---
+
+## 9. Open questions
+
+1. ~~Is BudgetTracker single-user or multi-user?~~ **Answered:** single-user now, very likely
+   multi-user later (see §8).
 2. What is the monthly monitoring budget?
 3. Is Lambda + Neon the long-term setup?
-4. What log retention is right, given Plaid data? Currently 14 days.
+4. What log retention is right, given Plaid data? 14 days today; at least 30 once multi-user.
 5. Where should alerts go: email, SMS, or Slack?
 6. How much added cold-start time is acceptable?
