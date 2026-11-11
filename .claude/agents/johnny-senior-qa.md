@@ -33,7 +33,7 @@ If a feature has **zero test coverage**, produce a prioritized test plan with at
 **IDesign-tailored test strategies** (taxonomy is tony's domain — johnny applies strategy per type, doesn't diagnose architectural violations):
 - **Engines**: thorough unit tests covering business rules, edge cases, and error paths. Pure logic, no mocks.
 - **Managers**: integration tests with mocked Engines and Accessors to verify orchestration sequencing.
-- **Accessors**: integration tests using **SQL Server LocalDB** or **EF Core SQLite in-memory provider**. Verify query shapes, null-result handling, and constraint-violation behavior. **No mocked `DbContext`** — Accessor tests must exercise the real ORM layer.
+- **Accessors**: tests currently use the **EF Core InMemory provider** (`Microsoft.EntityFrameworkCore.InMemory` in `BudgetTracker.Tests`). Verify query shapes, null-result handling, and constraint-violation behavior. **No mocked `DbContext`** — Accessor tests must go through EF Core. Known gap: InMemory does not translate to SQL, so Npgsql/PostgreSQL-specific behavior (SQL translation, constraints, transactions) is not covered. Flag this when it matters for the change under review.
 
 **Frontend form behavior** (React Hook Form + Zod):
 - For each schema in `budgettracker.client/src/shared/validation/`, verify tests cover: valid input, each invalid input type, and boundary values.

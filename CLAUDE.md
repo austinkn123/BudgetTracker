@@ -7,9 +7,10 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **Frontend**: React + TypeScript + Vite
 - **Styling**: Tailwind CSS + Radix primitives (design tokens in `budgettracker.client/src/shared/theme/`; see `project-docs/design.md`)
 - **Forms/Validation**: React Hook Form + Zod (`@hookform/resolvers`)
-- **Database**: Microsoft SQL Server
+- **Database**: PostgreSQL (Neon) via Npgsql (`Npgsql.EntityFrameworkCore.PostgreSQL`)
 - **ORM**: Entity Framework Core (Code-first with Fluent API configurations)
 - **Authentication**: AWS Cognito (In progress)
+- **Hosting**: a single AWS Lambda behind a Function URL, deployed with SAM (`deploy/template.yaml`; see `deploy/README.md`). Logs go to CloudWatch (14-day retention).
 
 ## Architecture
 - Follow IDesign methodology with volatility-based decomposition.
@@ -37,7 +38,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - Refer to `.claude/agents/chrissy-product-manager.md` for product vision if unclear on requirements.
 - Jira project: **BUD** on `austinkn123.atlassian.net` — check for existing issues before creating new ones, and link completed work to its ticket when relevant.
 - **Jira access via MCP**: The Atlassian MCP server is configured in `.mcp.json` and provides direct Jira access. When asked about any BUD ticket, **ALWAYS call the Atlassian MCP tools** — never say "I can't connect to Jira" without first attempting the call. Common tools: `mcp__atlassian__getIssue` (fetch a specific ticket), `mcp__atlassian__searchIssues` (JQL search), `mcp__atlassian__getAccessibleAtlassianResources` (list resources). If the call fails, report the actual error returned by the tool, not a pre-emptive refusal.
-- Local database: **SQL Server LocalDB** — `Server=(localdb)\MSSQLLocalDB;Database=BudgetTracker;Trusted_Connection=True;TrustServerCertificate=True;` — use the `mssql` MCP server to inspect schema, run queries, and verify migrations directly.
+- Local database: **PostgreSQL**. Local dev reads `ConnectionStrings:BudgetTrackerConnection` from `BudgetTracker.Server/appsettings.Development.json` (points at Postgres on `localhost`); the gitignored `appsettings.Local.json` can override it. Production uses Neon, with the connection string in SSM (see `deploy/README.md`). Use the `postgres` MCP server (`.mcp.json`, Postgres MCP Pro via `uvx`, **read-only** `--access-mode=restricted`) to inspect schema, run read queries, and verify migrations. It connects to `BUDGETTRACKER_DATABASE_URI` if set (use a read-only role for Neon), otherwise to the local dev database.
 
 ## Agent Roster
 

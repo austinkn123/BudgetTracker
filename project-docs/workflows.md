@@ -29,7 +29,7 @@ sequenceDiagram
     participant Dev as Developer
     participant EF as EF Core
     participant Snap as Model Snapshot
-    participant Db as SQL Server
+    participant Db as PostgreSQL
 
     Dev->>EF: Change entity or Fluent API config
     Dev->>EF: dotnet ef migrations add NewChange
