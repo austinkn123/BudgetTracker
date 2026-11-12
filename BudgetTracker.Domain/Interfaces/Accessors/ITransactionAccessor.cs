@@ -1,4 +1,5 @@
 using BudgetTracker.Domain.Models;
+using BudgetTracker.Domain.Models.Analysis;
 
 namespace BudgetTracker.Domain.Interfaces.Accessors;
 
@@ -33,6 +34,16 @@ public interface ITransactionAccessor
     /// <param name="since">The instant the inflow/outflow sums start at (inclusive).</param>
     /// <returns>One entry per used category, ordered by category id.</returns>
     Task<IReadOnlyList<CategoryUsage>> GetCategoryUsageAsync(int userId, DateTime since);
+
+    /// <summary>
+    /// The signed sum of the user's rows per (category, type) dated from <paramref name="from"/>'s day through the whole of
+    /// <paramref name="to"/>'s day, grouped in the database so a long window never loads its rows.
+    /// </summary>
+    /// <param name="userId">The owner.</param>
+    /// <param name="from">First day, inclusive; any time component is ignored.</param>
+    /// <param name="to">Last day, inclusive of its whole day; any time component is ignored.</param>
+    /// <returns>One total per (category, type) present in the window, ordered by category id then type (where uncategorized sorts is up to the provider).</returns>
+    Task<IReadOnlyList<CategoryTypeTotal>> GetTotalsByCategoryAndTypeAsync(int userId, DateTime from, DateTime to);
 
     /// <summary>
     /// Every distinct <see cref="Transaction.CategoryId"/> on the user's rows, null (uncategorized) included.

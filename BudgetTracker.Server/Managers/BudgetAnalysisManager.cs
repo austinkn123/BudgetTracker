@@ -32,18 +32,18 @@ public class BudgetAnalysisManager(
         var asOf = lastInstantOfRequestedMonth < now ? lastInstantOfRequestedMonth : now;
         var analyzedMonth = new DateTime(asOf.Year, asOf.Month, 1);
 
-        // Fetch only what the three figures read: the window, the analysed month in full, and the trend months before
-        // it. Rows outside that span used to be loaded just to seed zeroed trend series for every category ever used;
-        // the distinct category ids now come from the database instead.
+        // Raw rows are fetched only for what AnalyzeMonth and SummarizeByMonth read: the trend months through the end of
+        // the analysed month. Window spend is aggregated in the database instead, so a long window (the ALL range sends
+        // 1970-01-01..9999-12-31) never loads the ledger; the engine applies the spend rule to those totals. Categories
+        // used only outside the trend still get zeroed series via the distinct ids in use.
         var trendStart = engine.TrendStart(asOf, trendMonths);
         var analyzedMonthEnd = analyzedMonth.AddMonths(1).AddDays(-1);
-        var fetch = new TransactionFilter(
-            From: from.Date < trendStart ? from.Date : trendStart,
-            To: to.Date > analyzedMonthEnd ? to.Date : analyzedMonthEnd);
+        var fetch = new TransactionFilter(From: trendStart, To: analyzedMonthEnd);
 
         // Sequential awaits: these accessors share the scoped DbContext, which cannot
         // serve concurrent queries.
         var transactions = (await transactionAccessor.GetFilteredAsync(userId, fetch)).ToList();
+        var windowTotals = await transactionAccessor.GetTotalsByCategoryAndTypeAsync(userId, from, to);
         var categoryIdsInUse = await transactionAccessor.GetCategoryIdsInUseAsync(userId);
         var budgetPlans = await budgetPlanAccessor.GetByUserIdAsync(userId);
 
@@ -55,14 +55,9 @@ public class BudgetAnalysisManager(
             .OrderByDescending(p => p.PlanMonth)
             .FirstOrDefault();
 
-        // The window is an API concern, not a business one, so it is applied here.
-        var windowTransactions = transactions
-            .Where(t => t.OccurredAt >= from.Date && t.OccurredAt.Date <= to.Date)
-            .ToList();
-
         var analysis = new BudgetAnalysis(
             governingPlan is null ? null : engine.AnalyzeMonth(transactions, governingPlan, asOf),
-            engine.SummarizeSpend(windowTransactions),
+            engine.SummarizeSpend(windowTotals),
             engine.SummarizeByMonth(transactions, asOf, trendMonths, categoryIdsInUse));
 
         return Result<BudgetAnalysis>.Success(analysis);

@@ -93,11 +93,13 @@ public class BudgetAnalysisEngine : IBudgetAnalysisEngine
             actualTotal);
     }
 
-    public IReadOnlyList<CategorySpend> SummarizeSpend(IReadOnlyList<Transaction> transactions) =>
-        transactions
+    public IReadOnlyList<CategorySpend> SummarizeSpend(IReadOnlyList<CategoryTypeTotal> totals) =>
+        // BUD-18: Expense sums arrive signed (outflows negative, refunds positive and already netted in), so negating
+        // the sum gives net spend. Income and Transfer are not spending.
+        totals
             .Where(t => t.TransactionType == Expense)
             .GroupBy(t => t.CategoryId)
-            .Select(g => new CategorySpend(g.Key, g.Sum(t => -t.Amount)))
+            .Select(g => new CategorySpend(g.Key, -g.Sum(t => t.Amount)))
             .ToList();
 
     public IReadOnlyList<CategoryMonthSpend> SummarizeByMonth(

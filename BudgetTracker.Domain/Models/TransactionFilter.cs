@@ -8,7 +8,7 @@ namespace BudgetTracker.Domain.Models;
 public record TransactionFilter(
     DateTime? From = null,
     DateTime? To = null,
-    /// <summary>True = only rows with no category. False = only categorised rows.</summary>
+    /// <summary>True = only rows that need a category (none set, and not a Transfer). False = only categorised rows.</summary>
     bool? Uncategorized = null,
     /// <summary>True = only Plaid-imported rows. False = only manual entries.</summary>
     bool? IsImported = null,

@@ -1,6 +1,7 @@
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Domain.Models;
+using BudgetTracker.Server.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BudgetTracker.Server.Endpoints;
@@ -48,9 +49,9 @@ public static class TransactionEndpoints
     /// </summary>
     /// <param name="manager">Ledger workflow.</param>
     /// <param name="currentUser">The authenticated user.</param>
-    /// <param name="from">First day (yyyy-MM-dd), inclusive.</param>
-    /// <param name="to">Last day (yyyy-MM-dd), inclusive of its whole day.</param>
-    /// <param name="uncategorized">True: only rows with no category; false: only categorised rows.</param>
+    /// <param name="from">First day (yyyy-MM-dd), inclusive. Any zone suffix is ignored.</param>
+    /// <param name="to">Last day (yyyy-MM-dd), inclusive of its whole day. Any zone suffix is ignored.</param>
+    /// <param name="uncategorized">True: only rows that need a category (none set, not a Transfer); false: only categorised rows.</param>
     /// <param name="isImported">True: only Plaid-imported rows; false: only manual rows.</param>
     /// <param name="isPending">Only pending (true) or posted (false) rows.</param>
     /// <param name="search">Case-insensitive payee/notes substring.</param>
@@ -71,7 +72,7 @@ public static class TransactionEndpoints
     {
         var result = await manager.GetFilteredAsync(
             currentUser.UserId,
-            new TransactionFilter(from, to, uncategorized, isImported, isPending, search, plaidAccountId, categoryId));
+            new TransactionFilter(WallClock.Unzoned(from), WallClock.Unzoned(to), uncategorized, isImported, isPending, search, plaidAccountId, categoryId));
 
         return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(new { error = result.Error });
     }
@@ -83,9 +84,9 @@ public static class TransactionEndpoints
     /// </summary>
     /// <param name="manager">Ledger workflow.</param>
     /// <param name="currentUser">The authenticated user.</param>
-    /// <param name="from">First day (yyyy-MM-dd), inclusive.</param>
-    /// <param name="to">Last day (yyyy-MM-dd), inclusive of its whole day.</param>
-    /// <param name="uncategorized">True: only rows with no category; false: only categorised rows.</param>
+    /// <param name="from">First day (yyyy-MM-dd), inclusive. Any zone suffix is ignored.</param>
+    /// <param name="to">Last day (yyyy-MM-dd), inclusive of its whole day. Any zone suffix is ignored.</param>
+    /// <param name="uncategorized">True: only rows that need a category (none set, not a Transfer); false: only categorised rows.</param>
     /// <param name="isImported">True: only Plaid-imported rows; false: only manual rows.</param>
     /// <param name="isPending">Only pending (true) or posted (false) rows.</param>
     /// <param name="search">Case-insensitive payee/notes substring.</param>
@@ -110,7 +111,7 @@ public static class TransactionEndpoints
     {
         var result = await manager.GetPageAsync(
             currentUser.UserId,
-            new TransactionFilter(from, to, uncategorized, isImported, isPending, search, plaidAccountId, categoryId),
+            new TransactionFilter(WallClock.Unzoned(from), WallClock.Unzoned(to), uncategorized, isImported, isPending, search, plaidAccountId, categoryId),
             cursor,
             limit);
 

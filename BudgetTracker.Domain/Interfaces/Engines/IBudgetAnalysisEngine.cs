@@ -16,10 +16,13 @@ public interface IBudgetAnalysisEngine
     PlanPerformance AnalyzeMonth(IReadOnlyList<Transaction> transactions, BudgetPlan plan, DateTime now);
 
     /// <summary>
-    /// Net expense per category across whatever transactions are supplied: outflows minus refunds.
-    /// Callers do their own date filtering — the window is not a business concept.
+    /// Net expense per category from per-(category, type) signed totals: outflows minus refunds, with Income and Transfer
+    /// totals ignored. The totals are pre-aggregated by the caller over whatever window it chose — the window is not a
+    /// business concept — so a long window never has to be loaded row by row.
     /// </summary>
-    IReadOnlyList<CategorySpend> SummarizeSpend(IReadOnlyList<Transaction> transactions);
+    /// <param name="totals">Signed sums per (category, type); a category may appear more than once.</param>
+    /// <returns>One entry per category with Expense totals; positive is net spend, negative is net refund.</returns>
+    IReadOnlyList<CategorySpend> SummarizeSpend(IReadOnlyList<CategoryTypeTotal> totals);
 
     /// <summary>
     /// Per-category income/expense totals for the last <paramref name="months"/> calendar months

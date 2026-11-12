@@ -1,6 +1,8 @@
+using System.Linq.Expressions;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Models;
+using BudgetTracker.Domain.Models.Analysis;
 using Microsoft.EntityFrameworkCore;
 
 namespace BudgetTracker.Domain.Accessors;
@@ -9,6 +11,13 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
 {
     private const string TransferType = "Transfer";
     private const string IncomeType = "Income";
+
+    /// <summary>
+    /// A row waiting on a category: none set, and not a Transfer (a paired Transfer never needs one). The single source
+    /// for the summary's uncategorizedCount and the uncategorized filter; must match the client's needsCategory.
+    /// </summary>
+    private static readonly Expression<Func<Transaction, bool>> NeedsCategory =
+        t => t.CategoryId == null && t.TransactionType != TransferType;
 
     /// <inheritdoc />
     public async Task<IEnumerable<Transaction>> GetFilteredAsync(int userId, TransactionFilter filter)
@@ -44,8 +53,7 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
     {
         var owned = context.Transactions.AsNoTracking().Where(t => t.Account.UserId == userId);
 
-        // Must match the client's needsCategory: a paired Transfer never waits on a category.
-        var uncategorized = await owned.CountAsync(t => t.CategoryId == null && t.TransactionType != TransferType);
+        var uncategorized = await owned.CountAsync(NeedsCategory);
 
         var pending = await owned
             .Where(t => t.IsPending && t.PlaidAccountId != null)
@@ -70,6 +78,18 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
                 g.Count(),
                 g.Sum(t => t.OccurredAt >= since && t.Amount > 0 ? t.Amount : 0m),
                 g.Sum(t => t.OccurredAt >= since && t.Amount < 0 ? t.Amount : 0m)))
+            .ToListAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CategoryTypeTotal>> GetTotalsByCategoryAndTypeAsync(int userId, DateTime from, DateTime to)
+    {
+        // Same whole-day bounds as the filtered read, so the totals cover exactly the rows GetFilteredAsync would return.
+        return await Filtered(userId, new TransactionFilter(From: from, To: to))
+            .GroupBy(t => new { t.CategoryId, t.TransactionType })
+            .OrderBy(g => g.Key.CategoryId)
+            .ThenBy(g => g.Key.TransactionType)
+            .Select(g => new CategoryTypeTotal(g.Key.CategoryId, g.Key.TransactionType, g.Sum(t => t.Amount)))
             .ToListAsync();
     }
 
@@ -152,9 +172,10 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
             query = query.Where(t => t.OccurredAt < dayAfterTo);
         }
 
+        // True is the review backlog ("needs a category"), so Transfers are left out; false is every categorized row.
         if (filter.Uncategorized is bool uncategorized)
             query = uncategorized
-                ? query.Where(t => t.CategoryId == null)
+                ? query.Where(NeedsCategory)
                 : query.Where(t => t.CategoryId != null);
 
         if (filter.IsImported is bool imported)

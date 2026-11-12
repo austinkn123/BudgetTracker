@@ -1,6 +1,7 @@
 using BudgetTracker.Domain.Accessors;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Models;
+using BudgetTracker.Domain.Models.Analysis;
 using Microsoft.EntityFrameworkCore;
 
 namespace BudgetTracker.Tests.Accessors;
@@ -211,6 +212,111 @@ public class TransactionAccessorTests : IDisposable
         var rows = await BuildSut().GetFilteredAsync(UserId, new TransactionFilter(From: new DateTime(1970, 1, 1), To: new DateTime(9999, 12, 31)));
 
         Assert.Equal([1], rows.Select(r => r.Id));
+    }
+
+    // ── Uncategorized filter: "needs a category" ────────────────────────────
+
+    [Fact]
+    public async Task Should_ExcludeTransfers_When_FilteringForUncategorizedRows()
+    {
+        await SeedAsync(
+            Row(1),                                                  // needs a category
+            Row(2, type: "Income", amount: 40m),                     // needs a category
+            Row(3, type: "Transfer", transferAccountId: 2),          // paired transfer: never waits on a category
+            Row(4, categoryId: 9),                                   // categorized
+            Row(5, accountId: 3));                                   // someone else's
+
+        var filtered = await BuildSut().GetFilteredAsync(UserId, new TransactionFilter(Uncategorized: true));
+        var page = await BuildSut().GetPageAsync(UserId, new TransactionFilter(Uncategorized: true), null, 10);
+
+        Assert.Equal([1, 2], filtered.Select(r => r.Id).Order());
+        Assert.Equal([2, 1], page.Select(r => r.Id));
+    }
+
+    [Fact]
+    public async Task Should_MatchTheSummaryCount_When_FilteringForUncategorizedRows()
+    {
+        await SeedAsync(
+            Row(1), Row(2, type: "Income", amount: 40m), Row(3, type: "Transfer", transferAccountId: 2),
+            Row(4, type: "Transfer", transferAccountId: 1, accountId: 2), Row(5, categoryId: 9));
+
+        var summary = await BuildSut().GetSummaryAsync(UserId);
+        var backlog = await BuildSut().GetFilteredAsync(UserId, new TransactionFilter(Uncategorized: true));
+
+        Assert.Equal(summary.UncategorizedCount, backlog.Count());
+    }
+
+    [Fact]
+    public async Task Should_StillReturnEveryCategorizedRow_When_UncategorizedIsFalse()
+    {
+        await SeedAsync(
+            Row(1), Row(2, type: "Transfer", transferAccountId: 2), Row(3, categoryId: 9),
+            Row(4, type: "Transfer", transferAccountId: 2, categoryId: 9));
+
+        var categorized = await BuildSut().GetFilteredAsync(UserId, new TransactionFilter(Uncategorized: false));
+
+        Assert.Equal([3, 4], categorized.Select(r => r.Id).Order());
+    }
+
+    // ── GetTotalsByCategoryAndTypeAsync ─────────────────────────────────────
+
+    [Fact]
+    public async Task Should_SumSignedAmountsPerCategoryAndType_When_TotallingAWindow()
+    {
+        var day = new DateTime(2026, 10, 10);
+        await SeedAsync(
+            At(Row(1, categoryId: 3, amount: -80m), day),
+            At(Row(2, categoryId: 3, amount: 30m), day),                                   // refund nets in SQL
+            At(Row(3, categoryId: 3, type: "Income", amount: 500m), day),
+            At(Row(4, amount: -12m), day),                                                 // uncategorized
+            At(Row(5, amount: -3m), day),
+            At(Row(6, type: "Transfer", amount: -200m, transferAccountId: 2), day),
+            At(Row(7, categoryId: 3, amount: -1000m, accountId: 3), day));                 // someone else's
+
+        var totals = await BuildSut().GetTotalsByCategoryAndTypeAsync(UserId, day, day);
+
+        Assert.Equal(
+            new[]
+            {
+                new CategoryTypeTotal(null, "Expense", -15m),
+                new CategoryTypeTotal(null, "Transfer", -200m),
+                new CategoryTypeTotal(3, "Expense", -50m),
+                new CategoryTypeTotal(3, "Income", 500m)
+            },
+            totals.OrderBy(t => t.CategoryId).ThenBy(t => t.TransactionType));
+    }
+
+    [Fact]
+    public async Task Should_IncludeBothEndDaysWholly_When_TotallingAWindow()
+    {
+        var from = new DateTime(2026, 10, 1);
+        var to = new DateTime(2026, 10, 31);
+        await SeedAsync(
+            At(Row(1, categoryId: 3, amount: -1m), from.AddMinutes(-1)),               // just before
+            At(Row(2, categoryId: 3, amount: -2m), from),                              // first instant of from
+            At(Row(3, categoryId: 3, amount: -3m), to.AddHours(23).AddMinutes(59)),    // 23:59 on to
+            At(Row(4, categoryId: 3, amount: -4m), to.AddDays(1)));                    // just after
+
+        // A time component on the bounds is ignored: whole days, as the filtered read does.
+        var totals = await BuildSut().GetTotalsByCategoryAndTypeAsync(UserId, from.AddHours(15), to.AddHours(1));
+
+        Assert.Equal(new CategoryTypeTotal(3, "Expense", -5m), Assert.Single(totals));
+    }
+
+    [Fact]
+    public async Task Should_NotOverflow_When_TotallingTheAllTimeRange()
+    {
+        await SeedAsync(At(Row(1, categoryId: 3, amount: -7m), new DateTime(1970, 1, 1)), At(Row(2, categoryId: 3, amount: -1m), new DateTime(2026, 10, 1)));
+
+        var totals = await BuildSut().GetTotalsByCategoryAndTypeAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31));
+
+        Assert.Equal(new CategoryTypeTotal(3, "Expense", -8m), Assert.Single(totals));
+    }
+
+    [Fact]
+    public async Task Should_ReturnNothing_When_TotallingAnEmptyLedger()
+    {
+        Assert.Empty(await BuildSut().GetTotalsByCategoryAndTypeAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31)));
     }
 
     // ── GetSummaryAsync ─────────────────────────────────────────────────────

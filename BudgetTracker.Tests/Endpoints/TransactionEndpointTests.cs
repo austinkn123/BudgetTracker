@@ -80,6 +80,67 @@ public class TransactionEndpointTests
         Assert.Equal("Invalid cursor", EndpointAssert.ErrorOf(result));
     }
 
+    // ── Zoned from/to ───────────────────────────────────────────────────────
+
+    // "2026-10-01T00:00:00Z" binds as Kind=Utc, which Npgsql refuses against the timestamp-without-time-zone column.
+    [Theory]
+    [InlineData(DateTimeKind.Utc)]
+    [InlineData(DateTimeKind.Local)]
+    public async Task Should_PassTheSameWallClockAsUnspecifiedKind_When_GetIsGivenZonedDates(DateTimeKind kind)
+    {
+        TransactionFilter? passed = null;
+        _manager.Setup(m => m.GetFilteredAsync(5, It.IsAny<TransactionFilter>()))
+            .Callback<int, TransactionFilter>((_, f) => passed = f)
+            .ReturnsAsync(Result<IEnumerable<Transaction>>.Success([]));
+
+        var result = await TransactionEndpoints.GetAsync(
+            _manager.Object, _currentUser.Object,
+            new DateTime(2026, 10, 1, 0, 0, 0, kind), new DateTime(2026, 10, 31, 23, 30, 0, kind),
+            null, null, null, null, null, null);
+
+        Assert.Equal(StatusCodes.Status200OK, EndpointAssert.StatusOf(result));
+        AssertUnzoned(new DateTime(2026, 10, 1), passed!.From);
+        AssertUnzoned(new DateTime(2026, 10, 31, 23, 30, 0), passed.To);
+    }
+
+    [Theory]
+    [InlineData(DateTimeKind.Utc)]
+    [InlineData(DateTimeKind.Local)]
+    public async Task Should_PassTheSameWallClockAsUnspecifiedKind_When_GetPageIsGivenZonedDates(DateTimeKind kind)
+    {
+        TransactionFilter? passed = null;
+        _manager.Setup(m => m.GetPageAsync(5, It.IsAny<TransactionFilter>(), null, null))
+            .Callback<int, TransactionFilter, string?, int?>((_, f, _, _) => passed = f)
+            .ReturnsAsync(Result<TransactionPage>.Success(new TransactionPage([], null)));
+
+        var result = await TransactionEndpoints.GetPageAsync(
+            _manager.Object, _currentUser.Object,
+            new DateTime(2026, 10, 1, 0, 0, 0, kind), new DateTime(2026, 10, 31, 0, 0, 0, kind),
+            null, null, null, null, null, null, null, null);
+
+        Assert.Equal(StatusCodes.Status200OK, EndpointAssert.StatusOf(result));
+        AssertUnzoned(new DateTime(2026, 10, 1), passed!.From);
+        AssertUnzoned(new DateTime(2026, 10, 31), passed.To);
+    }
+
+    [Fact]
+    public async Task Should_LeaveAbsentDatesNull_When_GetPageIsGivenNoDates()
+    {
+        TransactionFilter? passed = null;
+        _manager.Setup(m => m.GetPageAsync(5, It.IsAny<TransactionFilter>(), null, null))
+            .Callback<int, TransactionFilter, string?, int?>((_, f, _, _) => passed = f)
+            .ReturnsAsync(Result<TransactionPage>.Success(new TransactionPage([], null)));
+
+        await TransactionEndpoints.GetPageAsync(
+            _manager.Object, _currentUser.Object, null, null, null, null, null, null, null, null, null, null);
+
+        Assert.Equal((null, null), (passed!.From, passed.To));
+    }
+
+    // DateTime equality ignores Kind, so the kind is asserted separately.
+    private static void AssertUnzoned(DateTime expected, DateTime? actual) =>
+        Assert.Equal((expected, DateTimeKind.Unspecified), (actual!.Value, actual.Value.Kind));
+
     // ── GET /api/transactions/summary ───────────────────────────────────────
 
     [Fact]

@@ -1,6 +1,7 @@
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Domain.Models;
+using BudgetTracker.Server.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BudgetTracker.Server.Endpoints;
@@ -55,9 +56,7 @@ public static class CategoryEndpoints
         if (since is not DateTime start)
             return Results.BadRequest(new { error = "since is required (ISO date-time)" });
 
-        // Transaction dates are stored without a time zone (Npgsql rejects a Utc/Local DateTime against them), so the
-        // given wall-clock time is used as-is.
-        var result = await manager.GetUsageAsync(currentUser.UserId, DateTime.SpecifyKind(start, DateTimeKind.Unspecified));
+        var result = await manager.GetUsageAsync(currentUser.UserId, WallClock.Unzoned(start));
         return Results.Ok(result.Value);
     }
 

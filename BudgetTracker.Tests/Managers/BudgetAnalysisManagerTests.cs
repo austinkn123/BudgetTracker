@@ -1,6 +1,7 @@
 using BudgetTracker.Domain.Engines;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Models;
+using BudgetTracker.Domain.Models.Analysis;
 using BudgetTracker.Server.Managers;
 using Moq;
 
@@ -46,6 +47,7 @@ public class BudgetAnalysisManagerTests
     };
 
     private readonly List<TransactionFilter> _filters = [];
+    private readonly List<(DateTime From, DateTime To)> _totalWindows = [];
 
     /// <summary>
     /// Stands in for the ledger: the filtered read honours From/To the way the accessor does (whole days, To inclusive),
@@ -63,6 +65,14 @@ public class BudgetAnalysisManagerTests
                 .ToList());
         _transactionAccessor.Setup(a => a.GetCategoryIdsInUseAsync(UserId))
             .ReturnsAsync(rows.Select(t => t.CategoryId).Distinct().ToList());
+        // Same whole-day bounds as the filtered read, aggregated the way the SQL GROUP BY does.
+        _transactionAccessor.Setup(a => a.GetTotalsByCategoryAndTypeAsync(UserId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .Callback<int, DateTime, DateTime>((_, from, to) => _totalWindows.Add((from, to)))
+            .ReturnsAsync((int _, DateTime from, DateTime to) => rows
+                .Where(t => t.OccurredAt >= from.Date && t.OccurredAt.Date <= to.Date)
+                .GroupBy(t => (t.CategoryId, t.TransactionType))
+                .Select(g => new CategoryTypeTotal(g.Key.CategoryId, g.Key.TransactionType, g.Sum(t => t.Amount)))
+                .ToList());
     }
 
     private static Transaction Expense(int id, decimal signed, DateTime occurredAt) => new()
@@ -176,6 +186,7 @@ public class BudgetAnalysisManagerTests
         Assert.Equal("Current", result.Value!.PlanMonth!.Plan.Name);
         Assert.Equal(40m, result.Value.PlanMonth.Pacing.ActualExpenses);
         _transactionAccessor.Verify(a => a.GetFilteredAsync(UserId, It.IsAny<TransactionFilter>()), Times.Once);
+        _transactionAccessor.Verify(a => a.GetTotalsByCategoryAndTypeAsync(UserId, From, To), Times.Once);
         _budgetPlanAccessor.Verify(a => a.GetByUserIdAsync(UserId), Times.Once);
     }
 
@@ -275,7 +286,7 @@ public class BudgetAnalysisManagerTests
     // ── Bounded reads ───────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Should_FetchOnlyFromTheEarlierOfWindowAndTrendStart_ThroughTheLaterOfWindowAndMonthEnd()
+    public async Task Should_FetchRawRowsFromTheTrendStart_ThroughTheAnalysedMonthEnd()
     {
         StubLedger([]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
@@ -290,14 +301,57 @@ public class BudgetAnalysisManagerTests
     }
 
     [Fact]
-    public async Task Should_FetchFromTheWindowStart_When_ItIsOlderThanTheTrend()
+    public async Task Should_FetchRawRowsOnlyForTheTrendAndAnalysedMonth_When_TheWindowIsAllTime()
     {
         StubLedger([]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
 
         await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3);
 
-        Assert.Equal(new TransactionFilter(From: new DateTime(1970, 1, 1), To: new DateTime(9999, 12, 31)), Assert.Single(_filters));
+        // The ALL range no longer drags the whole ledger in: rows cover only the trend through the current month's end.
+        Assert.Equal(
+            new TransactionFilter(From: CurrentMonth.AddMonths(-2), To: CurrentMonth.AddMonths(1).AddDays(-1)),
+            Assert.Single(_filters));
+    }
+
+    [Fact]
+    public async Task Should_AggregateWindowSpendInTheDatabase_OverExactlyTheRequestedWindow()
+    {
+        StubLedger([]);
+        _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
+
+        await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3);
+
+        Assert.Equal((new DateTime(1970, 1, 1), new DateTime(9999, 12, 31)), Assert.Single(_totalWindows));
+    }
+
+    [Fact]
+    public async Task Should_FetchOnlyTheTrendSpan_When_TheWindowStartsBeforeIt()
+    {
+        StubLedger([]);
+        _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
+        var windowFrom = CurrentMonth.AddYears(-3);
+
+        await BuildSut().GetAnalysisAsync(UserId, windowFrom, To, trendMonths: 3);
+
+        Assert.Equal(new TransactionFilter(From: CurrentMonth.AddMonths(-2), To: To), Assert.Single(_filters));
+        Assert.Equal((windowFrom, To), Assert.Single(_totalWindows));
+    }
+
+    [Fact]
+    public async Task Should_NetRefundsAndIgnoreTransfersAndIncome_InWindowSpend()
+    {
+        var refund = Expense(2, 30m, InsideMonth);
+        var transfer = Expense(3, -500m, InsideMonth);
+        transfer.TransactionType = "Transfer";
+        var income = Expense(4, 900m, InsideMonth);
+        income.TransactionType = "Income";
+        StubLedger([Expense(1, -80m, InsideMonth), refund, transfer, income]);
+        _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
+
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+
+        Assert.Equal(new CategorySpend(1, 50m), Assert.Single(result.Value!.WindowSpend));
     }
 
     [Fact]

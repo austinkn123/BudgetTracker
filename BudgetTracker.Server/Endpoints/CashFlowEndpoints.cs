@@ -1,6 +1,7 @@
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Domain.Models.CashFlow;
+using BudgetTracker.Server.Utilities;
 
 namespace BudgetTracker.Server.Endpoints;
 
@@ -16,7 +17,7 @@ public static class CashFlowEndpoints
 
     /// <summary>
     /// <c>GET /api/cash-flow</c> — the cash-flow report. Dates are yyyy-MM-dd; <paramref name="to"/> and
-    /// <paramref name="compareTo"/> include their whole day; no <paramref name="from"/> means All. 400 with
+    /// <paramref name="compareTo"/> include their whole day; any zone suffix is ignored; no <paramref name="from"/> means All. 400 with
     /// <c>{ error }</c> for an unknown <paramref name="groupBy"/> or a From after To.
     /// </summary>
     /// <param name="from">First day of the window, or null for All.</param>
@@ -49,7 +50,9 @@ public static class CashFlowEndpoints
         var grouping = Enum.Parse<CashFlowGrouping>(groupBy, ignoreCase: true);
         var result = await manager.GetReportAsync(
             currentUser.UserId,
-            new CashFlowQuery(from, to, grouping, compareFrom, compareTo, plaidAccountId, categoryId, search));
+            new CashFlowQuery(
+                WallClock.Unzoned(from), WallClock.Unzoned(to), grouping, WallClock.Unzoned(compareFrom), WallClock.Unzoned(compareTo),
+                plaidAccountId, categoryId, search));
 
         return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(new { error = result.Error });
     }
