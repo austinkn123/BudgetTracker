@@ -569,22 +569,30 @@ public class PlaidManager(
 
         var (inserted, updated) = await transactionAccessor.UpsertImportedAsync(mapped);
         var removed = 0;
-        if (idsToDelete.Count > 0)
+        DateTime syncedAt;
+        try
         {
-            removed = await transactionAccessor.DeleteByPlaidTransactionIdsAsync(idsToDelete);
+            if (idsToDelete.Count > 0)
+            {
+                removed = await transactionAccessor.DeleteByPlaidTransactionIdsAsync(idsToDelete);
+            }
+
+            // Plaid's cached balances ride along on /transactions/sync for free (/accounts/balance/get is billed).
+            if (syncResult.Accounts is { Count: > 0 } accounts)
+                await itemAccessor.UpdateBalancesAsync(plaidItemId, accounts);
+
+            syncedAt = DateTime.UtcNow;
+            await itemAccessor.UpdateSyncStateAsync(plaidItemId, syncResult.NextCursor, syncedAt);
+
+            await PairOwnAccountTransfersAsync(userId, userCategories);
         }
-
-        // Plaid's cached balances ride along on /transactions/sync for free (/accounts/balance/get is billed).
-        if (syncResult.Accounts is { Count: > 0 } accounts)
-            await itemAccessor.UpdateBalancesAsync(plaidItemId, accounts);
-
-        var syncedAt = DateTime.UtcNow;
-        await itemAccessor.UpdateSyncStateAsync(plaidItemId, syncResult.NextCursor, syncedAt);
-
-        await PairOwnAccountTransfersAsync(userId, userCategories);
-
-        // Bumped on every completed sync, even with no rows: the sync time and balances shown have changed.
-        await dataVersion.BumpAsync(userId);
+        finally
+        {
+            // The upsert has committed by here, so bump even when a later write throws (the exception still propagates):
+            // webhook, sweep and sync-on-open callers never invalidate client caches themselves. Also bumped on a
+            // completed sync with no rows, since the sync time and balances shown have changed. BumpAsync never throws.
+            await dataVersion.BumpAsync(userId);
+        }
 
         return Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, syncedAt));
     }

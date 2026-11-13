@@ -1951,6 +1951,70 @@ public class PlaidManagerTests
         Assert.Equal(["flag", "bump:5"], _calls);
     }
 
+    /// <summary>
+    /// Arranges a sync for user 5 that imports a row, removes another and carries balances, recording each write in
+    /// <see cref="_calls"/>; the write named by <paramref name="failingStep"/> throws after recording itself.
+    /// </summary>
+    private void ArrangeRecordedSyncWithRows(string? failingStep = null)
+    {
+        IReadOnlyList<PlaidAccountDto> balances = [new("plaid-acct-1", "Plaid Checking", "0000", "depository", "checking", 10m)];
+        StubSyncWith(new PlaidSyncResult([ZelleIn()], [], ["removed-1"], "next-cursor", balances));
+
+        Exception? FailAt(string step)
+        {
+            _calls.Add(step);
+            return step == failingStep ? new InvalidOperationException($"{step} failed") : null;
+        }
+
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.Is<IEnumerable<Transaction>>(t => t.Any())))
+            .Returns(() => FailAt("upsert") is { } ex ? Task.FromException<(int, int)>(ex) : Task.FromResult((1, 0)));
+        _txnAccessor.Setup(a => a.DeleteByPlaidTransactionIdsAsync(It.Is<IEnumerable<string>>(ids => ids.Contains("removed-1"))))
+            .Returns(() => FailAt("delete") is { } ex ? Task.FromException<int>(ex) : Task.FromResult(1));
+        _itemAccessor.Setup(a => a.UpdateBalancesAsync(11, balances))
+            .Returns(() => FailAt("balances") is { } ex ? Task.FromException(ex) : Task.CompletedTask);
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, "next-cursor", It.IsAny<DateTime>()))
+            .Returns(() => FailAt("sync-state") is { } ex ? Task.FromException(ex) : Task.CompletedTask);
+    }
+
+    [Fact]
+    public async Task Sync_WithRows_UpsertsThenDeletesThenSavesSyncStateThenBumps()
+    {
+        ArrangeRecordedSyncWithRows();
+
+        var result = await BuildSut().SyncAsync(5);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["upsert", "delete", "balances", "sync-state", "bump:5"], _calls);
+    }
+
+    [Theory]
+    [InlineData("delete", new[] { "upsert", "delete", "bump:5" })]
+    [InlineData("balances", new[] { "upsert", "delete", "balances", "bump:5" })]
+    [InlineData("sync-state", new[] { "upsert", "delete", "balances", "sync-state", "bump:5" })]
+    public async Task Sync_WriteAfterTheUpsertThrows_StillBumpsOnce_AndTheFailureStillSurfaces(string failingStep, string[] expected)
+    {
+        ArrangeRecordedSyncWithRows(failingStep);
+
+        var result = await BuildSut().SyncAsync(5);
+
+        // The upsert committed, so clients must still be told; the exception still reaches SyncAsync's per-item catch.
+        Assert.Equal(expected, _calls);
+        Assert.False(result.IsSuccess);
+        VerifyWarningLogged(Times.Once());
+    }
+
+    [Fact]
+    public async Task Sync_UpsertThrows_DoesNotBump()
+    {
+        ArrangeRecordedSyncWithRows("upsert");
+
+        var result = await BuildSut().SyncAsync(5);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(["upsert"], _calls);
+        VerifyNeverBumped();
+    }
+
     /// <summary>Arranges an exchange for user 5 that persists item 11; the follow-up sync is left to the caller.</summary>
     private void ArrangeExchangeThatPersists()
     {
@@ -2091,11 +2155,17 @@ public class PlaidManagerTests
         var item = ItemFor("plaid-item-1");
         item.UserId = 42;
         ArrangeSyncForItem("plaid-item-1", item);
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback(() => _calls.Add("upsert"))
+            .ReturnsAsync((1, 0));
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(item.Id, "next-cursor", It.IsAny<DateTime>()))
+            .Callback(() => _calls.Add("sync-state"))
+            .Returns(Task.CompletedTask);
 
         var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(["bump:42"], _calls);
+        Assert.Equal(["upsert", "sync-state", "bump:42"], _calls);
     }
 
     [Fact]
@@ -2127,10 +2197,16 @@ public class PlaidManagerTests
         _itemAccessor.Setup(a => a.GetAllActiveAsync()).ReturnsAsync([itemA, itemB]);
         ArrangeSweepSyncForItem(itemA);
         ArrangeSweepSyncForItem(itemB);
+        foreach (var item in new[] { itemA, itemB })
+        {
+            _itemAccessor.Setup(a => a.UpdateSyncStateAsync(item.Id, "next", It.IsAny<DateTime>()))
+                .Callback(() => _calls.Add($"sync-state:{item.Id}"))
+                .Returns(Task.CompletedTask);
+        }
 
         await BuildSut().SweepAllAsync();
 
-        Assert.Equal(["bump:10", "bump:20"], _calls);
+        Assert.Equal(["sync-state:1", "bump:10", "sync-state:2", "bump:20"], _calls);
     }
 
     // ── Real-engine harness helpers ─────────────────────────────────────────
