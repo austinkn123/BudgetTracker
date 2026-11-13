@@ -1,3 +1,4 @@
+import { StrictMode, type ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { focusManager, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -170,6 +171,61 @@ describe('useDataVersionSync', () => {
     await waitFor(() => expect(getVersion).toHaveBeenCalledTimes(2));
     await act(async () => {});
 
+    expect(invalidated(queryClient)).toEqual([]);
+  });
+
+  it('invalidates live keys on remount when the version moved while unmounted', async () => {
+    getVersion.mockResolvedValueOnce({ version: 7 }).mockResolvedValue({ version: 8 });
+    const { queryClient, unmount } = setup();
+    await settledAt(queryClient, 7);
+    unmount();
+
+    // The cached 7 is the baseline; the remount's own check sees 8, a change made while away.
+    renderHook(() => useDataVersionSync(), { wrapper: createQueryWrapper(queryClient) });
+    await settledAt(queryClient, 8);
+
+    await waitFor(() => expect(invalidated(queryClient)).toHaveLength(LIVE_KEYS.length));
+    expect(invalidated(queryClient)).toEqual(expect.arrayContaining(LIVE_KEYS));
+  });
+
+  it('takes the first successful version as the baseline when the first check errors', async () => {
+    getVersion.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ version: 8 });
+    const { queryClient } = setup();
+    await waitFor(() => expect(queryClient.getQueryState(DATA_VERSION_QUERY_KEY)?.status).toBe('error'));
+
+    await check(queryClient);
+    await settledAt(queryClient, 8);
+    await act(async () => {});
+
+    expect(getVersion).toHaveBeenCalledTimes(2);
+    expect(invalidated(queryClient)).toEqual([]);
+  });
+
+  it('under StrictMode takes one baseline, invalidates nothing and polls on one interval', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    getVersion.mockResolvedValue({ version: 7 });
+    const queryClient = createTestQueryClient();
+    seed(queryClient);
+    const QueryWrapper = createQueryWrapper(queryClient);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>
+        <QueryWrapper>{children}</QueryWrapper>
+      </StrictMode>
+    );
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    renderHook(() => useDataVersionSync(), { wrapper });
+
+    await settledAt(queryClient, 7);
+    await act(async () => {});
+    expect(getVersion).toHaveBeenCalledTimes(1);
+
+    // A duplicated interval would show up as two checks per tick.
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    expect(getVersion).toHaveBeenCalledTimes(2);
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    expect(getVersion).toHaveBeenCalledTimes(3);
+
+    expect(invalidate).not.toHaveBeenCalled();
     expect(invalidated(queryClient)).toEqual([]);
   });
 
