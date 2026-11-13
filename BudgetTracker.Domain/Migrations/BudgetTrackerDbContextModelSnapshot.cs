@@ -452,6 +452,9 @@ namespace BudgetTracker.Domain.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
 
+                    b.Property<long>("DataVersion")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CognitoSub")

@@ -211,6 +211,10 @@ var webullGroup = apiGroup.MapGroup("/webull")
     .WithTags("Webull");
 webullGroup.MapWebullEndpoints();
 
+apiGroup.MapGroup("/data-version")
+    .WithTags("Data Version")
+    .MapDataVersionEndpoints();
+
 app.MapFallbackToFile("/index.html");
 
 app.Run();

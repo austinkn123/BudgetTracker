@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildListQuery, statusToQuery } from './transactionFilters';
+import {
+  buildCalendarQuery,
+  buildFeedQuery,
+  buildListQuery,
+  statusToQuery,
+} from './transactionFilters';
 
 describe('statusToQuery', () => {
   it('sends no constraints for "all"', () => {
@@ -58,5 +63,31 @@ describe('buildListQuery', () => {
 
   it('trims the search term so a stray space does not change the query key', () => {
     expect(buildListQuery('all', '  H-E-B  ', monthStart, monthEnd).search).toBe('H-E-B');
+  });
+});
+
+describe('buildFeedQuery', () => {
+  it('carries the chip and the search but no dates, so the feed spans all history', () => {
+    expect(buildFeedQuery('pending', '  coffee ')).toEqual({ isPending: true, search: 'coffee' });
+  });
+
+  it('is empty for "all" with no search', () => {
+    expect(buildFeedQuery('all', '   ')).toEqual({});
+  });
+});
+
+describe('buildCalendarQuery', () => {
+  it('covers the six fixed weeks the grid draws, outside days included', () => {
+    // April 2026 starts on a Wednesday: the grid opens on Sunday March 29 and runs 42 days.
+    expect(buildCalendarQuery(new Date(2026, 3, 1))).toEqual({ from: '2026-03-29', to: '2026-05-09' });
+  });
+
+  it('anchors on the month of any day passed in', () => {
+    expect(buildCalendarQuery(new Date(2026, 3, 17))).toEqual(buildCalendarQuery(new Date(2026, 3, 1)));
+  });
+
+  it('still spans six weeks for a month that starts on a Sunday', () => {
+    // November 2026 starts on a Sunday, so no leading days from October.
+    expect(buildCalendarQuery(new Date(2026, 10, 1))).toEqual({ from: '2026-11-01', to: '2026-12-12' });
   });
 });

@@ -14,6 +14,7 @@ public class SandboxSeedManager(
     IPlaidItemAccessor itemAccessor,
     IBudgetPlanAccessor budgetPlanAccessor,
     ICategoryAccessor categoryAccessor,
+    IDataVersionAccessor dataVersion,
     IOptions<PlaidOptions> options,
     ILogger<SandboxSeedManager> logger) : ISandboxSeedManager
 {
@@ -124,19 +125,28 @@ public class SandboxSeedManager(
         }
 
         // Deliberately reuses the real link path, so seeded data exercises the same mapping,
-        // dedupe and persistence code a genuine connection would.
+        // dedupe and persistence code a genuine connection would. It bumps the data version for what it writes.
         // TODO: SandboxSeedManager violates IDesign layering — consult tony.
-        var seeded = await plaidManager.ExchangePublicTokenAsync(userId, publicToken);
         if (previousItem is null)
+            return await plaidManager.ExchangePublicTokenAsync(userId, publicToken);
+
+        try
+        {
+            var seeded = await plaidManager.ExchangePublicTokenAsync(userId, publicToken);
+
+            // A failed initial sync still leaves the new item persisted, so success alone does not decide this.
+            if (seeded.IsSuccess || await NewItemWasPersistedAsync(userId, activeBefore))
+                await RevokePreviousItemAsync(previousItem.Id, previousToken!, cancellationToken);
+            else
+                await RestorePreviousItemAsync(userId, previousItem.Id);
+
             return seeded;
-
-        // A failed initial sync still leaves the new item persisted, so success alone does not decide this.
-        if (seeded.IsSuccess || await NewItemWasPersistedAsync(userId, activeBefore))
-            await RevokePreviousItemAsync(previousItem.Id, previousToken!, cancellationToken);
-        else
-            await RestorePreviousItemAsync(userId, previousItem.Id);
-
-        return seeded;
+        }
+        finally
+        {
+            // The previous item was taken offline above, so the user's connections changed whatever happens next.
+            await dataVersion.BumpAsync(userId);
+        }
     }
 
     /// <inheritdoc />

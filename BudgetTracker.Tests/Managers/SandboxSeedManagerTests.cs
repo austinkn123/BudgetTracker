@@ -30,6 +30,8 @@ public class SandboxSeedManagerTests
     private readonly Mock<ICategoryAccessor> _categoryAccessor = new(MockBehavior.Strict);
     private readonly Mock<ITransactionAccessor> _txnAccessor = new(MockBehavior.Strict);
     private readonly Mock<IAccountAccessor> _accountAccessor = new(MockBehavior.Strict);
+    private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
+    private readonly List<string> _calls = [];
     private readonly PlaidOptions _options = new() { Environment = "sandbox" };
 
     private static readonly PlaidSyncSummary SeedSummary = new(12, 0, 0, DateTime.UtcNow);
@@ -54,6 +56,9 @@ public class SandboxSeedManagerTests
             .ReturnsAsync("public-sandbox-token");
         _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
             .ReturnsAsync([]);
+        _dataVersion.Setup(d => d.BumpAsync(It.IsAny<int>()))
+            .Callback<int>(userId => _calls.Add($"bump:{userId}"))
+            .ReturnsAsync(true);
     }
 
     private SandboxSeedManager BuildSut(ILogger<SandboxSeedManager>? logger = null, IPlaidManager? plaidManager = null) => new(
@@ -62,6 +67,7 @@ public class SandboxSeedManagerTests
         _itemAccessor.Object,
         _budgetPlanAccessor.Object,
         _categoryAccessor.Object,
+        _dataVersion.Object,
         Options.Create(_options),
         logger ?? NullLogger<SandboxSeedManager>.Instance);
 
@@ -73,6 +79,7 @@ public class SandboxSeedManagerTests
         _categoryAccessor.Object,
         new PlaidEngine(),
         Mock.Of<IPlaidWebhookEngine>(),
+        _dataVersion.Object,
         Options.Create(_options),
         NullLogger<PlaidManager>.Instance);
 
@@ -291,6 +298,90 @@ public class SandboxSeedManagerTests
             It.IsAny<It.IsAnyType>(),
             It.IsAny<Exception?>(),
             It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once);
+    }
+
+    // ── Data version (live refresh) ─────────────────────────────────────────
+
+    private void VerifyNeverBumped() => _dataVersion.Verify(d => d.BumpAsync(It.IsAny<int>()), Times.Never);
+
+    [Fact]
+    public async Task Seed_PreviousItemRetired_BumpsOnceAtTheEnd()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([Item(12, new DateTime(2026, 9, 20))]);
+        _plaidManager.Setup(m => m.ExchangePublicTokenAsync(UserId, "public-sandbox-token"))
+            .Callback(() => _calls.Add("exchange"))
+            .ReturnsAsync(Result<PlaidSyncSummary>.Success(SeedSummary));
+        ArrangeTakeOffline(12, AccessTokenLookup.Found("token-12"));
+        _plaidAccessor.Setup(a => a.RemoveItemAsync("token-12", It.IsAny<CancellationToken>()))
+            .Callback(() => _calls.Add("revoke"))
+            .Returns(Task.CompletedTask);
+
+        await BuildSut().SeedAsync(UserId, months: 2);
+
+        Assert.Equal(["exchange", "revoke", $"bump:{UserId}"], _calls);
+    }
+
+    [Fact]
+    public async Task Seed_ExchangeFailsAndPreviousIsRestored_StillBumpsOnceAfterTheRestore()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([Item(12, new DateTime(2026, 9, 20))]);
+        ArrangeTakeOffline(12, AccessTokenLookup.Found("token-12"));
+        _itemAccessor.Setup(a => a.ReactivateAsync(UserId, 12)).Callback(() => _calls.Add("restore")).ReturnsAsync(true);
+        _plaidManager.Setup(m => m.ExchangePublicTokenAsync(UserId, "public-sandbox-token"))
+            .ReturnsAsync(Result<PlaidSyncSummary>.Failure("Could not link your bank. Please try again."));
+
+        await BuildSut().SeedAsync(UserId, months: 2);
+
+        Assert.Equal(["restore", $"bump:{UserId}"], _calls);
+    }
+
+    [Fact]
+    public async Task Seed_ExchangeThrowsAfterThePreviousWasDeactivated_StillBumps()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([Item(12, new DateTime(2026, 9, 20))]);
+        ArrangeTakeOffline(12, AccessTokenLookup.Found("token-12"));
+        _plaidManager.Setup(m => m.ExchangePublicTokenAsync(UserId, "public-sandbox-token"))
+            .ThrowsAsync(new InvalidOperationException("db down"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => BuildSut().SeedAsync(UserId, months: 2));
+
+        Assert.Equal([$"bump:{UserId}"], _calls);
+    }
+
+    [Fact]
+    public async Task Seed_NoPreviousItem_LeavesTheBumpToTheExchange()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([]);
+        _plaidManager.Setup(m => m.ExchangePublicTokenAsync(UserId, "public-sandbox-token"))
+            .ReturnsAsync(Result<PlaidSyncSummary>.Success(SeedSummary));
+
+        await BuildSut().SeedAsync(UserId, months: 2);
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Seed_RejectedBeforeAnyWrite_DoesNotBump()
+    {
+        await BuildSut().SeedAsync(UserId, months: 0);
+        _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
+        await BuildSut().SeedAsync(UserId, months: 2);
+        _options.Environment = "production";
+        await BuildSut().SeedAsync(UserId, months: 2);
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task ResetLogin_DoesNotBump()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(UserId, 12)).ReturnsAsync(AccessTokenLookup.Found("token-12"));
+        _plaidAccessor.Setup(a => a.ResetSandboxLoginAsync("token-12", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var result = await BuildSut().ResetLoginAsync(UserId, 12);
+
+        Assert.True(result.IsSuccess);
+        VerifyNeverBumped();
     }
 
     // ── ResetLoginAsync ─────────────────────────────────────────────────────

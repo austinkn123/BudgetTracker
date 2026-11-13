@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { PageHeader } from '../../../shared/components/ui';
 import { useCategories } from '../../categories/hooks/useCategories';
-import { useTransactions } from '../../transactions/hooks/useTransactions';
+import { useTransactionSummary } from '../../transactions/hooks/useTransactionSummary';
 import { useUser } from '../../user/hooks/useUser';
 import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
 import ReconnectAlert from '../../linked-accounts/components/ReconnectAlert';
@@ -23,6 +23,7 @@ import UncategorizedNudge from '../components/UncategorizedNudge';
 import type { Stat } from '../components/StatStrip';
 import { useDateRange } from '../hooks/useDateRange';
 import { useBudgetAnalysis } from '../hooks/useBudgetAnalysis';
+import { useWindowTransactions, windowFilter } from '../hooks/useWindowTransactions';
 import { getStatusHeadline } from '../utils/planCopy';
 import {
   selectCategoryCards,
@@ -32,7 +33,6 @@ import {
   selectWaterfall,
 } from '../utils/selectors';
 import { currency } from '../../../shared/utils/format';
-import { needsCategory } from '../../transactions/utils/transactionGroups';
 
 // How much of the server's analysis this particular screen chooses to show.
 const TREND_MONTHS = 3;
@@ -51,23 +51,21 @@ const DashboardPage = () => {
 
   const { isLoading: loadingUser, error: userError } = useUser();
   const { data: categories = [], isLoading: loadingCategories, error: categoriesError } = useCategories();
-  const { data: transactions = [], isLoading: loadingTransactions, error: transactionsError } = useTransactions();
   const { range, setRange, start, end } = useDateRange();
+  const {
+    data: windowTransactions = [],
+    isLoading: loadingTransactions,
+    error: transactionsError,
+  } = useWindowTransactions(range, start, end, RECENT_ACTIVITY_ITEMS);
+  // Each category drill reads its own rows, by this filter, when opened.
+  const drillFilter = useMemo(() => windowFilter(range, start, end), [range, start, end]);
+  const { data: summary } = useTransactionSummary();
   const { data: analysis, isLoading: loadingAnalysis, error: analysisError } =
     useBudgetAnalysis(start, end, TREND_MONTHS);
   const categoryNames = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
     [categories],
   );
-
-  const windowTransactions = useMemo(() => {
-    const startMs = start.getTime();
-    const endMs = end.getTime();
-    return transactions.filter((t) => {
-      const ts = new Date(t.occurredAt).getTime();
-      return ts >= startMs && ts <= endMs;
-    });
-  }, [transactions, start, end]);
 
   const planMonth = analysis?.planMonth ?? null;
 
@@ -97,12 +95,10 @@ const DashboardPage = () => {
         ? selectCategoryCards(
             planMonth,
             analysis?.monthlyTrend ?? [],
-            windowTransactions,
             categoryNames,
-            DRILL_TRANSACTIONS,
           )
         : [],
-    [planMonth, analysis?.monthlyTrend, windowTransactions, categoryNames],
+    [planMonth, analysis?.monthlyTrend, categoryNames],
   );
 
   const topSpend = useMemo(
@@ -149,12 +145,9 @@ const DashboardPage = () => {
     ];
   }, [planMonth]);
 
-  // Counted across the whole ledger, not the selected range: a row outside the current window
-  // is still missing from the plan-vs-actual maths.
-  const uncategorizedCount = useMemo(
-    () => transactions.filter(needsCategory).length,
-    [transactions],
-  );
+  // Counted server-side across the whole ledger, not the selected range: a row outside the
+  // current window is still missing from the plan-vs-actual maths.
+  const uncategorizedCount = summary?.uncategorizedCount ?? 0;
 
   const isLoading = loadingUser || loadingCategories || loadingTransactions || loadingAnalysis;
   const hasErrors = userError || categoriesError || transactionsError || analysisError;
@@ -221,7 +214,11 @@ const DashboardPage = () => {
             <WhereItWent rows={topSpend} />
           </div>
 
-          <CategoryDrillGrid cards={categoryCards} />
+          <CategoryDrillGrid
+            cards={categoryCards}
+            rangeFilter={drillFilter}
+            transactionLimit={DRILL_TRANSACTIONS}
+          />
 
           {/* Bucket breakdown + recent activity */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

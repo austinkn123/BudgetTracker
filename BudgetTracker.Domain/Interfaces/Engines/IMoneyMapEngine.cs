@@ -23,4 +23,20 @@ public interface IMoneyMapEngine
         IEnumerable<Category> categories,
         DateTime today,
         int months);
+
+    /// <summary>
+    /// The history <see cref="Build"/> reads for this request, so the caller fetches only that: every row from
+    /// <see cref="MoneyMapHistory.From"/> through today, plus the newest qualifying paychecks in
+    /// <see cref="MoneyMapHistory.PayCategoryIds"/> (see <see cref="PaycheckFloor"/>) wherever they fall.
+    /// </summary>
+    /// <param name="plans">The user's plans; the newest active one decides the pay categories.</param>
+    /// <param name="today">The current date.</param>
+    /// <param name="months">Window length, 1 to 24.</param>
+    /// <returns>The history, or a failure when <paramref name="months"/> is out of range.</returns>
+    Result<MoneyMapHistory> DescribeHistory(IEnumerable<BudgetPlan> plans, DateTime today, int months);
+
+    /// <summary>The smallest amount that still counts as a paycheck, given the newest pay row's amount.</summary>
+    /// <param name="latestPay">The newest pay row's amount.</param>
+    /// <returns>The minimum qualifying paycheck amount.</returns>
+    decimal PaycheckFloor(decimal latestPay);
 }

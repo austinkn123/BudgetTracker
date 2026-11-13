@@ -22,6 +22,7 @@ public class PlaidManager(
     ICategoryAccessor categoryAccessor,
     IPlaidEngine engine,
     IPlaidWebhookEngine webhookEngine,
+    IDataVersionAccessor dataVersion,
     IOptions<PlaidOptions> options,
     ILogger<PlaidManager> logger) : IPlaidManager
 {
@@ -169,6 +170,9 @@ public class PlaidManager(
             return Result<PlaidSyncSummary>.Failure("Could not save the new bank connection. Please try again.");
         }
 
+        // The new connection is visible now, even if the initial sync below fails.
+        await dataVersion.BumpAsync(userId);
+
         // Initial sync (~30 days delivered automatically by Plaid via /transactions/sync with null cursor)
         return await RunSyncAsync(userId, newPlaidItemId, accessToken, cursor: null, accountsLookup: allAccounts, plaidAccountSnapshots: accountSnapshots);
     }
@@ -268,9 +272,11 @@ public class PlaidManager(
                 break;
         }
 
-        return await itemAccessor.DeactivateAsync(userId, plaidItemId)
-            ? Result.Success()
-            : Result.Failure(ConnectionNotFoundMessage);
+        if (!await itemAccessor.DeactivateAsync(userId, plaidItemId))
+            return Result.Failure(ConnectionNotFoundMessage);
+
+        await dataVersion.BumpAsync(userId);
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -281,6 +287,7 @@ public class PlaidManager(
             return Result.Failure(ConnectionNotFoundMessage);
 
         await itemAccessor.SetNeedsReconnectAsync(plaidItemId, false);
+        await dataVersion.BumpAsync(userId);
         return Result.Success();
     }
 
@@ -318,6 +325,7 @@ public class PlaidManager(
         if (action != WebhookAction.Sync)
         {
             await itemAccessor.SetNeedsReconnectAsync(item.Id, action == WebhookAction.FlagReconnect);
+            await dataVersion.BumpAsync(item.UserId);
             return Result.Success();
         }
 
@@ -501,6 +509,7 @@ public class PlaidManager(
         {
             // The bank wants the user to sign in again; the flag makes the client offer update-mode Link (Reconnect).
             await itemAccessor.SetNeedsReconnectAsync(plaidItemId, true);
+            await dataVersion.BumpAsync(userId);
             return Result<PlaidSyncSummary>.Failure(LoginRequiredMessage);
         }
         catch (Exception)
@@ -528,10 +537,12 @@ public class PlaidManager(
             : (await transactionAccessor.GetByPlaidTransactionIdsAsync(changes.Select(t => t.TransactionId)))
                 .ToDictionary(t => t.PlaidTransactionId!);
 
-        // A row still uncategorized follows how the user last filed its payee, ahead of Plaid's suggestion.
+        // A row still uncategorized follows how the user last filed its payee, ahead of Plaid's suggestion. Only this
+        // batch's payees are looked up.
         IReadOnlyDictionary<string, int> categoryByPayee = changes.Count == 0
             ? new Dictionary<string, int>()
-            : await transactionAccessor.GetLatestCategoryByPayeeAsync(userId);
+            : await transactionAccessor.GetLatestCategoryByPayeeAsync(
+                userId, changes.Select(engine.ResolvePayee).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
 
         foreach (var plaidTxn in changes)
         {
@@ -558,27 +569,40 @@ public class PlaidManager(
 
         var (inserted, updated) = await transactionAccessor.UpsertImportedAsync(mapped);
         var removed = 0;
-        if (idsToDelete.Count > 0)
+        DateTime syncedAt;
+        try
         {
-            removed = await transactionAccessor.DeleteByPlaidTransactionIdsAsync(idsToDelete);
+            if (idsToDelete.Count > 0)
+            {
+                removed = await transactionAccessor.DeleteByPlaidTransactionIdsAsync(idsToDelete);
+            }
+
+            // Plaid's cached balances ride along on /transactions/sync for free (/accounts/balance/get is billed).
+            if (syncResult.Accounts is { Count: > 0 } accounts)
+                await itemAccessor.UpdateBalancesAsync(plaidItemId, accounts);
+
+            syncedAt = DateTime.UtcNow;
+            await itemAccessor.UpdateSyncStateAsync(plaidItemId, syncResult.NextCursor, syncedAt);
+
+            await PairOwnAccountTransfersAsync(userId, userCategories);
         }
-
-        // Plaid's cached balances ride along on /transactions/sync for free (/accounts/balance/get is billed).
-        if (syncResult.Accounts is { Count: > 0 } accounts)
-            await itemAccessor.UpdateBalancesAsync(plaidItemId, accounts);
-
-        var syncedAt = DateTime.UtcNow;
-        await itemAccessor.UpdateSyncStateAsync(plaidItemId, syncResult.NextCursor, syncedAt);
-
-        await PairOwnAccountTransfersAsync(userId, userCategories);
+        finally
+        {
+            // The upsert has committed by here, so bump even when a later write throws (the exception still propagates):
+            // webhook, sweep and sync-on-open callers never invalidate client caches themselves. Also bumped on a
+            // completed sync with no rows, since the sync time and balances shown have changed. BumpAsync never throws.
+            await dataVersion.BumpAsync(userId);
+        }
 
         return Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, syncedAt));
     }
 
     /// <summary>
     /// Re-pair every money movement between the user's own linked cash accounts from scratch, so a leg that lands in a
-    /// later sync (or on another bank) still pairs, older history is back-filled, and a leg whose partner Plaid removed
-    /// reverts. Best-effort: the sync itself has already been saved, and the next sync retries.
+    /// later sync (or on another bank) still pairs, older history is back-filled, and a leg whose partner Plaid removed,
+    /// or another leg took, reverts. Pairing is one oldest-first walk over the whole history, so it cannot be narrowed to
+    /// the days a sync touched without risking an orphaned Transfer leg. Best-effort: the sync itself has already been
+    /// saved, and the next sync retries.
     /// </summary>
     private async Task PairOwnAccountTransfersAsync(int userId, IReadOnlyList<Category> userCategories)
     {

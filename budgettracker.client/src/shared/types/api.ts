@@ -4,6 +4,14 @@ export interface User {
   createdAt: string;
 }
 
+/**
+ * GET /data-version: an opaque counter that changes whenever any of the user's budget data changes.
+ * Compare with `!==` only — it can go down after a restore.
+ */
+export interface DataVersion {
+  version: number;
+}
+
 export interface Category {
   id: number;
   userId: number;
@@ -31,6 +39,36 @@ export interface Transaction {
   plaidCategoryPrimary?: string | null;
   isImported?: boolean;
   isPending?: boolean;
+}
+
+/** GET /api/transactions/page. Newest first (occurredAt desc, id desc); `nextCursor` is opaque, null on the last page. */
+export interface TransactionPage {
+  items: Transaction[];
+  nextCursor: string | null;
+}
+
+/** One account's signed net of still-pending rows (money in positive). */
+export interface PendingByAccount {
+  plaidAccountId: string;
+  amount: number;
+}
+
+/** GET /api/transactions/summary. The small ledger-wide figures that used to need the whole ledger. */
+export interface TransactionSummary {
+  /** Rows that still need a category: no category and not a paired transfer (same rule as `needsCategory`). */
+  uncategorizedCount: number;
+  pendingByAccount: PendingByAccount[];
+}
+
+/** GET /api/categories/usage?since=. Only categories with at least one transaction appear. */
+export interface CategoryUsage {
+  categoryId: number;
+  /** Every transaction filed here, any date. */
+  transactionCount: number;
+  /** Sum of positive amounts on or after `since`. */
+  inflowSince: number;
+  /** Sum of negative amounts on or after `since` (zero or below). */
+  outflowSince: number;
 }
 
 export interface PlaidLinkedAccountView {

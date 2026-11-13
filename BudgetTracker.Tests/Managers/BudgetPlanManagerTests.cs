@@ -14,14 +14,19 @@ public class BudgetPlanManagerTests
 
     private readonly Mock<IBudgetPlanAccessor> _accessor = new(MockBehavior.Strict);
     private readonly BudgetPlanEngine _engine = new();
+    private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
+    private readonly List<string> _calls = [];
 
     public BudgetPlanManagerTests()
     {
         _accessor.Setup(a => a.GetOtherNamesForMonthAsync(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<int>()))
             .ReturnsAsync([]);
+        _dataVersion.Setup(d => d.BumpAsync(It.IsAny<int>()))
+            .Callback<int>(userId => _calls.Add($"bump:{userId}"))
+            .ReturnsAsync(true);
     }
 
-    private BudgetPlanManager BuildSut() => new(_engine, _accessor.Object);
+    private BudgetPlanManager BuildSut() => new(_engine, _accessor.Object, _dataVersion.Object);
 
     private static BudgetPlan BuildPlan(int id = 0, string name = "Baseline") => new()
     {
@@ -138,5 +143,88 @@ public class BudgetPlanManagerTests
 
         Assert.True(result.IsSuccess);
         _accessor.Verify(a => a.GetOtherNamesForMonthAsync(UserId, March, 7), Times.Once);
+    }
+
+    // ── Data version (live refresh) ─────────────────────────────────────────
+
+    private void VerifyNeverBumped() => _dataVersion.Verify(d => d.BumpAsync(It.IsAny<int>()), Times.Never);
+
+    [Fact]
+    public async Task Create_Persisted_BumpsTheDataVersionAfterTheWrite()
+    {
+        _accessor.Setup(a => a.CreateAsync(It.IsAny<BudgetPlan>())).Callback(() => _calls.Add("write")).ReturnsAsync(3);
+
+        var result = await BuildSut().CreateAsync(BuildPlan(), UserId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", $"bump:{UserId}"], _calls);
+    }
+
+    [Fact]
+    public async Task Create_InvalidDuplicateOrForeignCategory_DoesNotBump()
+    {
+        await BuildSut().CreateAsync(BuildPlan(name: null!), UserId);
+
+        _accessor.Setup(a => a.GetOtherNamesForMonthAsync(UserId, March, 0)).ReturnsAsync(["baseline"]);
+        await BuildSut().CreateAsync(BuildPlan(), UserId);
+
+        _accessor.Setup(a => a.GetOtherNamesForMonthAsync(UserId, March, 0)).ReturnsAsync([]);
+        _accessor.Setup(a => a.CategoriesBelongToUserAsync(It.IsAny<IEnumerable<int>>(), UserId)).ReturnsAsync(false);
+        var foreign = BuildPlan();
+        foreign.Entries = [new BudgetPlanEntry { CategoryId = 99, LineType = "Expense", Bucket = "Needs", Cadence = "Monthly", Amount = 1m }];
+        await BuildSut().CreateAsync(foreign, UserId);
+
+        _accessor.Setup(a => a.CreateAsync(It.IsAny<BudgetPlan>()))
+            .ThrowsAsync(new UniqueNameViolationException("UQ_BudgetPlans_User_Month_Name", new Exception("23505")));
+        await BuildSut().CreateAsync(BuildPlan(), UserId);
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Update_Persisted_BumpsTheDataVersionAfterTheWrite()
+    {
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<BudgetPlan>(), UserId)).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+
+        var result = await BuildSut().UpdateAsync(BuildPlan(id: 7), UserId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", $"bump:{UserId}"], _calls);
+    }
+
+    [Fact]
+    public async Task Update_NotFoundInvalidOrDuplicate_DoesNotBump()
+    {
+        await BuildSut().UpdateAsync(BuildPlan(id: 7, name: null!), UserId);
+
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<BudgetPlan>(), UserId)).ReturnsAsync(false);
+        await BuildSut().UpdateAsync(BuildPlan(id: 7), UserId);
+
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<BudgetPlan>(), UserId))
+            .ThrowsAsync(new UniqueNameViolationException("UQ_BudgetPlans_User_Month_Name", new Exception("23505")));
+        await BuildSut().UpdateAsync(BuildPlan(id: 7), UserId);
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Delete_Deleted_BumpsTheDataVersionAfterTheWrite()
+    {
+        _accessor.Setup(a => a.DeleteAsync(7, UserId)).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+
+        var result = await BuildSut().DeleteAsync(7, UserId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", $"bump:{UserId}"], _calls);
+    }
+
+    [Fact]
+    public async Task Delete_NotFound_DoesNotBump()
+    {
+        _accessor.Setup(a => a.DeleteAsync(99, UserId)).ReturnsAsync(false);
+
+        await BuildSut().DeleteAsync(99, UserId);
+
+        VerifyNeverBumped();
     }
 }

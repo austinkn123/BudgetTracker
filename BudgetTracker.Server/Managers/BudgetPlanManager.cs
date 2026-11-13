@@ -6,7 +6,7 @@ using BudgetTracker.Domain.Models;
 
 namespace BudgetTracker.Server.Managers;
 
-public class BudgetPlanManager(IBudgetPlanEngine engine, IBudgetPlanAccessor accessor) : IBudgetPlanManager
+public class BudgetPlanManager(IBudgetPlanEngine engine, IBudgetPlanAccessor accessor, IDataVersionAccessor dataVersion) : IBudgetPlanManager
 {
     public async Task<Result<BudgetPlan>> GetByIdAsync(int id, int userId)
     {
@@ -40,14 +40,18 @@ public class BudgetPlanManager(IBudgetPlanEngine engine, IBudgetPlanAccessor acc
         if (categoryOwnershipError is not null)
             return Result<int>.Failure(categoryOwnershipError);
 
+        int id;
         try
         {
-            return Result<int>.Success(await accessor.CreateAsync(budgetPlan));
+            id = await accessor.CreateAsync(budgetPlan);
         }
         catch (UniqueNameViolationException)
         {
             return Result<int>.Failure(engine.DuplicateNameError(budgetPlan.Name));
         }
+
+        await dataVersion.BumpAsync(userId);
+        return Result<int>.Success(id);
     }
 
     public async Task<Result<bool>> UpdateAsync(BudgetPlan budgetPlan, int userId)
@@ -78,17 +82,21 @@ public class BudgetPlanManager(IBudgetPlanEngine engine, IBudgetPlanAccessor acc
             return Result<bool>.Failure(engine.DuplicateNameError(budgetPlan.Name));
         }
 
-        return updated
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("Budget plan not found");
+        if (!updated)
+            return Result<bool>.Failure("Budget plan not found");
+
+        await dataVersion.BumpAsync(userId);
+        return Result<bool>.Success(true);
     }
 
     public async Task<Result<bool>> DeleteAsync(int id, int userId)
     {
         var deleted = await accessor.DeleteAsync(id, userId);
-        return deleted
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("Budget plan not found");
+        if (!deleted)
+            return Result<bool>.Failure("Budget plan not found");
+
+        await dataVersion.BumpAsync(userId);
+        return Result<bool>.Success(true);
     }
 
     private async Task<string?> ValidateCategoryOwnershipAsync(BudgetPlan budgetPlan, int userId)
