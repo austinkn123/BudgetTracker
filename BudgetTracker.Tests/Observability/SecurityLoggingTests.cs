@@ -49,6 +49,23 @@ public class SecurityLoggingTests
     }
 
     [Fact]
+    public async Task Should_LogDeniedRequestWithUserId_When_EndpointReturnsForbid()
+    {
+        var currentUser = new Mock<ICurrentUserProvider>();
+        currentUser.SetupGet(u => u.UserId).Returns(7);
+        await using var host = await StartHostAsync(b => b.Services.AddScoped(_ => currentUser.Object));
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/forbid");
+        request.Headers.Add(ObservabilityTestHost.TestUserHeader, Sub);
+
+        var response = await host.Client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var record = Assert.Single(host.Logs.GetSnapshot(), r => r.Category == SecurityLog.Category);
+        Assert.Contains("403", record.Message);
+        Assert.Equal(7, ObservabilityTestHost.ScopeValues(record)[RequestLogScope.UserIdKey]);
+    }
+
+    [Fact]
     public async Task Should_NotLogSecurityEvent_When_RequestSucceeds()
     {
         await using var host = await StartHostAsync();
@@ -75,12 +92,16 @@ public class SecurityLoggingTests
             }));
         using var request = new HttpRequestMessage(HttpMethod.Get, "/protected");
         request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
+        request.Headers.Add(CorrelationId.HeaderName, "corr-auth");
 
         var response = await host.Client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var security = host.Logs.GetSnapshot().Where(r => r.Category == SecurityLog.Category).ToList();
-        Assert.Contains(security, r => r.Message.Contains("Authentication failed"));
+        var failed = Assert.Single(security, r => r.Message.Contains("Authentication failed"));
+        Assert.Null(failed.Exception);
+        Assert.Equal(["FailureType"], failed.StructuredState!.Select(kv => kv.Key).Where(k => k != "{OriginalFormat}"));
+        Assert.Equal("corr-auth", ObservabilityTestHost.ScopeValues(failed)[RequestLogScope.CorrelationIdKey]);
         Assert.Contains(security, r => r.Message.Contains("401"));
         Assert.All(host.Logs.GetSnapshot(), r => Assert.DoesNotContain("SECRET-TOKEN-VALUE", ObservabilityTestHost.Render(r)));
     }
@@ -91,6 +112,7 @@ public class SecurityLoggingTests
             {
                 app.MapGet("/protected", () => "secret");
                 app.MapGet("/admin", () => "secret").RequireAuthorization(p => p.RequireRole("admin"));
+                app.MapGet("/forbid", () => Results.Forbid());
             },
             configure);
 }

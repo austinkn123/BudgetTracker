@@ -21,6 +21,8 @@ public class CorrelationIdTests
     [InlineData("new\nline")]
     [InlineData("quote\"")]
     [InlineData("<script>")]
+    [InlineData("caf\u00e9")]
+    [InlineData("a,a")]
     [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0")] // 65 chars
     public void Should_RejectCorrelationId_When_MissingUnsafeOrOversized(string? value) =>
         Assert.False(CorrelationId.IsValid(value));
@@ -51,6 +53,7 @@ public class CorrelationIdTests
     [Theory]
     [InlineData("has space")]
     [InlineData("semi;colon")]
+    [InlineData("caf\u00e9")]
     [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef-oversized")]
     public async Task Should_ReplaceCorrelationId_When_InboundIsInvalid(string inbound)
     {
@@ -64,6 +67,20 @@ public class CorrelationIdTests
         Assert.NotEqual(inbound, echoed);
         Assert.True(CorrelationId.IsValid(echoed));
         Assert.Equal(echoed, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Should_ReplaceCorrelationId_When_HeaderIsRepeated()
+    {
+        await using var host = await StartEchoHostAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/echo");
+        request.Headers.TryAddWithoutValidation(CorrelationId.HeaderName, ["a", "a"]);
+
+        var response = await host.Client.SendAsync(request);
+
+        var echoed = Assert.Single(response.Headers.GetValues(CorrelationId.HeaderName));
+        Assert.NotEqual("a", echoed);
+        Assert.True(CorrelationId.IsValid(echoed));
     }
 
     [Fact]
