@@ -214,3 +214,6 @@ webullGroup.MapWebullEndpoints();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+/// <summary>Exposes the entry point to WebApplicationFactory in the wiring tests.</summary>
+public partial class Program;
