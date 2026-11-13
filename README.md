@@ -8,7 +8,8 @@ BudgetTracker is a full-stack personal finance application with a React frontend
 - Styling: Tailwind CSS + Radix primitives (design tokens in `src/shared/theme/`)
 - Forms and validation: React Hook Form + Zod
 - Backend: ASP.NET Core Minimal APIs on .NET 9
-- Database: SQL Server
+- Database: PostgreSQL (Neon in production) via Npgsql
+- Hosting: AWS Lambda behind a Function URL (see [deploy/README.md](deploy/README.md))
 - Data access: Entity Framework Core
 - Backend structure: BudgetTracker.Domain + BudgetTracker.Server
 
@@ -43,7 +44,6 @@ BudgetTracker/
 |-- budgettracker.client/      React SPA
 |-- BudgetTracker.Domain/      Domain models, interfaces, engines, accessors
 |-- BudgetTracker.Server/      API host, endpoints, managers, utilities
-|-- DatabaseSetup.sql          Database bootstrap script
 `-- BudgetTracker.sln          Solution file
 ```
 
@@ -53,13 +53,18 @@ BudgetTracker/
 
 - .NET 9 SDK
 - Node.js 18+
-- SQL Server
+- PostgreSQL
+- EF Core CLI: `dotnet tool install --global dotnet-ef`
 
 ### 1. Configure the database
 
-Update the connection string in `BudgetTracker.Server/appsettings.Development.json` for your local SQL Server instance.
+Update `ConnectionStrings:BudgetTrackerConnection` in `BudgetTracker.Server/appsettings.Development.json` for your local PostgreSQL instance, or override it in the gitignored `BudgetTracker.Server/appsettings.Local.json`.
 
-Then run `DatabaseSetup.sql` against that database to create the schema and seed data.
+Then apply the EF Core migrations to create the schema:
+
+```bash
+dotnet ef database update --project BudgetTracker.Domain --startup-project BudgetTracker.Server
+```
 
 ### 2. Run the backend
 
@@ -107,8 +112,8 @@ Endpoint mappings live in `BudgetTracker.Server/Endpoints/`.
 
 - ASP.NET Core Minimal APIs
 - .NET 9
-- Entity Framework Core
-- SQL Server
+- Entity Framework Core (Npgsql provider)
+- PostgreSQL
 - Scrutor for DI registration
 
 ## Status
@@ -137,7 +142,7 @@ Authentication is not documented as active in the current setup. Treat the app a
 - `BudgetTracker.Server/Program.cs`
 - `BudgetTracker.Server/Endpoints/`
 - `BudgetTracker.Domain/Interfaces/`
-- `DatabaseSetup.sql`
+- `BudgetTracker.Domain/Migrations/`
 - `budgettracker.client/README.md`
 
 ## Contributing

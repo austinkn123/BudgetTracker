@@ -7,10 +7,10 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **Frontend**: React + TypeScript + Vite
 - **Styling**: Tailwind CSS + Radix primitives (design tokens in `budgettracker.client/src/shared/theme/`; see `project-docs/design.md`)
 - **Forms/Validation**: React Hook Form + Zod (`@hookform/resolvers`)
-- **Database**: PostgreSQL — Neon in production, local Postgres for development (EF Core provider: `Npgsql.EntityFrameworkCore.PostgreSQL`)
-- **Hosting**: AWS Lambda behind a Function URL (see `deploy/README.md`)
+- **Database**: PostgreSQL (Neon) via Npgsql (`Npgsql.EntityFrameworkCore.PostgreSQL`)
 - **ORM**: Entity Framework Core (Code-first with Fluent API configurations)
 - **Authentication**: AWS Cognito (In progress)
+- **Hosting**: a single AWS Lambda behind a Function URL, deployed with SAM (`deploy/template.yaml`; see `deploy/README.md`). Logs go to CloudWatch (14-day retention).
 
 ## Architecture
 - Follow IDesign methodology with volatility-based decomposition.
@@ -30,7 +30,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **React**: Use Functional Components and Hooks. Avoid class components.
 - **React Forms**: Use React Hook Form with Zod for validation. Keep reusable schemas in `budgettracker.client/src/shared/validation/` and prefer shared schema imports over inline schema duplication.
 - **EF Core**: Use LINQ queries through `BudgetTrackerDbContext`. Use `AsNoTracking()` for read-only queries. Define entity configurations using Fluent API in `BudgetTracker.Domain/Data/Configurations/`. Use EF migrations (`dotnet ef migrations add`) for schema changes.
-- **Testing**: Follow TDD (Red-Green-Refactor). Unit test Engines directly. Test Managers with mocked Engines/Accessors.
+- **Testing**: Follow TDD (Red-Green-Refactor). Unit test Engines directly. Test Managers with mocked Engines/Accessors. Accessor tests that need a relational provider (e.g. `ExecuteUpdate`) use EF Core SQLite in-memory — the EF InMemory provider can't translate it. There is no committed real-Postgres test fixture yet.
 - **Contracts first**: Define interfaces in `BudgetTracker.Domain/Interfaces/` before implementing.
 
 ## Commits & Pull Requests
@@ -49,8 +49,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - Refer to `.claude/agents/chrissy-product-manager.md` for product vision if unclear on requirements.
 - Jira project: **BUD** on `austinkn123.atlassian.net` — check for existing issues before creating new ones, and link completed work to its ticket when relevant.
 - **Jira access via MCP**: The Atlassian MCP server is configured in `.mcp.json` and provides direct Jira access. When asked about any BUD ticket, **ALWAYS call the Atlassian MCP tools** — never say "I can't connect to Jira" without first attempting the call. Common tools: `mcp__atlassian__getIssue` (fetch a specific ticket), `mcp__atlassian__searchIssues` (JQL search), `mcp__atlassian__getAccessibleAtlassianResources` (list resources). If the call fails, report the actual error returned by the tool, not a pre-emptive refusal.
-- Local database: **PostgreSQL** — `Host=localhost;Database=budgettracker;Username=postgres;Password=postgres` (from `appsettings.Development.json`). Inspect schema and verify migrations with `psql` or `dotnet ef`. Production is Neon Postgres (direct, non-pooler connection string; see `deploy/README.md`). Write Postgres-correct SQL: `ILIKE`/`lower()` for case-insensitive matching, `timestamp without time zone` columns (pass `DateTimeKind.Unspecified`), expression/partial indexes via raw SQL in migrations.
-- **Tests**: Accessor tests that need a relational provider (e.g. `ExecuteUpdate`) use EF Core SQLite in-memory; the EF InMemory provider can't translate it. There is no committed real-Postgres test fixture yet.
+- Local database: **PostgreSQL**. Local dev reads `ConnectionStrings:BudgetTrackerConnection` from `BudgetTracker.Server/appsettings.Development.json` (points at Postgres on `localhost`); the gitignored `appsettings.Local.json` can override it. Production uses Neon, with the connection string in SSM (see `deploy/README.md`). Use the `postgres` MCP server (`.mcp.json`, Postgres MCP Pro via `uvx`, **read-only** `--access-mode=restricted`) to inspect schema, run read queries, and verify migrations. It connects to `BUDGETTRACKER_DATABASE_URI` if set (use a read-only role for Neon), otherwise to the local dev database.
 
 ## Agent Roster
 

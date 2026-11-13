@@ -15,7 +15,7 @@ Steps:
 
 If either fails to start, diagnose and suggest a fix. Common issues:
 - **Port already in use** → another instance is running. Suggest stopping it.
-- **Postgres not running / connection refused on 5432** → start the local Postgres service (e.g. `brew services start postgresql`, `sudo service postgresql start`, or Docker `postgres` image) and check the `BudgetTrackerConnection` string in `appsettings.Development.json`
+- **Database not reachable** → check that the PostgreSQL server in `ConnectionStrings:BudgetTrackerConnection` (`appsettings.Development.json`, or `appsettings.Local.json` if present) is running.
 - **Missing dev cert** → `dotnet dev-certs https --trust`
 - **Build error** → show the relevant error excerpt and stop; do not retry blindly.
 - **`Invalid column name 'X'`** → DB out of sync. Suggest `/migrate` or `dotnet ef database update`.
