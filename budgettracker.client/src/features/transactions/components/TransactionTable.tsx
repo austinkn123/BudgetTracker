@@ -123,6 +123,7 @@ const TransactionTable = ({
                 return (
                   <li key={transaction.id}>
                     {index > 0 && <Separator />}
+                    {/* Native <button>: full-row click target holding payee, details and amount. */}
                     <button
                       type="button"
                       onClick={() => onRowClick(transaction)}

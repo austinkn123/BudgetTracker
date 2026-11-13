@@ -51,6 +51,7 @@ const StepHeader = ({ screen, onBack }: { screen: Screen; onBack: () => void }) 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
+        {/* Native <button>: primary-coloured text "Back" link at the builder's large text-lg size; no Button variant is a bare primary text link. */}
         <button
           type="button"
           onClick={onBack}

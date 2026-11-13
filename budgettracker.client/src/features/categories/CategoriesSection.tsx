@@ -217,6 +217,7 @@ const CategoriesSection = ({
                   key={row.category.id}
                   className="flex items-center gap-1 border-b border-border-subtle last:border-b-0"
                 >
+                  {/* Native <button>: full-row click target laid out as a 4-column grid; Button forces inline-flex + nowrap. */}
                   <button
                     type="button"
                     onClick={() => openEditDialog(row.category)}
@@ -247,14 +248,16 @@ const CategoriesSection = ({
                     </span>
                   </button>
                   <Tooltip title={`Delete ${row.category.name}`}>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setDeleteTarget(row)}
                       aria-label={`Delete ${row.category.name}`}
-                      className="focus-ring inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-120 hover:bg-error/10 hover:text-error"
+                      className="h-8 w-8 shrink-0 rounded-full p-0 hover:bg-error/10 hover:text-error"
                     >
                       <Trash2 size={15} />
-                    </button>
+                    </Button>
                   </Tooltip>
                 </li>
               );

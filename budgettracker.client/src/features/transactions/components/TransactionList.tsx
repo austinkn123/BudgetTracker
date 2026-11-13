@@ -68,6 +68,7 @@ const TransactionList = ({
 
   return (
     <div className="overflow-x-auto">
+      {/* Native <table>: per-row selected highlight and a select-all header checkbox the shared Table can't style. */}
       <table className="w-full min-w-[720px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-ink-muted">
@@ -116,6 +117,7 @@ const TransactionList = ({
                 </td>
 
                 <td className="px-3 py-2.5 align-middle">
+                  {/* Native <button>: inline payee text link inside a cell; Button's height and padding would break the row rhythm. */}
                   <button
                     type="button"
                     onClick={() => onRowClick(transaction)}

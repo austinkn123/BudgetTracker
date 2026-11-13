@@ -103,6 +103,7 @@ const ItemStep = ({ step, items, addable, onChange, onAdd, note }: ItemStepProps
             key={item.key}
             className={cn('rounded-2xl border-[1.5px] border-border p-4', item.on ? 'bg-surface' : 'bg-background')}
           >
+            {/* Native <button>: full-row role="checkbox" toggle with a 32px tick; neither Button nor InlineCheckbox covers a whole-row target. */}
             <button
               type="button"
               role="checkbox"
@@ -121,6 +122,7 @@ const ItemStep = ({ step, items, addable, onChange, onAdd, note }: ItemStepProps
               <span className={cn('text-lg font-semibold', item.on ? 'text-ink' : 'text-ink-muted')}>{item.name}</span>
             </button>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-12">
+              {/* Native <button>: oversized amount chip (text-xl, min-h-12) that reads as the figure itself, not as a Button. */}
               <button
                 type="button"
                 onClick={() => setEditingKey(item.key)}
@@ -139,6 +141,7 @@ const ItemStep = ({ step, items, addable, onChange, onAdd, note }: ItemStepProps
         ))}
       </ul>
 
+      {/* Native <button>: dashed full-width "add" tile; no Button variant draws a dashed placeholder. */}
       <button
         type="button"
         onClick={() => setAdding('pick')}
@@ -238,6 +241,7 @@ const ItemStep = ({ step, items, addable, onChange, onAdd, note }: ItemStepProps
           />
         ) : (
           <>
+            {/* Native <button>: dashed full-width "make a new one" tile; no Button variant draws a dashed placeholder. */}
             <button
               type="button"
               onClick={() => {
@@ -253,6 +257,7 @@ const ItemStep = ({ step, items, addable, onChange, onAdd, note }: ItemStepProps
               <ul className="flex flex-col gap-2">
                 {addable.map(({ category, bankMonthly }) => (
                   <li key={category.id}>
+                    {/* Native <button>: full-row, two-line pick target; Button forces a single nowrap line. */}
                     <button
                       type="button"
                       onClick={() => pick(category, bankMonthly)}

@@ -47,6 +47,7 @@ const AmountForm = ({ id, label, defaultAmount, step, onSubmit, children }: Amou
         {label}
       </label>
       <div className="flex items-center gap-3">
+        {/* Native <button>: 64px round nudge control sized for the large-target builder; Button sizes cap at h-11. */}
         <button type="button" onClick={() => nudge(-step)} aria-label={`$${step} less`} className={NUDGE_BUTTON}>
           <Minus size={28} aria-hidden />
         </button>
@@ -57,6 +58,7 @@ const AmountForm = ({ id, label, defaultAmount, step, onSubmit, children }: Amou
           >
             $
           </span>
+          {/* Native <input>: register()-bound hero amount field with its own big label; Input is Controller-bound with the small FieldShell label. */}
           <input
             id={inputId}
             type="number"
@@ -68,6 +70,7 @@ const AmountForm = ({ id, label, defaultAmount, step, onSubmit, children }: Amou
             className="focus-ring numeric h-20 w-full rounded-2xl border-2 border-border-strong bg-surface pl-10 pr-3 text-4xl font-bold tracking-[-0.03em] text-ink [appearance:textfield] focus:border-primary aria-[invalid]:border-error [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </div>
+        {/* Native <button>: 64px round nudge control, paired with the one above. */}
         <button type="button" onClick={() => nudge(step)} aria-label={`$${step} more`} className={NUDGE_BUTTON}>
           <Plus size={28} aria-hidden />
         </button>

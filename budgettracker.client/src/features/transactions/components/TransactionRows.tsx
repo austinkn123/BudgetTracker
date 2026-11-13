@@ -194,6 +194,7 @@ const TransactionRow = ({
           </div>
 
           {transaction.categoryId == null && suggestion && (
+            // Native <button>: primary-subtle suggestion chip; no Button variant matches the chip treatment.
             <button
               type="button"
               disabled={isBusy}
@@ -213,6 +214,7 @@ const TransactionRow = ({
           )}
 
           {editingNote ? (
+            // Native <input>: inline-edit note cell (Enter commits, Escape reverts); Input is react-hook-form-bound.
             <input
               autoFocus
               value={noteDraft}
@@ -231,6 +233,7 @@ const TransactionRow = ({
               className="focus-ring h-8 min-w-[14rem] flex-1 rounded-md border border-border bg-surface px-2 text-xs text-ink"
             />
           ) : (
+            // Native <button>: note text doubling as its edit trigger; long notes must wrap, Button forces nowrap.
             <button
               type="button"
               disabled={isBusy}

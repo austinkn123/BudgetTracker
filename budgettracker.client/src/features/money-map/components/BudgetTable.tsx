@@ -33,6 +33,7 @@ const BudgetTable = ({ lines, months, income, plan, actual }: BudgetTableProps) 
     subtitle="Monthly amounts. Yearly bills show the monthly set-aside. Lines over plan come first in their group."
     contentClassName="p-0"
   >
+    {/* Native <table>: one <tbody> per group with a spanning group-header row; the shared Table renders a single flat body. */}
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-border text-left text-2xs font-semibold uppercase tracking-[0.08em] text-ink-muted">

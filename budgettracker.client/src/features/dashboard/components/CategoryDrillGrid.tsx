@@ -102,6 +102,7 @@ const CategoryDrillGrid = ({ cards, rangeFilter, transactionLimit }: CategoryDri
       subtitle={`${cards.length} categories`}
       contentClassName="p-0"
     >
+      {/* Native <table>: expandable detail rows, per-row expanded state and breakpoint-hidden columns are beyond the shared Table. */}
       <table className="w-full border-collapse text-sm numeric">
         <thead>
           <tr className="border-b border-border-subtle bg-background/60">
@@ -193,6 +194,7 @@ const CategoryDrillGrid = ({ cards, rangeFilter, transactionLimit }: CategoryDri
                     )}
                   </td>
                   <td className="px-3 py-3">
+                    {/* Native <button>: bare chevron disclosure inside an already-clickable row; Button's border/hover would change the row. */}
                     <button
                       type="button"
                       aria-expanded={expanded}

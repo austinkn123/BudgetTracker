@@ -138,6 +138,7 @@ const CategoryRow = ({ category, ...rowProps }: CategoryRowProps) => {
 
   return (
     <li className="border-b border-border-subtle last:border-b-0">
+      {/* Native <button>: full-row disclosure trigger holding the name, totals and progress bar. */}
       <button
         type="button"
         onClick={() => hasTransactions && setOpen((v) => !v)}

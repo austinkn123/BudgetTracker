@@ -28,6 +28,7 @@ const NewCategoryForm = ({ id, error, onSubmit }: NewCategoryFormProps) => {
       <label htmlFor={inputId} className="text-lg font-semibold text-ink">
         What do you call it?
       </label>
+      {/* Native <input>: register()-bound hero name field with its own big label; Input is Controller-bound with the small FieldShell label. */}
       <input
         id={inputId}
         type="text"
