@@ -385,6 +385,38 @@ public class CategoryManagerTests
     }
 
     [Fact]
+    public async Task Update_RetypeThrowsAfterTheCategorySaved_StillBumpsOnce_AndRethrows()
+    {
+        StubTypeChange(Row(1, "Expense", "TRANSFER_IN"));
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+        _txnAccessor.Setup(a => a.SetCategoryAsync(It.IsAny<IReadOnlyDictionary<int, string>>(), 8, 5))
+            .Callback(() => _calls.Add("retype"))
+            .ThrowsAsync(new InvalidOperationException("db blip"));
+        var incoming = BuildMappedCategory();
+        incoming.CategoryType = "Income";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => BuildSut().UpdateAsync(incoming));
+
+        Assert.Equal(["write", "retype", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Update_LoadingRowsToRetypeThrowsAfterTheCategorySaved_StillBumpsOnce_AndRethrows()
+    {
+        StubTypeChange();
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+        var byCategory = new TransactionFilter(CategoryId: 8);
+        _txnAccessor.Setup(a => a.GetFilteredAsync(5, byCategory))
+            .ThrowsAsync(new InvalidOperationException("db blip"));
+        var incoming = BuildMappedCategory();
+        incoming.CategoryType = "Income";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => BuildSut().UpdateAsync(incoming));
+
+        Assert.Equal(["write", "bump:5"], _calls);
+    }
+
+    [Fact]
     public async Task Update_NotFoundDuplicateOrUnsaved_DoesNotBump()
     {
         _accessor.Setup(a => a.GetByIdForUserAsync(8, 5)).ReturnsAsync((Category?)null);

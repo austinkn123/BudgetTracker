@@ -110,16 +110,23 @@ public class CategoryManager(
         // The category type is the user's Income/Expense override, so its rows follow it (Transfer and Adjustment
         // rows keep their type). ponytail: a second save, not atomic with the category's; a unit of work is the
         // upgrade path if a half-applied change is ever seen.
-        if (typeChanged)
+        try
         {
-            var rows = await transactionAccessor.GetFilteredAsync(existing.UserId, new TransactionFilter(CategoryId: existing.Id));
-            var types = rows.ToDictionary(
-                r => r.Id,
-                r => plaidEngine.ClassifyTransactionType(r.PlaidCategoryPrimary, existing.CategoryType, r.TransactionType));
-            await transactionAccessor.SetCategoryAsync(types, existing.Id, existing.UserId);
+            if (typeChanged)
+            {
+                var rows = await transactionAccessor.GetFilteredAsync(existing.UserId, new TransactionFilter(CategoryId: existing.Id));
+                var types = rows.ToDictionary(
+                    r => r.Id,
+                    r => plaidEngine.ClassifyTransactionType(r.PlaidCategoryPrimary, existing.CategoryType, r.TransactionType));
+                await transactionAccessor.SetCategoryAsync(types, existing.Id, existing.UserId);
+            }
+        }
+        finally
+        {
+            // The category row is already saved, so clients must refetch even if the retype throws (it still propagates).
+            await dataVersion.BumpAsync(existing.UserId);
         }
 
-        await dataVersion.BumpAsync(existing.UserId);
         return Result<bool>.Success(true);
     }
 
