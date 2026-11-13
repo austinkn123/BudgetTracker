@@ -7,7 +7,8 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **Frontend**: React + TypeScript + Vite
 - **Styling**: Tailwind CSS + Radix primitives (design tokens in `budgettracker.client/src/shared/theme/`; see `project-docs/design.md`)
 - **Forms/Validation**: React Hook Form + Zod (`@hookform/resolvers`)
-- **Database**: Microsoft SQL Server
+- **Database**: PostgreSQL — Neon in production, local Postgres for development (EF Core provider: `Npgsql.EntityFrameworkCore.PostgreSQL`)
+- **Hosting**: AWS Lambda behind a Function URL (see `deploy/README.md`)
 - **ORM**: Entity Framework Core (Code-first with Fluent API configurations)
 - **Authentication**: AWS Cognito (In progress)
 
@@ -48,7 +49,8 @@ You are an expert developer working on the BudgetTracker application. This proje
 - Refer to `.claude/agents/chrissy-product-manager.md` for product vision if unclear on requirements.
 - Jira project: **BUD** on `austinkn123.atlassian.net` — check for existing issues before creating new ones, and link completed work to its ticket when relevant.
 - **Jira access via MCP**: The Atlassian MCP server is configured in `.mcp.json` and provides direct Jira access. When asked about any BUD ticket, **ALWAYS call the Atlassian MCP tools** — never say "I can't connect to Jira" without first attempting the call. Common tools: `mcp__atlassian__getIssue` (fetch a specific ticket), `mcp__atlassian__searchIssues` (JQL search), `mcp__atlassian__getAccessibleAtlassianResources` (list resources). If the call fails, report the actual error returned by the tool, not a pre-emptive refusal.
-- Local database: **SQL Server LocalDB** — `Server=(localdb)\MSSQLLocalDB;Database=BudgetTracker;Trusted_Connection=True;TrustServerCertificate=True;` — use the `mssql` MCP server to inspect schema, run queries, and verify migrations directly.
+- Local database: **PostgreSQL** — `Host=localhost;Database=budgettracker;Username=postgres;Password=postgres` (from `appsettings.Development.json`). Inspect schema and verify migrations with `psql` or `dotnet ef`. Production is Neon Postgres (direct, non-pooler connection string; see `deploy/README.md`). Write Postgres-correct SQL: `ILIKE`/`lower()` for case-insensitive matching, `timestamp without time zone` columns (pass `DateTimeKind.Unspecified`), expression/partial indexes via raw SQL in migrations.
+- **Tests**: Accessor tests that need a relational provider (e.g. `ExecuteUpdate`) use EF Core SQLite in-memory; the EF InMemory provider can't translate it. There is no committed real-Postgres test fixture yet.
 
 ## Agent Roster
 

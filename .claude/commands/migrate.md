@@ -20,7 +20,7 @@ Steps:
 
 4. **Show the generated file.** Find the newest file under `BudgetTracker.Domain/Migrations/` and read it. Print a concise summary of the schema changes (added columns, dropped columns, new tables, new indexes). Highlight anything destructive (DropColumn, DropTable) in a warning tone.
 
-5. **Confirm before applying.** Ask: "Apply this migration to the LocalDB now? (yes / no / show me the SQL)". If they ask for SQL, run `dotnet ef migrations script --idempotent --project BudgetTracker.Domain --startup-project BudgetTracker.Server` and show the relevant section.
+5. **Confirm before applying.** Ask: "Apply this migration to the local Postgres database now? (yes / no / show me the SQL)". If they ask for SQL, run `dotnet ef migrations script --idempotent --project BudgetTracker.Domain --startup-project BudgetTracker.Server` and show the relevant section.
 
 6. **Apply on confirmation:**
    `dotnet ef database update --project BudgetTracker.Domain --startup-project BudgetTracker.Server`
