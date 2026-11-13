@@ -8,6 +8,8 @@ export interface FieldShellProps {
   /** Validation message; wins over helperText. */
   error?: string;
   helperText?: string;
+  /** id for the helper/error line, so the control can point `aria-describedby` at it. */
+  messageId?: string;
   fullWidth?: boolean;
   className?: string;
   children: ReactNode;
@@ -24,6 +26,7 @@ const FieldShell = ({
   required = false,
   error,
   helperText,
+  messageId,
   fullWidth = true,
   className,
   children,
@@ -42,7 +45,9 @@ const FieldShell = ({
     </label>
     {children}
     {(error || helperText) && (
-      <p className={cn('text-xs', error ? 'text-error' : 'text-ink-muted')}>{error ?? helperText}</p>
+      <p id={messageId} className={cn('text-xs', error ? 'text-error' : 'text-ink-muted')}>
+        {error ?? helperText}
+      </p>
     )}
   </div>
 );

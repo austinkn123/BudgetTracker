@@ -46,4 +46,20 @@ describe('FieldShell', () => {
 
     expect(container.querySelector('p')).toBeNull();
   });
+
+  it('gives the helper/error message the messageId so a control can reference it', () => {
+    const { rerender } = render(
+      <FieldShell label="Amount" htmlFor="amount" messageId="amount-msg" helperText="In dollars">
+        <input id="amount" aria-describedby="amount-msg" />
+      </FieldShell>,
+    );
+    expect(screen.getByRole('textbox')).toHaveAccessibleDescription('In dollars');
+
+    rerender(
+      <FieldShell label="Amount" htmlFor="amount" messageId="amount-msg" helperText="In dollars" error="Required">
+        <input id="amount" aria-describedby="amount-msg" />
+      </FieldShell>,
+    );
+    expect(screen.getByRole('textbox')).toHaveAccessibleDescription('Required');
+  });
 });

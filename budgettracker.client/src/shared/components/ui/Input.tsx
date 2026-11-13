@@ -80,6 +80,7 @@ const Input = <TFieldValues extends FieldValues>({
   className,
 }: InputProps<TFieldValues>) => {
   const id = useId();
+  const messageId = `${id}-message`;
 
   return (
     <Controller
@@ -106,6 +107,7 @@ const Input = <TFieldValues extends FieldValues>({
           autoComplete,
           maxLength,
           'aria-invalid': fieldState.error ? true : undefined,
+          'aria-describedby': fieldState.error?.message || helperText ? messageId : undefined,
         };
 
         return (
@@ -115,6 +117,7 @@ const Input = <TFieldValues extends FieldValues>({
             required={required}
             error={fieldState.error?.message}
             helperText={helperText}
+            messageId={messageId}
             fullWidth={fullWidth}
             className={className}
           >
