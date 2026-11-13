@@ -41,4 +41,22 @@ describe('Gauge', () => {
     expect(meter).toHaveAttribute('width', '120');
     expect(meter.querySelector('path')).toHaveAttribute('stroke', cssVar('border'));
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'treats a non-finite value (%s) as 0',
+    (value) => {
+      render(<Gauge value={value} {...COLORS} />);
+
+      const meter = screen.getByRole('meter');
+      expect(meter).toHaveAttribute('aria-valuenow', '0');
+      expect(screen.getByText('0%')).toBeInTheDocument();
+      expect(meter.querySelectorAll('path')).toHaveLength(1);
+    },
+  );
+
+  it('names the meter from ariaLabel', () => {
+    render(<Gauge value={42} ariaLabel="Budget spent" {...COLORS} />);
+
+    expect(screen.getByRole('meter', { name: 'Budget spent' })).toBeInTheDocument();
+  });
 });

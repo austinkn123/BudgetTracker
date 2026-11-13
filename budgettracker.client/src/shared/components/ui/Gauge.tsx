@@ -10,6 +10,8 @@ export interface GaugeProps {
   trackColor?: string;
   /** CSS color of the centered text. */
   textColor: string;
+  /** Accessible name for the meter, e.g. "Budget spent". */
+  ariaLabel?: string;
 }
 
 /** Sweep matches the old MUI Gauge: −110° → 110° (220° of arc). */
@@ -26,8 +28,9 @@ const polar = (center: number, radius: number, angle: number): [number, number] 
  * Static SVG gauge (BUD-20). Replaces @mui/x-charts Gauge — two stroked arcs
  * with round caps plus centered text; no interactivity by design.
  */
-const Gauge = ({ value, size = 200, valueColor, trackColor, textColor }: GaugeProps) => {
-  const clamped = Math.min(100, Math.max(0, value));
+const Gauge = ({ value, size = 200, valueColor, trackColor, textColor, ariaLabel }: GaugeProps) => {
+  // NaN/Infinity (e.g. a 0/0 percentage) would leak into aria-valuenow and the label; show 0.
+  const clamped = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
   const center = size / 2;
   // Slim ring: a thinner arc reads as precision instrumentation rather than
   // a chunky progress donut.
@@ -44,6 +47,7 @@ const Gauge = ({ value, size = 200, valueColor, trackColor, textColor }: GaugePr
       height={size}
       viewBox={`0 0 ${size} ${size}`}
       role="meter"
+      aria-label={ariaLabel}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(clamped)}
