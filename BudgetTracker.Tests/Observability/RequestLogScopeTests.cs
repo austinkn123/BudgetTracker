@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Moq;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace BudgetTracker.Tests.Observability;
 
@@ -71,6 +72,34 @@ public class RequestLogScopeTests
 
         response.EnsureSuccessStatusCode();
         Assert.False(ObservabilityTestHost.ScopeValues(ProbeRecord(host)).ContainsKey(RequestLogScope.UserIdKey));
+        var warning = Assert.Single(host.Logs.GetSnapshot(), r => r.Level == LogLevel.Warning);
+        Assert.Null(warning.Exception);
+        Assert.Contains(nameof(InvalidOperationException), ObservabilityTestHost.Render(warning));
+        Assert.DoesNotContain("Failed to provision user", ObservabilityTestHost.Render(warning));
+    }
+
+    [Fact]
+    public async Task Should_NotResolveUser_When_HealthIsCalledWithValidToken()
+    {
+        var currentUser = new Mock<ICurrentUserProvider>(MockBehavior.Strict);
+        await using var host = await StartHostAsync(currentUser.Object);
+
+        var response = await SendAsync(host, ObservabilityExtensions.HealthPath, correlationId: "corr-5", sub: Sub);
+
+        response.EnsureSuccessStatusCode();
+        currentUser.VerifyGet(u => u.UserId, Times.Never());
+    }
+
+    [Fact]
+    public async Task Should_NotResolveUser_When_EndpointAllowsAnonymous()
+    {
+        var currentUser = new Mock<ICurrentUserProvider>(MockBehavior.Strict);
+        await using var host = await StartHostAsync(currentUser.Object);
+
+        var response = await SendAsync(host, "/anonymous", correlationId: "corr-6", sub: Sub);
+
+        response.EnsureSuccessStatusCode();
+        currentUser.VerifyGet(u => u.UserId, Times.Never());
     }
 
     [Fact]

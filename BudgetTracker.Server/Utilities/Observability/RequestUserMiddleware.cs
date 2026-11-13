@@ -1,11 +1,13 @@
 using BudgetTracker.Domain.Interfaces.Utilities;
+using Microsoft.AspNetCore.Authorization;
 
 namespace BudgetTracker.Server.Utilities.Observability;
 
 /// <summary>
 /// Adds the internal UserId to the request's <see cref="RequestLogScope"/> once authentication has run. Uses
 /// <see cref="ICurrentUserProvider"/> (scoped, so endpoints reuse the resolved user) and never the Cognito sub.
-/// A user that cannot be resolved is left out of the scope; the request carries on unchanged.
+/// A user that cannot be resolved is left out of the scope; the request carries on unchanged. Anonymous endpoints
+/// (e.g. <c>/health</c>) are skipped even when a token is sent, so they never touch the database.
 /// </summary>
 public sealed class RequestUserMiddleware(RequestDelegate next, ILogger<RequestUserMiddleware> logger)
 {
@@ -15,6 +17,7 @@ public sealed class RequestUserMiddleware(RequestDelegate next, ILogger<RequestU
     public async Task InvokeAsync(HttpContext context)
     {
         if (context.User.Identity?.IsAuthenticated == true
+            && context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is null
             && RequestLogScope.For(context) is { } scope
             && context.RequestServices.GetService<ICurrentUserProvider>() is { } currentUser)
         {
