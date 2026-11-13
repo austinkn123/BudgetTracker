@@ -32,6 +32,17 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **Testing**: Follow TDD (Red-Green-Refactor). Unit test Engines directly. Test Managers with mocked Engines/Accessors.
 - **Contracts first**: Define interfaces in `BudgetTracker.Domain/Interfaces/` before implementing.
 
+## Commits & Pull Requests
+- **Every commit uses Conventional Commits**: `<type>(<optional scope>): <imperative summary>` — lowercase type, summary ≤ 72 chars, no trailing period.
+  - Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `style`, `build`, `ci`, `chore`, `revert`.
+  - Scopes (optional, use the area touched): `transactions`, `plaid`, `categories`, `budget`, `cash-flow`, `money-map`, `dashboard`, `webull`, `auth`, `db`, `client`, `server`, `deploy`.
+  - Breaking API/contract change: add `!` after the type/scope (`feat(transactions)!: …`) and a `BREAKING CHANGE:` footer.
+  - Body (optional): what and why, wrapped at 72 chars.
+  - Examples: `feat(transactions): add infinite-scroll ledger feed`, `fix(plaid): revert windowed transfer pairing`, `feat(db): add Users.DataVersion change counter`.
+- One logical change per commit; don't mix unrelated types in one commit.
+- **PR titles** follow the same format, since PRs are squash-merged and the title becomes the commit on `main`.
+- Applies to every agent in the roster — anyone who commits follows this.
+
 ## Context
 - Always check `project-docs/` for architectural decisions before suggesting major changes.
 - Refer to `.claude/agents/chrissy-product-manager.md` for product vision if unclear on requirements.
