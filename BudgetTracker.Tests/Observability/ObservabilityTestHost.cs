@@ -85,6 +85,12 @@ internal sealed class ObservabilityTestHost : IAsyncDisposable
     }
 
     /// <summary>The scope values visible to <paramref name="record"/>, last writer wins.</summary>
+    /// <remarks>
+    /// FakeLogger keeps each scope object by reference, not a snapshot. <see cref="RequestLogScope"/> is mutable, so
+    /// these values are the scope's final state at the end of the request (e.g. a UserId set after the record was written
+    /// would still show). The real JSON console logger renders scopes at write time, which is what the ordering of
+    /// RequestUserMiddleware (before endpoints and the exception handler's logging) relies on.
+    /// </remarks>
     public static IReadOnlyDictionary<string, object?> ScopeValues(FakeLogRecord record)
     {
         var values = new Dictionary<string, object?>();
@@ -101,7 +107,7 @@ internal sealed class ObservabilityTestHost : IAsyncDisposable
     }
 
     /// <summary>Authenticates when <see cref="TestUserHeader"/> is present, as a user whose sub is the header value.</summary>
-    private sealed class TestAuthHandler(
+    internal sealed class TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder)

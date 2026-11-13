@@ -12,6 +12,8 @@ public static class ObservabilityExtensions
     /// <summary>The anonymous liveness endpoint. It runs no health checks, so it never touches the database.</summary>
     public const string HealthPath = "/health";
 
+    private const string BuiltInExceptionHandlerCategory = "Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware";
+
     /// <summary>
     /// Registers JSON console logging (with scopes), the production log-level caps, ProblemDetails, health checks and
     /// failed-authentication logging.
@@ -27,17 +29,23 @@ public static class ObservabilityExtensions
             options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
         });
 
+        // The built-in handler logs the full exception, message included; UnhandledExceptionLogger logs a sanitized one.
+        builder.Logging.AddFilter(BuiltInExceptionHandlerCategory, LogLevel.None);
+
         if (!builder.Environment.IsDevelopment())
         {
-            // Keeps SQL text, parameters and outbound URLs out of CloudWatch (§3). Code rules win over appsettings.
+            // Keeps SQL text, parameters, outbound URLs and inbound URLs with query strings (ASP.NET Core hosting logs
+            // them at Information) out of CloudWatch (§3). Code rules win over appsettings.
             builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
             builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
+            builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
         }
 
         builder.Services.AddProblemDetails(options =>
             options.CustomizeProblemDetails = context =>
                 context.ProblemDetails.Extensions["correlationId"] = CorrelationId.Get(context.HttpContext));
 
+        builder.Services.AddExceptionHandler<UnhandledExceptionLogger>();
         builder.Services.AddHealthChecks();
 
         builder.Services.PostConfigureAll<JwtBearerOptions>(options =>
