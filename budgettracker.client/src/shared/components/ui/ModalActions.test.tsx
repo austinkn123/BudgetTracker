@@ -74,10 +74,9 @@ describe('ModalActions', () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 
-  // BUG (reported, not fixed here): Button does not default `type="button"`, so Cancel and
-  // Delete are implicit submit buttons inside a <form> — clicking Cancel submits the form.
-  // `it.fails` keeps the suite green; flip to `it` once fixed.
-  it.fails('does not submit the enclosing form when Cancel is clicked', async () => {
+  // Regression: Button had no default `type="button"`, so Cancel and Delete were implicit
+  // submit buttons inside a <form> and clicking Cancel submitted it.
+  it('does not submit the enclosing form when Cancel is clicked', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn((event: FormEvent) => event.preventDefault());
     const onCancel = vi.fn();
