@@ -24,6 +24,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.CreatedAt)
             .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
 
+        // Bumped with a single atomic UPDATE ... SET "DataVersion" = "DataVersion" + 1; never a concurrency token.
+        // No HasDefaultValue (CLR default 0 would trip EF's sentinel warning); the migration backfills 0. Not indexed, so
+        // the bump stays eligible for heap-only-tuple updates.
+        builder.Property(u => u.DataVersion)
+            .IsRequired();
+
         builder.HasMany(u => u.Categories)
             .WithOne(c => c.User)
             .HasForeignKey(c => c.UserId)
