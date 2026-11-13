@@ -226,15 +226,16 @@ public class BudgetAnalysisEngineTests
 
     // ---- SummarizeSpend ----
 
+    private static CategoryTypeTotal Total(int? categoryId, string type, decimal signedSum) => new(categoryId, type, signedSum);
+
     [Fact]
     public void SummarizeSpend_TotalsExpenseMagnitudePerCategoryAndIgnoresIncome()
     {
         var spend = _sut.SummarizeSpend(
         [
-            Expense(1, -10m, MidJune, categoryId: 1),
-            Expense(2, -15m, MidJune, categoryId: 1),
-            Expense(3, -40m, MidJune, categoryId: 2),
-            Income(4, 500m, MidJune, categoryId: 1)
+            Total(1, "Expense", -25m),
+            Total(2, "Expense", -40m),
+            Total(1, "Income", 500m)
         ]);
 
         Assert.Equal(2, spend.Count);
@@ -244,6 +245,40 @@ public class BudgetAnalysisEngineTests
 
     [Fact]
     public void SummarizeSpend_EmptyInputReturnsEmpty() => Assert.Empty(_sut.SummarizeSpend([]));
+
+    [Fact]
+    public void Should_IgnoreTransfers_When_SummarizingSpend()
+    {
+        var spend = _sut.SummarizeSpend([Total(1, "Transfer", -300m), Total(1, "Expense", -20m)]);
+
+        Assert.Equal(new CategorySpend(1, 20m), Assert.Single(spend));
+    }
+
+    [Fact]
+    public void Should_KeepUncategorizedSpendAsANullCategory_When_SummarizingSpend()
+    {
+        var spend = _sut.SummarizeSpend([Total(null, "Expense", -12m), Total(3, "Expense", -5m)]);
+
+        Assert.Equal(12m, spend.Single(s => s.CategoryId is null).Amount);
+        Assert.Equal(5m, spend.Single(s => s.CategoryId == 3).Amount);
+    }
+
+    [Fact]
+    public void Should_MergeRepeatedCategoryRows_When_TheSameCategoryArrivesMoreThanOnce()
+    {
+        // The contract does not promise one row per (category, type); the engine must still produce one per category.
+        var spend = _sut.SummarizeSpend([Total(1, "Expense", -80m), Total(1, "Expense", 30m)]);
+
+        Assert.Equal(new CategorySpend(1, 50m), Assert.Single(spend));
+    }
+
+    [Fact]
+    public void Should_ReportNegativeSpend_When_RefundsExceedOutflows()
+    {
+        var spend = _sut.SummarizeSpend([Total(1, "Expense", 15m)]);
+
+        Assert.Equal(new CategorySpend(1, -15m), Assert.Single(spend));
+    }
 
     // ---- SummarizeByMonth ----
 
@@ -309,7 +344,8 @@ public class BudgetAnalysisEngineTests
     [Fact]
     public void SummarizeSpend_Refund_NetsWithinItsCategory()
     {
-        var spend = _sut.SummarizeSpend([Expense(1, -80m, MidJune), Expense(2, 30m, MidJune)]);
+        // A refund is a positive Expense; in SQL it is already netted into the (category, Expense) sum.
+        var spend = _sut.SummarizeSpend([Total(1, "Expense", -80m + 30m)]);
 
         Assert.Equal(50m, Assert.Single(spend).Amount);
     }
@@ -328,4 +364,51 @@ public class BudgetAnalysisEngineTests
 
         Assert.Equal(50m, Assert.Single(trend).Expenses);
     }
+
+    // ---- Trend window helpers ----
+
+    [Fact]
+    public void SummarizeByMonth_SeedCategories_GetZeroedMonthsAlongsideThePresentOnes()
+    {
+        var trend = _sut.SummarizeByMonth([Expense(1, -10m, MidJune)], MidJune, months: 2, seedCategoryIds: [42, null]);
+
+        Assert.Equal(6, trend.Count);
+        Assert.All(trend.Where(p => p.CategoryId != 1), p => Assert.Equal((0m, 0m), (p.Income, p.Expenses)));
+        Assert.Equal(new int?[] { null, 1, 42 }, trend.Select(p => p.CategoryId).Distinct().Order());
+    }
+
+    [Fact]
+    public void SummarizeByMonth_SeedCategoryAlsoPresent_IsNotDuplicated()
+    {
+        var categoryId = Expense(1, -10m, MidJune).CategoryId;
+
+        var trend = _sut.SummarizeByMonth([Expense(1, -10m, MidJune)], MidJune, months: 1, seedCategoryIds: [categoryId]);
+
+        Assert.Equal(10m, Assert.Single(trend).Expenses);
+    }
+
+    [Theory]
+    [InlineData(1, 2026, 6)]
+    [InlineData(3, 2026, 4)]
+    [InlineData(12, 2025, 7)]
+    [InlineData(24, 2024, 7)]
+    public void TrendStart_IsTheFirstDayOfTheOldestMonthInTheWindow(int months, int year, int month)
+    {
+        Assert.Equal(new DateTime(year, month, 1), _sut.TrendStart(MidJune, months));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(24)]
+    public void ValidateTrendMonths_AcceptsOneToTwentyFour(int months) =>
+        Assert.Null(_sut.ValidateTrendMonths(months));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    [InlineData(25)]
+    [InlineData(int.MaxValue)]
+    public void ValidateTrendMonths_RejectsOutOfRange(int months) =>
+        Assert.Equal("trendMonths must be between 1 and 24", _sut.ValidateTrendMonths(months));
 }

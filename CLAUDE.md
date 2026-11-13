@@ -30,8 +30,19 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **React**: Use Functional Components and Hooks. Avoid class components.
 - **React Forms**: Use React Hook Form with Zod for validation. Keep reusable schemas in `budgettracker.client/src/shared/validation/` and prefer shared schema imports over inline schema duplication.
 - **EF Core**: Use LINQ queries through `BudgetTrackerDbContext`. Use `AsNoTracking()` for read-only queries. Define entity configurations using Fluent API in `BudgetTracker.Domain/Data/Configurations/`. Use EF migrations (`dotnet ef migrations add`) for schema changes.
-- **Testing**: Follow TDD (Red-Green-Refactor). Unit test Engines directly. Test Managers with mocked Engines/Accessors.
+- **Testing**: Follow TDD (Red-Green-Refactor). Unit test Engines directly. Test Managers with mocked Engines/Accessors. Accessor tests that need a relational provider (e.g. `ExecuteUpdate`) use EF Core SQLite in-memory — the EF InMemory provider can't translate it. There is no committed real-Postgres test fixture yet.
 - **Contracts first**: Define interfaces in `BudgetTracker.Domain/Interfaces/` before implementing.
+
+## Commits & Pull Requests
+- **Every commit uses Conventional Commits**: `<type>(<optional scope>): <imperative summary>` — lowercase type, summary ≤ 72 chars, no trailing period.
+  - Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `style`, `build`, `ci`, `chore`, `revert`.
+  - Scopes (optional, use the area touched): `transactions`, `plaid`, `categories`, `budget`, `cash-flow`, `money-map`, `dashboard`, `webull`, `auth`, `db`, `client`, `server`, `deploy`.
+  - Breaking API/contract change: add `!` after the type/scope (`feat(transactions)!: …`) and a `BREAKING CHANGE:` footer.
+  - Body (optional): what and why, wrapped at 72 chars.
+  - Examples: `feat(transactions): add infinite-scroll ledger feed`, `fix(plaid): revert windowed transfer pairing`, `feat(db): add Users.DataVersion change counter`.
+- One logical change per commit; don't mix unrelated types in one commit.
+- **PR titles** follow the same format, since PRs are squash-merged and the title becomes the commit on `main`.
+- Applies to every agent in the roster — anyone who commits follows this.
 
 ## Context
 - Always check `project-docs/` for architectural decisions before suggesting major changes.

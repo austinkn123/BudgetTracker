@@ -64,7 +64,9 @@ public class PlaidEngine : IPlaidEngine
 
     /// <inheritdoc />
     public IReadOnlyList<TransferUpdate> ReconcileOwnAccountTransfers(
-        IEnumerable<Transaction> candidates, IEnumerable<PlaidAccount> linkedAccounts, IEnumerable<Category> userCategories)
+        IEnumerable<Transaction> candidates,
+        IEnumerable<PlaidAccount> linkedAccounts,
+        IEnumerable<Category> userCategories)
     {
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(linkedAccounts);
@@ -81,13 +83,14 @@ public class PlaidEngine : IPlaidEngine
             .Where(t => !t.IsPending && t.TransactionType != Adjustment &&
                         t.PlaidCategoryPrimary is not null && TransferCategorySet.Contains(t.PlaidCategoryPrimary))
             .ToList();
-        var counterpartAccountById = PairLegs(pool.Where(t => t.PlaidAccountId is not null && cashAccountIds.Contains(t.PlaidAccountId)));
+
+        var counterpartById = PairLegs(pool.Where(t => t.PlaidAccountId is not null && cashAccountIds.Contains(t.PlaidAccountId)));
 
         var updates = new List<TransferUpdate>();
         foreach (var row in pool.OrderBy(t => t.Id))
         {
-            TransferUpdate? update = counterpartAccountById.TryGetValue(row.Id, out var counterpartAccountId)
-                ? new(row.Id, Transfer, counterpartAccountId)
+            TransferUpdate? update = counterpartById.TryGetValue(row.Id, out var counterpart)
+                ? new(row.Id, Transfer, counterpart.AccountId)
                 : row.TransactionType == Transfer
                     ? new(row.Id, ClassifyTransactionType(row.PlaidCategoryPrimary, CategoryTypeOf(row, categoryTypeById)), null)
                     : null;
@@ -107,10 +110,10 @@ public class PlaidEngine : IPlaidEngine
     /// outflow takes the oldest unused inflow inside its window. With one window width for all legs that is a
     /// maximum matching, unlike closest-first, which can strand legs.
     /// </summary>
-    /// <returns>Each paired row's counterpart <see cref="Transaction.AccountId"/>, by row id.</returns>
-    private static Dictionary<int, int> PairLegs(IEnumerable<Transaction> legs)
+    /// <returns>Each paired row's counterpart row, by row id.</returns>
+    private static Dictionary<int, Transaction> PairLegs(IEnumerable<Transaction> legs)
     {
-        var counterpartAccountById = new Dictionary<int, int>();
+        var counterpartById = new Dictionary<int, Transaction>();
         foreach (var sameAmount in legs.GroupBy(t => Math.Abs(t.Amount)))
         {
             var outflows = sameAmount.Where(t => t.Amount < 0).OrderBy(t => t.OccurredAt.Date).ThenBy(t => t.Id).ToList();
@@ -134,14 +137,21 @@ public class PlaidEngine : IPlaidEngine
                         continue;
 
                     used[i] = true;
-                    counterpartAccountById[outflow.Id] = inflows[i].AccountId;
-                    counterpartAccountById[inflows[i].Id] = outflow.AccountId;
+                    counterpartById[outflow.Id] = inflows[i];
+                    counterpartById[inflows[i].Id] = outflow;
                     break;
                 }
             }
         }
 
-        return counterpartAccountById;
+        return counterpartById;
+    }
+
+    /// <inheritdoc />
+    public string ResolvePayee(PlaidTransactionDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        return PayeeOf(dto);
     }
 
     /// <inheritdoc />

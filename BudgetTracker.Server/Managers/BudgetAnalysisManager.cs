@@ -2,6 +2,7 @@ using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Engines;
 using BudgetTracker.Domain.Interfaces.Managers;
+using BudgetTracker.Domain.Models;
 using BudgetTracker.Domain.Models.Analysis;
 
 namespace BudgetTracker.Server.Managers;
@@ -13,10 +14,8 @@ public class BudgetAnalysisManager(
 {
     public async Task<Result<BudgetAnalysis>> GetAnalysisAsync(int userId, DateTime from, DateTime to, int trendMonths)
     {
-        // Sequential awaits: these accessors share the scoped DbContext, which cannot
-        // serve concurrent queries.
-        var transactions = (await transactionAccessor.GetByUserIdAsync(userId)).ToList();
-        var budgetPlans = await budgetPlanAccessor.GetByUserIdAsync(userId);
+        if (engine.ValidateTrendMonths(trendMonths) is string error)
+            return Result<BudgetAnalysis>.Failure(error);
 
         var now = DateTime.UtcNow;
 
@@ -33,6 +32,21 @@ public class BudgetAnalysisManager(
         var asOf = lastInstantOfRequestedMonth < now ? lastInstantOfRequestedMonth : now;
         var analyzedMonth = new DateTime(asOf.Year, asOf.Month, 1);
 
+        // Raw rows are fetched only for what AnalyzeMonth and SummarizeByMonth read: the trend months through the end of
+        // the analysed month. Window spend is aggregated in the database instead, so a long window (the ALL range sends
+        // 1970-01-01..9999-12-31) never loads the ledger; the engine applies the spend rule to those totals. Categories
+        // used only outside the trend still get zeroed series via the distinct ids in use.
+        var trendStart = engine.TrendStart(asOf, trendMonths);
+        var analyzedMonthEnd = analyzedMonth.AddMonths(1).AddDays(-1);
+        var fetch = new TransactionFilter(From: trendStart, To: analyzedMonthEnd);
+
+        // Sequential awaits: these accessors share the scoped DbContext, which cannot
+        // serve concurrent queries.
+        var transactions = (await transactionAccessor.GetFilteredAsync(userId, fetch)).ToList();
+        var windowTotals = await transactionAccessor.GetTotalsByCategoryAndTypeAsync(userId, from, to);
+        var categoryIdsInUse = await transactionAccessor.GetCategoryIdsInUseAsync(userId);
+        var budgetPlans = await budgetPlanAccessor.GetByUserIdAsync(userId);
+
         // Plans roll forward: PlanMonth is the month a plan takes effect, so the one governing the
         // analysed month is the NEWEST active plan dated on or before it. Picking the first active
         // plan regardless of date meant a stale plan reported its own month forever.
@@ -41,15 +55,10 @@ public class BudgetAnalysisManager(
             .OrderByDescending(p => p.PlanMonth)
             .FirstOrDefault();
 
-        // The window is an API concern, not a business one, so it is applied here.
-        var windowTransactions = transactions
-            .Where(t => t.OccurredAt >= from.Date && t.OccurredAt.Date <= to.Date)
-            .ToList();
-
         var analysis = new BudgetAnalysis(
             governingPlan is null ? null : engine.AnalyzeMonth(transactions, governingPlan, asOf),
-            engine.SummarizeSpend(windowTransactions),
-            engine.SummarizeByMonth(transactions, asOf, trendMonths));
+            engine.SummarizeSpend(windowTotals),
+            engine.SummarizeByMonth(transactions, asOf, trendMonths, categoryIdsInUse));
 
         return Result<BudgetAnalysis>.Success(analysis);
     }

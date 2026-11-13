@@ -42,7 +42,11 @@ public interface IPlaidEngine
     /// Adjustment rows never do. The pairing maximises the number of pairs, each row is used at most once, and the result
     /// is deterministic.
     /// </summary>
-    /// <param name="candidates">Every posted row in <see cref="TransferCategories"/>, including current Transfer legs.</param>
+    /// <param name="candidates">
+    /// Every posted row in <see cref="TransferCategories"/> across the user's whole history, including current Transfer
+    /// legs. Pairing is one oldest-first walk, so a new leg can shift partners arbitrarily far along a run of same-amount
+    /// legs; a partial history can leave a Transfer whose partner was taken.
+    /// </param>
     /// <param name="linkedAccounts">The user's linked Plaid accounts; only depository and credit accounts can hold a leg.</param>
     /// <param name="userCategories">The user's categories, to re-classify a leg that no longer pairs.</param>
     /// <returns>
@@ -51,7 +55,14 @@ public interface IPlaidEngine
     /// <see cref="ClassifyTransactionType"/> with no transfer account.
     /// </returns>
     IReadOnlyList<TransferUpdate> ReconcileOwnAccountTransfers(
-        IEnumerable<Transaction> candidates, IEnumerable<PlaidAccount> linkedAccounts, IEnumerable<Category> userCategories);
+        IEnumerable<Transaction> candidates,
+        IEnumerable<PlaidAccount> linkedAccounts,
+        IEnumerable<Category> userCategories);
+
+    /// <summary>The payee an imported row gets: Plaid's merchant name, falling back to its raw name.</summary>
+    /// <param name="dto">Plaid's raw transaction record.</param>
+    /// <returns>The payee.</returns>
+    string ResolvePayee(PlaidTransactionDto dto);
 
     /// <summary>
     /// Whether a Plaid transaction can be kept as a BudgetTracker <see cref="Transaction"/>. A $0 row carries

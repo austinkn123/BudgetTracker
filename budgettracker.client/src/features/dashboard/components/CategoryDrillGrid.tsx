@@ -3,14 +3,78 @@ import { ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Card, Sparkline } from '../../../shared/components/ui';
 import { cn } from '../../../shared/utils/cn';
+import type { TransactionQuery } from '../../../shared/services/transaction.service';
 import type { CategoryCard } from '../utils/selectors';
 import { isInflowTransaction } from '../../transactions/utils/transactionGroups';
+import { useCategoryDrillTransactions } from '../hooks/useWindowTransactions';
 import { semanticColors } from '../utils/chartTheme';
 import { currency, currencyPrecise } from '../../../shared/utils/format';
 
 interface CategoryDrillGridProps {
   cards: CategoryCard[];
+  /** The dashboard range as a server filter; empty for "all time". */
+  rangeFilter: TransactionQuery;
+  /** How many of a category's newest rows an open drill shows. */
+  transactionLimit: number;
 }
+
+interface CategoryDrillTransactionsProps {
+  card: CategoryCard;
+  rangeFilter: TransactionQuery;
+  limit: number;
+}
+
+/**
+ * An open drill's rows. Mounted only while the row is expanded, so a category's rows are read on
+ * demand, one capped page, rather than every card's rows up front.
+ */
+const CategoryDrillTransactions = ({ card, rangeFilter, limit }: CategoryDrillTransactionsProps) => {
+  const { data: transactions = [], isLoading, isError } = useCategoryDrillTransactions(
+    card.categoryId,
+    rangeFilter,
+    limit,
+  );
+
+  if (isLoading) {
+    return (
+      <span role="status" className="text-xs text-ink-muted">
+        Loading transactions…
+      </span>
+    );
+  }
+
+  if (isError) {
+    return <span className="text-xs text-ink-muted">Couldn't load these transactions.</span>;
+  }
+
+  if (transactions.length === 0) {
+    return <span className="text-xs text-ink-muted">No transactions in this range.</span>;
+  }
+
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {transactions.map((t) => (
+        <li key={t.id} className="flex items-center justify-between gap-4">
+          <span className="truncate text-[13px] text-ink">
+            {t.payee || card.name}
+            <span className="ml-2 text-2xs text-ink-muted">
+              {format(parseISO(t.occurredAt), 'MMM d')}
+            </span>
+          </span>
+          <span
+            className={cn(
+              'shrink-0 text-[13px] font-semibold',
+              isInflowTransaction(t) ? 'text-success-dark' : 'text-ink',
+            )}
+          >
+            {isInflowTransaction(t) ? '+' : '−'}
+            {currencyPrecise.format(Math.abs(t.amount))}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+};
 
 /**
  * Category performance as a dense ledger (BUD-20).
@@ -19,7 +83,7 @@ interface CategoryDrillGridProps {
  * became visual noise and forced a hard scan. Rows align every figure on a
  * common baseline, so over-plan categories stand out at a glance.
  */
-const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
+const CategoryDrillGrid = ({ cards, rangeFilter, transactionLimit }: CategoryDrillGridProps) => {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   if (cards.length === 0) {
@@ -155,35 +219,7 @@ const CategoryDrillGrid = ({ cards }: CategoryDrillGridProps) => {
                 {expanded && (
                   <tr className="border-b border-border-subtle bg-background/60">
                     <td colSpan={6} className="px-6 py-3">
-                      {data.transactions.length === 0 ? (
-                        <span className="text-xs text-ink-muted">
-                          No transactions in this range.
-                        </span>
-                      ) : (
-                        <ul className="flex flex-col gap-1.5">
-                          {data.transactions.map((t) => (
-                            <li key={t.id} className="flex items-center justify-between gap-4">
-                              <span className="truncate text-[13px] text-ink">
-                                {t.payee || data.name}
-                                <span className="ml-2 text-2xs text-ink-muted">
-                                  {format(parseISO(t.occurredAt), 'MMM d')}
-                                </span>
-                              </span>
-                              <span
-                                className={cn(
-                                  'shrink-0 text-[13px] font-semibold',
-                                  isInflowTransaction(t)
-                                    ? 'text-success-dark'
-                                    : 'text-ink',
-                                )}
-                              >
-                                {isInflowTransaction(t) ? '+' : '−'}
-                                {currencyPrecise.format(Math.abs(t.amount))}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      <CategoryDrillTransactions card={data} rangeFilter={rangeFilter} limit={transactionLimit} />
                     </td>
                   </tr>
                 )}

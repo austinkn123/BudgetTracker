@@ -3,6 +3,7 @@ using BudgetTracker.Domain.Engines;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Models;
 using BudgetTracker.Server.Managers;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 
 namespace BudgetTracker.Tests.Managers;
@@ -12,13 +13,18 @@ public class CategoryManagerTests
     private readonly Mock<ICategoryAccessor> _accessor = new(MockBehavior.Strict);
     private readonly CategoryEngine _engine = new();
     private readonly Mock<ITransactionAccessor> _txnAccessor = new(MockBehavior.Strict);
+    private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
+    private readonly List<string> _calls = [];
 
     public CategoryManagerTests()
     {
         _accessor.Setup(a => a.GetOtherNamesAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync([]);
+        _dataVersion.Setup(d => d.BumpAsync(It.IsAny<int>()))
+            .Callback<int>(userId => _calls.Add($"bump:{userId}"))
+            .ReturnsAsync(true);
     }
 
-    private CategoryManager BuildSut() => new(_engine, _accessor.Object, _txnAccessor.Object, new PlaidEngine());
+    private CategoryManager BuildSut() => new(_engine, _accessor.Object, _txnAccessor.Object, new PlaidEngine(), _dataVersion.Object);
 
     private static Category BuildMappedCategory() => new()
     {
@@ -291,5 +297,166 @@ public class CategoryManagerTests
 
         Assert.False(result.IsSuccess);
         _txnAccessor.VerifyNoOtherCalls();
+    }
+
+    // ── Usage ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Should_ReturnTheAccessorsUsage_ForTheUserAndInstant()
+    {
+        var since = new DateTime(2026, 9, 1);
+        IReadOnlyList<CategoryUsage> usage = [new CategoryUsage(3, 4, 5m, -20m)];
+        _txnAccessor.Setup(a => a.GetCategoryUsageAsync(5, since)).ReturnsAsync(usage);
+
+        var result = await BuildSut().GetUsageAsync(5, since);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(usage, result.Value);
+    }
+
+    // ── Data version (live refresh) ─────────────────────────────────────────
+
+    private void VerifyNeverBumped() => _dataVersion.Verify(d => d.BumpAsync(It.IsAny<int>()), Times.Never);
+
+    [Fact]
+    public async Task Create_Persisted_BumpsTheDataVersionAfterTheWrite()
+    {
+        _accessor.Setup(a => a.CreateAsync(It.IsAny<Category>())).Callback(() => _calls.Add("write")).ReturnsAsync(12);
+
+        var result = await BuildSut().CreateAsync(BuildMappedCategory());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Create_InvalidOrDuplicate_DoesNotBump()
+    {
+        var invalid = BuildMappedCategory();
+        invalid.Name = "";
+        await BuildSut().CreateAsync(invalid);
+
+        _accessor.Setup(a => a.GetOtherNamesAsync(5, 0)).ReturnsAsync(["food (groceries + eating out)"]);
+        await BuildSut().CreateAsync(BuildMappedCategory());
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Create_LosesTheUniqueIndexRace_DoesNotBump()
+    {
+        _accessor.Setup(a => a.CreateAsync(It.IsAny<Category>()))
+            .ThrowsAsync(new UniqueNameViolationException("UQ_Categories_User_Name", new Exception("23505")));
+
+        await BuildSut().CreateAsync(BuildMappedCategory());
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Update_Persisted_BumpsTheDataVersionAfterTheWrite()
+    {
+        _accessor.Setup(a => a.GetByIdForUserAsync(8, 5)).ReturnsAsync(BuildMappedCategory());
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+        var incoming = BuildMappedCategory();
+        incoming.Name = "Food";
+
+        var result = await BuildSut().UpdateAsync(incoming);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Update_TypeChanged_BumpsOnceAfterTheRowsAreRetyped()
+    {
+        StubTypeChange(Row(1, "Expense", "TRANSFER_IN"));
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+        _txnAccessor.Setup(a => a.SetCategoryAsync(It.IsAny<IReadOnlyDictionary<int, string>>(), 8, 5))
+            .Callback(() => _calls.Add("retype"))
+            .ReturnsAsync(1);
+        var incoming = BuildMappedCategory();
+        incoming.CategoryType = "Income";
+
+        var result = await BuildSut().UpdateAsync(incoming);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", "retype", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Update_RetypeThrowsAfterTheCategorySaved_StillBumpsOnce_AndRethrows()
+    {
+        StubTypeChange(Row(1, "Expense", "TRANSFER_IN"));
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+        _txnAccessor.Setup(a => a.SetCategoryAsync(It.IsAny<IReadOnlyDictionary<int, string>>(), 8, 5))
+            .Callback(() => _calls.Add("retype"))
+            .ThrowsAsync(new InvalidOperationException("db blip"));
+        var incoming = BuildMappedCategory();
+        incoming.CategoryType = "Income";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => BuildSut().UpdateAsync(incoming));
+
+        Assert.Equal(["write", "retype", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Update_LoadingRowsToRetypeThrowsAfterTheCategorySaved_StillBumpsOnce_AndRethrows()
+    {
+        StubTypeChange();
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+        var byCategory = new TransactionFilter(CategoryId: 8);
+        _txnAccessor.Setup(a => a.GetFilteredAsync(5, byCategory))
+            .ThrowsAsync(new InvalidOperationException("db blip"));
+        var incoming = BuildMappedCategory();
+        incoming.CategoryType = "Income";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => BuildSut().UpdateAsync(incoming));
+
+        Assert.Equal(["write", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Update_NotFoundDuplicateOrUnsaved_DoesNotBump()
+    {
+        _accessor.Setup(a => a.GetByIdForUserAsync(8, 5)).ReturnsAsync((Category?)null);
+        await BuildSut().UpdateAsync(BuildMappedCategory());
+
+        _accessor.Setup(a => a.GetByIdForUserAsync(8, 5)).ReturnsAsync(BuildMappedCategory());
+        _accessor.Setup(a => a.GetOtherNamesAsync(5, 8)).ReturnsAsync(["food (groceries + eating out)"]);
+        await BuildSut().UpdateAsync(BuildMappedCategory());
+
+        _accessor.Setup(a => a.GetOtherNamesAsync(5, 8)).ReturnsAsync([]);
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>())).ReturnsAsync(false);
+        await BuildSut().UpdateAsync(BuildMappedCategory());
+
+        _accessor.Setup(a => a.UpdateAsync(It.IsAny<Category>()))
+            .ThrowsAsync(new UniqueNameViolationException("UQ_Categories_User_Name", new Exception("23505")));
+        await BuildSut().UpdateAsync(BuildMappedCategory());
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Delete_Deleted_BumpsTheDataVersionAfterTheWrite()
+    {
+        _accessor.Setup(a => a.DeleteAsync(8, 5)).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+
+        var result = await BuildSut().DeleteAsync(8, 5);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Delete_NotFoundOrInUse_DoesNotBump()
+    {
+        _accessor.Setup(a => a.DeleteAsync(99, 5)).ReturnsAsync(false);
+        _accessor.Setup(a => a.DeleteAsync(8, 5)).ThrowsAsync(new DbUpdateException("FK"));
+
+        await BuildSut().DeleteAsync(99, 5);
+        await BuildSut().DeleteAsync(8, 5);
+
+        VerifyNeverBumped();
     }
 }

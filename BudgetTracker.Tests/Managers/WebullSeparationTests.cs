@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using BudgetTracker.Domain.Accessors;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Engines;
+using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Models;
 using BudgetTracker.Domain.Models.CashFlow;
 using BudgetTracker.Domain.Webull;
@@ -71,8 +72,8 @@ public class WebullSeparationTests : IDisposable
             .GetAnalysisAsync(UserId, month.AddMonths(-1), to, 6);
         var cashFlow = await new CashFlowManager(new CashFlowEngine(), new TransactionAccessor(_context), new PlaidItemAccessor(_context, _keyRing))
             .GetReportAsync(UserId, new CashFlowQuery(month.AddMonths(-1), to, CashFlowGrouping.Month));
-        var transactions = await new TransactionManager(new TransactionAccessor(_context), new CategoryAccessor(_context), new PlaidEngine())
-            .GetByUserIdAsync(UserId);
+        var transactions = await new TransactionManager(new TransactionAccessor(_context), new CategoryAccessor(_context), new PlaidEngine(), new TransactionEngine(), Moq.Mock.Of<IDataVersionAccessor>())
+            .GetPageAsync(UserId, new TransactionFilter(), cursor: null, limit: 200);
 
         Assert.True(analysis.IsSuccess, analysis.Error);
         Assert.True(cashFlow.IsSuccess, cashFlow.Error);
@@ -126,5 +127,19 @@ public class WebullSeparationTests : IDisposable
         Assert.Equal(3, await _context.WebullOrders.CountAsync());
         Assert.Equal(1, await _context.WebullOrderSyncs.CountAsync());
         Assert.Equal(without, with);
+    }
+
+    /// <summary>
+    /// Webull is read-only and outside the budget's live refresh: its managers must never be able to bump the user's
+    /// data version, so a portfolio refresh or trade sync cannot make the budget screens refetch.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(WebullManager))]
+    [InlineData(typeof(WebullTradesManager))]
+    public void WebullManagers_DoNotDependOnTheDataVersionAccessor(Type manager)
+    {
+        var dependencies = manager.GetConstructors().SelectMany(c => c.GetParameters()).Select(p => p.ParameterType);
+
+        Assert.DoesNotContain(typeof(IDataVersionAccessor), dependencies);
     }
 }

@@ -7,5 +7,4 @@ export const useMoneyMap = (months: number) =>
     queryKey: ['money-map', months],
     queryFn: () => moneyMapService.get(months),
     retry: 1,
-    refetchOnWindowFocus: true,
   });

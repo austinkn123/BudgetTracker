@@ -196,4 +196,58 @@ public class MoneyMapEngineTests
 
         Assert.Empty(Build(plan, rows).Upcoming);
     }
+
+    // ── DescribeHistory / PaycheckFloor ─────────────────────────────────────
+
+    [Theory]
+    [InlineData(12, 2025, 10, 30)]   // bills look back a year, which reaches past a 12-month window's first day
+    [InlineData(1, 2025, 10, 30)]
+    [InlineData(24, 2024, 11, 1)]    // a 24-month window reaches further than the bill lookback
+    public void DescribeHistory_FromIsTheEarlierOfTheWindowStartAndTheBillLookback(int months, int year, int month, int day)
+    {
+        var history = _sut.DescribeHistory([], Today, months);
+
+        Assert.True(history.IsSuccess);
+        Assert.Equal(new DateTime(year, month, day), history.Value!.From);
+    }
+
+    [Fact]
+    public void DescribeHistory_PayCategoriesAreTheNewestActivePlansIncomeLines()
+    {
+        var stale = Plan(Line(9, 100m, lineType: "Income"));
+        stale.PlanMonth = new DateTime(2026, 1, 1);
+        var inactive = Plan(Line(8, 100m, lineType: "Income"));
+        inactive.PlanMonth = new DateTime(2027, 1, 1);
+        inactive.IsActive = false;
+        var current = Plan(Line(1, 6526m, lineType: "Income"), Line(7, 50m, lineType: "Income"), Line(2, 425m));
+
+        var history = _sut.DescribeHistory([stale, inactive, current], Today, 12).Value!;
+
+        Assert.Equal([1, 7], history.PayCategoryIds.Order());
+        Assert.Equal(6, history.RecentPaychecks);
+    }
+
+    [Fact]
+    public void DescribeHistory_NoPlan_HasNoPayCategories()
+    {
+        Assert.Empty(_sut.DescribeHistory([], Today, 12).Value!.PayCategoryIds);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(25)]
+    public void DescribeHistory_MonthsOutOfRange_IsAFailure(int months)
+    {
+        var history = _sut.DescribeHistory([], Today, months);
+
+        Assert.False(history.IsSuccess);
+        Assert.Equal("months must be between 1 and 24", history.Error);
+    }
+
+    [Theory]
+    [InlineData(2000, 1000)]
+    [InlineData(-300, -150)]
+    [InlineData(0.01, 0.005)]
+    public void PaycheckFloor_IsHalfTheLatestPay(decimal latest, decimal expected) =>
+        Assert.Equal(expected, _sut.PaycheckFloor(latest));
 }

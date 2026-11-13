@@ -7,11 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BudgetTracker.Server.Managers;
 
+// TODO: CategoryManager violates IDesign layering (references Microsoft.EntityFrameworkCore for DbUpdateException) — consult tony.
 public class CategoryManager(
     ICategoryEngine engine,
     ICategoryAccessor accessor,
     ITransactionAccessor transactionAccessor,
-    IPlaidEngine plaidEngine) : ICategoryManager
+    IPlaidEngine plaidEngine,
+    IDataVersionAccessor dataVersion) : ICategoryManager
 {
     public async Task<Result<Category>> GetByIdAsync(int id, int userId)
     {
@@ -25,6 +27,13 @@ public class CategoryManager(
     {
         var categories = await accessor.GetByUserIdAsync(userId);
         return Result<IEnumerable<Category>>.Success(categories);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<CategoryUsage>>> GetUsageAsync(int userId, DateTime since)
+    {
+        var usage = await transactionAccessor.GetCategoryUsageAsync(userId, since);
+        return Result<IReadOnlyList<CategoryUsage>>.Success(usage);
     }
 
     public async Task<Result<int>> CreateAsync(Category category)
@@ -42,14 +51,18 @@ public class CategoryManager(
             ? null
             : category.PlaidCategoryPrimary.Trim();
 
+        int id;
         try
         {
-            return Result<int>.Success(await accessor.CreateAsync(category));
+            id = await accessor.CreateAsync(category);
         }
         catch (UniqueNameViolationException)
         {
             return Result<int>.Failure(engine.DuplicateNameError(category.Name));
         }
+
+        await dataVersion.BumpAsync(category.UserId);
+        return Result<int>.Success(id);
     }
 
     public async Task<Result<bool>> UpdateAsync(Category category)
@@ -97,13 +110,21 @@ public class CategoryManager(
         // The category type is the user's Income/Expense override, so its rows follow it (Transfer and Adjustment
         // rows keep their type). ponytail: a second save, not atomic with the category's; a unit of work is the
         // upgrade path if a half-applied change is ever seen.
-        if (typeChanged)
+        try
         {
-            var rows = await transactionAccessor.GetFilteredAsync(existing.UserId, new TransactionFilter(CategoryId: existing.Id));
-            var types = rows.ToDictionary(
-                r => r.Id,
-                r => plaidEngine.ClassifyTransactionType(r.PlaidCategoryPrimary, existing.CategoryType, r.TransactionType));
-            await transactionAccessor.SetCategoryAsync(types, existing.Id, existing.UserId);
+            if (typeChanged)
+            {
+                var rows = await transactionAccessor.GetFilteredAsync(existing.UserId, new TransactionFilter(CategoryId: existing.Id));
+                var types = rows.ToDictionary(
+                    r => r.Id,
+                    r => plaidEngine.ClassifyTransactionType(r.PlaidCategoryPrimary, existing.CategoryType, r.TransactionType));
+                await transactionAccessor.SetCategoryAsync(types, existing.Id, existing.UserId);
+            }
+        }
+        finally
+        {
+            // The category row is already saved, so clients must refetch even if the retype throws (it still propagates).
+            await dataVersion.BumpAsync(existing.UserId);
         }
 
         return Result<bool>.Success(true);
@@ -122,8 +143,10 @@ public class CategoryManager(
             return Result<bool>.Failure("Category is in use and cannot be deleted");
         }
 
-        return deleted
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("Category not found");
+        if (!deleted)
+            return Result<bool>.Failure("Category not found");
+
+        await dataVersion.BumpAsync(userId);
+        return Result<bool>.Success(true);
     }
 }
