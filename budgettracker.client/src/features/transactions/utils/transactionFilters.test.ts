@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { ALLY, CHASE } from '../../../test/plaidFixtures';
+import type { PlaidConnectionView } from '../../../shared/types/api';
 import {
+  accountOptionsFrom,
   buildCalendarQuery,
   buildFeedQuery,
   buildListQuery,
+  resolveAccountFilter,
   statusToQuery,
 } from './transactionFilters';
 
@@ -73,6 +77,56 @@ describe('buildFeedQuery', () => {
 
   it('is empty for "all" with no search', () => {
     expect(buildFeedQuery('all', '   ')).toEqual({});
+  });
+
+  it('sends no account constraint when every account is shown', () => {
+    expect(buildFeedQuery('all', '', null)).toEqual({});
+  });
+
+  it('narrows to one linked account alongside the other filters', () => {
+    expect(buildFeedQuery('pending', 'grocer', 'acc-chase-1')).toEqual({
+      isPending: true,
+      search: 'grocer',
+      plaidAccountId: 'acc-chase-1',
+    });
+  });
+});
+
+describe('accountOptionsFrom', () => {
+  const CHASE_TWO: PlaidConnectionView = {
+    ...CHASE,
+    accounts: [
+      ...CHASE.accounts,
+      { plaidAccountId: 'acc-chase-2', name: 'Sapphire', mask: '9876', accountType: 'credit' },
+    ],
+  };
+
+  it('lists every account across every connection, labelled by institution and mask', () => {
+    expect(accountOptionsFrom([CHASE_TWO, ALLY])).toEqual([
+      { value: 'acc-chase-1', label: 'Chase ••1234' },
+      { value: 'acc-chase-2', label: 'Chase ••9876' },
+      { value: 'acc-ally-1', label: 'Ally Bank · Savings' },
+    ]);
+  });
+
+  it('is empty before connections load', () => {
+    expect(accountOptionsFrom(undefined)).toEqual([]);
+  });
+});
+
+describe('resolveAccountFilter', () => {
+  const options = accountOptionsFrom([CHASE, ALLY]);
+
+  it('keeps an account that is still linked', () => {
+    expect(resolveAccountFilter('acc-ally-1', options)).toBe('acc-ally-1');
+  });
+
+  it('falls back to all accounts once the selected bank is disconnected', () => {
+    expect(resolveAccountFilter('acc-gone', options)).toBeNull();
+  });
+
+  it('passes "all accounts" through', () => {
+    expect(resolveAccountFilter(null, options)).toBeNull();
   });
 });
 

@@ -1,5 +1,7 @@
 import { addDays, format, startOfMonth, startOfWeek } from 'date-fns';
+import type { SelectOption } from '../../../shared/components/ui';
 import type { TransactionQuery } from '../../../shared/services/transaction.service';
+import type { PlaidConnectionView } from '../../../shared/types/api';
 
 export type TransactionStatusFilter = 'all' | 'uncategorized' | 'pending';
 
@@ -40,16 +42,45 @@ export const buildListQuery = (
 });
 
 /**
- * The List feed's filters: status chip + search, and no dates. The feed is the whole history,
- * newest first, so the month switcher has no say in it.
+ * The List feed's filters: status chip + search + account, and no dates. The feed is the whole
+ * history, newest first, so the month switcher has no say in it. `plaidAccountId` is null for
+ * "All accounts", and is then left out of the query entirely.
  */
 export const buildFeedQuery = (
   status: TransactionStatusFilter,
   search: string,
+  plaidAccountId: string | null = null,
 ): TransactionQuery => ({
   ...statusToQuery(status),
   ...(search.trim() ? { search: search.trim() } : {}),
+  ...(plaidAccountId ? { plaidAccountId } : {}),
 });
+
+/**
+ * One option per linked account across every connection, for the feed's account filter.
+ * Labelled `{institution} ••{mask}` — the mask is what a bank statement shows. Accounts Plaid
+ * returned no mask for fall back to the account name, still prefixed by the institution so two
+ * banks' "Checking" stay distinguishable.
+ */
+export const accountOptionsFrom = (
+  connections: readonly PlaidConnectionView[] | undefined,
+): SelectOption<string>[] =>
+  (connections ?? []).flatMap((c) =>
+    c.accounts.map((a) => ({
+      value: a.plaidAccountId,
+      label: a.mask ? `${c.institutionName} ••${a.mask}` : `${c.institutionName} · ${a.name}`,
+    })),
+  );
+
+/**
+ * The account filter actually in force. A selection whose account is no longer linked (the bank
+ * was disconnected) would silently show an empty feed, so it falls back to all accounts.
+ */
+export const resolveAccountFilter = (
+  selected: string | null,
+  options: readonly SelectOption<string>[],
+): string | null =>
+  selected !== null && options.some((o) => o.value === selected) ? selected : null;
 
 /** The Calendar's grid is always six weeks (`fixedWeeks`), Sunday first, as react-day-picker draws it. */
 const CALENDAR_GRID_DAYS = 42;
