@@ -11,8 +11,9 @@ export const categorySchema = z.object({
   /**
    * Optional Plaid taxonomy mapping. '' means "no mapping" and is sent as an explicit empty
    * string so the server can tell "clear it" apart from "field not supplied" (which preserves).
+   * The Select's empty option writes null; callers map null/undefined to '' on submit.
    */
-  plaidCategoryPrimary: z.string().optional(),
+  plaidCategoryPrimary: z.string().nullish(),
 });
 
 export type CategoryFormValues = z.infer<typeof categorySchema>;

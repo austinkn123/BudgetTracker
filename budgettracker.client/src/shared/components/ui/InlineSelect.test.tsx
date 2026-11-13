@@ -122,10 +122,9 @@ describe('InlineSelect', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  // BUG (reported, not fixed here): a null value maps to the '__empty__' sentinel rather than
-  // '', so Radix never treats the select as unset and the placeholder is not rendered when
-  // there is no emptyOptionLabel. `it.fails` keeps the suite green; flip to `it` once fixed.
-  it.fails('shows the placeholder when value is null and there is no empty option', () => {
+  // Regression: a null value used to map to the '__empty__' sentinel, so Radix never treated
+  // the select as unset and the placeholder was hidden when there is no emptyOptionLabel.
+  it('shows the placeholder when value is null and there is no empty option', () => {
     render(
       <InlineSelect
         value={null}

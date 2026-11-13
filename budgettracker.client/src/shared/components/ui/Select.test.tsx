@@ -77,7 +77,7 @@ describe('Select', () => {
     expect(trigger()).toHaveTextContent('Rent');
   });
 
-  it('clears the form value to undefined when the empty option is chosen', async () => {
+  it('clears the form value to null when the empty option is chosen', async () => {
     const user = userEvent.setup();
     const onValue = vi.fn();
     render(<Harness defaultValue={20} onValue={onValue} emptyOptionLabel="Uncategorized" />);
@@ -85,13 +85,13 @@ describe('Select', () => {
     await user.click(trigger());
     await user.click(await screen.findByRole('option', { name: 'Uncategorized' }));
 
-    expect(onValue).toHaveBeenLastCalledWith(undefined);
+    expect(onValue).toHaveBeenLastCalledWith(null);
   });
 
-  // BUG (reported, not fixed here): the empty option writes `undefined`, and RHF's Controller
-  // falls back to the field's defaultValue for an undefined value, so the trigger snaps back to
-  // the default option ("Rent") instead of showing "Uncategorized". Writing `null` would fix it.
-  it.fails('shows the empty option label after it is chosen over a non-empty default', async () => {
+  // Regression: the empty option used to write `undefined`, and RHF's Controller falls back to
+  // the field's defaultValue for an undefined value, so the trigger snapped back to the default
+  // option ("Rent") instead of showing "Uncategorized". It now writes `null`.
+  it('shows the empty option label after it is chosen over a non-empty default', async () => {
     const user = userEvent.setup();
     render(<Harness defaultValue={20} onValue={vi.fn()} emptyOptionLabel="Uncategorized" />);
 
@@ -123,12 +123,21 @@ describe('Select', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  // BUG (reported, not fixed here): a null value maps to the '__empty__' sentinel rather than
-  // '', so Radix never treats the select as unset and the placeholder is not rendered when
-  // there is no emptyOptionLabel. `it.fails` keeps the suite green; flip to `it` once fixed.
-  it.fails('shows the placeholder when the form value is null', () => {
+  // Regression: a null value used to map to the '__empty__' sentinel, so Radix never treated
+  // the select as unset and the placeholder was hidden when there is no emptyOptionLabel.
+  it('shows the placeholder when the form value is null', () => {
     render(<Harness defaultValue={null} onValue={vi.fn()} />);
 
     expect(trigger()).toHaveTextContent('Pick a category');
+  });
+
+  it('describes the trigger by its helper text, then by the error once raised', async () => {
+    const user = userEvent.setup();
+    render(<Harness defaultValue={10} onValue={vi.fn()} error="Category is required" />);
+    expect(trigger()).toHaveAccessibleDescription('Where this spend goes');
+
+    await user.click(screen.getByRole('button', { name: 'raise error' }));
+
+    expect(trigger()).toHaveAccessibleDescription('Category is required');
   });
 });

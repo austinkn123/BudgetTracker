@@ -1,6 +1,7 @@
 import * as RadixSelect from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { EMPTY_SENTINEL, toRadixValue } from './selectValue';
 import type { SelectOption } from './Select';
 
 export interface InlineSelectProps<TValue extends string | number = string> {
@@ -21,10 +22,7 @@ export interface InlineSelectProps<TValue extends string | number = string> {
 /**
  * Standalone select for use outside a form (BUD-20 design system). The sibling `Select`
  * wraps react-hook-form; this one is plain value/onChange, for table rows and toolbars.
- *
- * Radix Select.Item throws on value="", so the empty choice uses a sentinel.
  */
-const EMPTY_SENTINEL = '__empty__';
 
 const InlineSelect = <TValue extends string | number = string>({
   value,
@@ -39,7 +37,7 @@ const InlineSelect = <TValue extends string | number = string>({
   className,
 }: InlineSelectProps<TValue>) => (
   <RadixSelect.Root
-    value={value == null || value === '' ? EMPTY_SENTINEL : String(value)}
+    value={toRadixValue(value, emptyOptionLabel !== undefined)}
     onValueChange={(next) => {
       if (next === EMPTY_SENTINEL) {
         onChange(null);
