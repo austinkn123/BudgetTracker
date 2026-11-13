@@ -12,6 +12,7 @@ using BudgetTracker.Server.Endpoints;
 using BudgetTracker.Server.Managers;
 using BudgetTracker.Server.Services;
 using BudgetTracker.Server.Utilities;
+using BudgetTracker.Server.Utilities.Observability;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,9 @@ if (isLambda)
     // Lambda environment variables, so they are read (and decrypted) once per cold start instead.
     builder.Configuration.AddSystemsManager(builder.Configuration["SsmParameterPath"] ?? "/budgettracker");
 }
+
+// JSON console logs with request scopes, ProblemDetails, /health, security logging (project-docs/observability.md).
+builder.AddBudgetTrackerObservability();
 
 // No-op outside Lambda. Function URLs use the HTTP API v2 payload format.
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
@@ -146,6 +150,8 @@ if (isLambda && Environment.GetEnvironmentVariable("BUDGETTRACKER_ENTRY") == "we
     return;
 }
 
+// First in the pipeline: correlation ID + log scope, exception handler, denied-request logging, and /health.
+app.UseBudgetTrackerObservability();
 
 app.UseDefaultFiles();
 app.MapStaticAssets();
@@ -162,6 +168,7 @@ if (!isLambda)
 }
 
 app.UseAuthentication();
+app.UseBudgetTrackerRequestUser();
 app.UseAuthorization();
 
 var apiGroup = app.MapGroup("/api")
