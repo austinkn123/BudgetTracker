@@ -17,9 +17,11 @@ import TransactionFeed from './components/TransactionFeed';
 import TransactionTable from './components/TransactionTable';
 import TransactionFilters from './components/TransactionFilters';
 import {
+  accountOptionsFrom,
   buildCalendarQuery,
   buildFeedQuery,
   buildListQuery,
+  resolveAccountFilter,
   type TransactionStatusFilter,
 } from './utils/transactionFilters';
 import { groupByPlan } from './utils/planGrouping';
@@ -48,6 +50,8 @@ const TransactionsSection = ({
   const [view, setView] = useState<ViewMode>('plan');
   const [status, setStatus] = useState<TransactionStatusFilter>('all');
   const [search, setSearch] = useState('');
+  // Null is "All accounts". Read through `account` below, never directly: see resolveAccountFilter.
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   // Which way the last month step went, so the results slide in from that side.
@@ -59,7 +63,8 @@ const TransactionsSection = ({
   // Three reads, each sized to its view, and none of them the whole ledger in one response.
   //
   // The List view is a search tool over all history: a newest-first feed, paged as you scroll, that
-  // carries the status chip and the search box but not the month. Changing either starts it over.
+  // carries the status chip, the search box and the account filter but not the month. Changing any
+  // of them starts it over.
   //
   // The Plan view is a reckoning: its buckets have to add up to the same month the header reports
   // from the server analysis, which knows nothing about the chips. Feeding it the filtered slice
@@ -67,7 +72,20 @@ const TransactionsSection = ({
   // Plan view.
   //
   // The Calendar tints its grid, so it reads exactly the days the grid draws.
-  const feedQuery = useMemo<TransactionQuery>(() => buildFeedQuery(status, search), [status, search]);
+  // Read-only share of the Settings page connections cache (same hook, same query key) so we can
+  // resolve a Plaid account mask for each imported row, whichever institution it came from, and
+  // offer the account filter.
+  const { data: connections } = usePlaidConnections();
+
+  const accountOptions = useMemo(() => accountOptionsFrom(connections), [connections]);
+  // A disconnected bank's account drops out of the options, and the filter falls back to all
+  // accounts rather than leaving an empty feed with no visible cause.
+  const account = resolveAccountFilter(selectedAccount, accountOptions);
+
+  const feedQuery = useMemo<TransactionQuery>(
+    () => buildFeedQuery(status, search, account),
+    [status, search, account],
+  );
 
   const planQuery = useMemo<TransactionQuery>(
     () => buildListQuery('all', '', monthStart, monthEnd),
@@ -98,10 +116,6 @@ const TransactionsSection = ({
 
   // Analysis now follows the requested window, so this is the plan-vs-actual for the month on screen.
   const { data: analysis } = useBudgetAnalysis(monthStart, monthEnd, 3);
-
-  // Read-only share of the Settings page connections cache (same hook, same query key) so we can
-  // resolve a Plaid account mask for each imported row, whichever institution it came from.
-  const { data: connections } = usePlaidConnections();
 
   const maskByPlaidAccountId = useMemo(
     () =>
@@ -297,6 +311,9 @@ const TransactionsSection = ({
               search={search}
               onSearchChange={setSearch}
               uncategorizedCount={uncategorizedCount}
+              account={account}
+              onAccountChange={setSelectedAccount}
+              accountOptions={accountOptions}
             />
             <TransactionFeed
               transactions={feed.transactions}

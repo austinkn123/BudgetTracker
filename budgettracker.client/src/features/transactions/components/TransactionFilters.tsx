@@ -1,4 +1,5 @@
-import { Badge, Button, SearchInput } from '../../../shared/components/ui';
+import { Badge, Button, InlineSelect, SearchInput } from '../../../shared/components/ui';
+import type { SelectOption } from '../../../shared/components/ui';
 import { cn } from '../../../shared/utils/cn';
 
 import type { TransactionStatusFilter } from '../utils/transactionFilters';
@@ -10,6 +11,11 @@ type TransactionFiltersProps = {
   onSearchChange: (search: string) => void;
   /** Counts for the chips that represent work to do; omitted when zero. */
   uncategorizedCount: number;
+  /** Selected linked account; null means all accounts. */
+  account: string | null;
+  onAccountChange: (account: string | null) => void;
+  /** One per linked account. The selector is only shown when there are two or more. */
+  accountOptions: readonly SelectOption<string>[];
 };
 
 const CHIPS: { value: TransactionStatusFilter; label: string }[] = [
@@ -19,7 +25,7 @@ const CHIPS: { value: TransactionStatusFilter; label: string }[] = [
 ];
 
 /**
- * Status chips + free-text search for the ledger. Before this the page could only be
+ * Status chips + free-text search + account filter for the ledger. Before this the page could only be
  * navigated one calendar day at a time, which does not scale to a few hundred imported rows.
  */
 const TransactionFilters = ({
@@ -28,18 +34,38 @@ const TransactionFilters = ({
   search,
   onSearchChange,
   uncategorizedCount,
+  account,
+  onAccountChange,
+  accountOptions,
 }: TransactionFiltersProps) => {
   const countFor = (value: TransactionStatusFilter) =>
     value === 'uncategorized' ? uncategorizedCount : 0;
 
   return (
     <div className="flex flex-col gap-3">
-      <SearchInput
-        value={search}
-        onChange={onSearchChange}
-        placeholder="Search payee or notes…"
-        ariaLabel="Search transactions"
-      />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <SearchInput
+          value={search}
+          onChange={onSearchChange}
+          placeholder="Search payee or notes…"
+          ariaLabel="Search transactions"
+          className="flex-1"
+        />
+        {/* With a single account "All accounts" and that account are the same ledger. */}
+        {accountOptions.length > 1 && (
+          <div className="sm:w-56">
+            <InlineSelect<string>
+              value={account}
+              onChange={onAccountChange}
+              options={accountOptions}
+              emptyOptionLabel="All accounts"
+              placeholder="All accounts"
+              ariaLabel="Filter by account"
+              className="h-10"
+            />
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {CHIPS.map((chip) => {
