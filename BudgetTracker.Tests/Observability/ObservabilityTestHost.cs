@@ -49,8 +49,8 @@ internal sealed class ObservabilityTestHost : IAsyncDisposable
         builder.WebHost.UseTestServer();
         builder.AddBudgetTrackerObservability();
         builder.Logging.AddFakeLogging();
-        builder.Services.AddAuthentication(TestAuthHandler.Scheme)
-            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.Scheme, _ => { });
+        builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
         builder.Services.AddAuthorization(o =>
             o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
         configure?.Invoke(builder);
@@ -113,7 +113,7 @@ internal sealed class ObservabilityTestHost : IAsyncDisposable
         UrlEncoder encoder)
         : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
-        public const string Scheme = "Test";
+        public const string SchemeName = "Test";
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
@@ -121,8 +121,8 @@ internal sealed class ObservabilityTestHost : IAsyncDisposable
                 return Task.FromResult(AuthenticateResult.NoResult());
 
             var identity = new ClaimsIdentity(
-                [new Claim("sub", sub.ToString()), new Claim("email", TestEmail)], Scheme);
-            return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme)));
+                [new Claim("sub", sub.ToString()), new Claim("email", TestEmail)], SchemeName);
+            return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName)));
         }
     }
 }

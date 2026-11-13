@@ -70,9 +70,9 @@ public class ProgramWiringTests
                 // Both tick against the database; the real host only runs them outside Lambda.
                 services.RemoveAll<IHostedService>(d =>
                     d.ImplementationType == typeof(PlaidSyncSweepService) || d.ImplementationType == typeof(WebullCloseSnapshotService));
-                services.AddAuthentication(ObservabilityTestHost.TestAuthHandler.Scheme)
+                services.AddAuthentication(ObservabilityTestHost.TestAuthHandler.SchemeName)
                     .AddScheme<AuthenticationSchemeOptions, ObservabilityTestHost.TestAuthHandler>(
-                        ObservabilityTestHost.TestAuthHandler.Scheme, _ => { });
+                        ObservabilityTestHost.TestAuthHandler.SchemeName, _ => { });
                 services.Configure<AuthorizationOptions>(o =>
                     o.DefaultPolicy = new AuthorizationPolicyBuilder().RequireClaim(AdminClaim).Build());
                 services.AddScoped(_ => currentUser);
