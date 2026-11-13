@@ -37,6 +37,8 @@ x86/
 [Aa][Rr][Mm]64[Ee][Cc]/
 bld/
 [Oo]bj/
+# Linux builds of the .esproj mis-handle a Windows path and emit a literal "obj\Debug" folder
+[Oo]bj\\*/
 [Oo]ut/
 [Ll]og/
 [Ll]ogs/
