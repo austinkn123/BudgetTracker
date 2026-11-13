@@ -5,9 +5,10 @@ import {
   type TransactionQuery,
 } from '../../../shared/services/transaction.service';
 import type { Transaction, TransactionPage } from '../../../shared/types/api';
-import { TRANSACTIONS_REFETCH_INTERVAL_MS } from './useTransactions';
-
 export const FEED_PAGE_SIZE = 50;
+
+/** How long a just-seeded head counts as fresh, so enabling it does not repeat the feed's own read. */
+const HEAD_STALE_MS = 60_000;
 
 /** Same rows, same order, same content, same continuation: nothing for the feed to show. */
 const samePage = (a: TransactionPage, b: TransactionPage) =>
@@ -18,11 +19,12 @@ const samePage = (a: TransactionPage, b: TransactionPage) =>
  * changing a chip or the search starts a fresh feed from the top.
  *
  * Background freshness costs one request, however deep the feed is scrolled. TanStack would
- * refetch an infinite query by re-reading every loaded page in turn, so the feed itself never
- * refreshes on a timer or on focus. A separate "head" query re-reads only the first page on that
- * cadence; when it differs from the feed's first page, the feed is reset to it — loaded older
- * pages are dropped and re-read as the user scrolls back down. An explicit invalidation (the
- * user's own edit, a sync) still re-reads every loaded page, so their place in the list holds.
+ * refetch an infinite query by re-reading every loaded page in turn, so the feed itself is never
+ * refreshed in the background. A separate "head" query reads only the first page, and is the one
+ * the app-wide data-version check (useDataVersionSync) invalidates when the server's data changes;
+ * when the head differs from the feed's first page, the feed is reset to it — loaded older pages
+ * are dropped and re-read as the user scrolls back down. An explicit invalidation of the ledger
+ * (the user's own edit, a sync) still re-reads every loaded page, so their place in the list holds.
  */
 export const useTransactionFeed = (query: TransactionQuery, { enabled = true } = {}) => {
   const queryClient = useQueryClient();
@@ -42,7 +44,7 @@ export const useTransactionFeed = (query: TransactionQuery, { enabled = true } =
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
     retry: 1,
-    // Only the head query below polls; an invalidation still refetches the feed.
+    // Only the head query below is refreshed in the background; an invalidation still refetches the feed.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
@@ -52,11 +54,11 @@ export const useTransactionFeed = (query: TransactionQuery, { enabled = true } =
     queryFn: () => transactionService.getPage(query, { limit: FEED_PAGE_SIZE }),
     enabled: enabled && feed.isSuccess,
     retry: 1,
-    // Fresh for one poll interval, so a just-seeded head is not re-read on enable; focus always
-    // re-reads it, as the feed itself used to.
-    staleTime: TRANSACTIONS_REFETCH_INTERVAL_MS,
-    refetchInterval: TRANSACTIONS_REFETCH_INTERVAL_MS,
-    refetchOnWindowFocus: 'always',
+    // No timer and no focus refetch: the head is refreshed by the data-version check, which
+    // invalidates it (and only it) when anything changed. The stale window keeps a just-seeded head
+    // from being re-read the moment it is enabled.
+    staleTime: HEAD_STALE_MS,
+    refetchOnWindowFocus: false,
   });
 
   const firstPage = feed.data?.pages[0];

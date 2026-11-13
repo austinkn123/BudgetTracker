@@ -5,9 +5,6 @@ import {
 } from '../../../shared/services/transaction.service';
 import type { Transaction } from '../../../shared/types/api';
 
-/** Poll cadence so server-side auto-synced rows surface without a manual Refresh (BUD-6). */
-export const TRANSACTIONS_REFETCH_INTERVAL_MS = 60_000;
-
 type ReadOptions = {
   /** Off while the view that reads it is not on screen. */
   enabled?: boolean;
@@ -25,8 +22,6 @@ export const useTransactions = (query: TransactionQuery, { enabled = true }: Rea
     queryFn: () => transactionService.getFiltered(query),
     enabled,
     retry: 1,
-    refetchInterval: TRANSACTIONS_REFETCH_INTERVAL_MS,
-    refetchOnWindowFocus: true,
   });
 };
 
@@ -45,7 +40,5 @@ export const useTransactionPage = (
     queryFn: async () => (await transactionService.getPage(query, { limit })).items,
     enabled,
     retry: 1,
-    refetchInterval: TRANSACTIONS_REFETCH_INTERVAL_MS,
-    refetchOnWindowFocus: true,
   });
 };

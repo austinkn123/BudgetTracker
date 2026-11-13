@@ -4,6 +4,14 @@ export interface User {
   createdAt: string;
 }
 
+/**
+ * GET /data-version: an opaque counter that changes whenever any of the user's budget data changes.
+ * Compare with `!==` only — it can go down after a restore.
+ */
+export interface DataVersion {
+  version: number;
+}
+
 export interface Category {
   id: number;
   userId: number;

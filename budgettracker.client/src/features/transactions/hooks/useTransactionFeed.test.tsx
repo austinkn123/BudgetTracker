@@ -1,11 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { focusManager } from '@tanstack/react-query';
+import { focusManager, type QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { transactionService } from '../../../shared/services/transaction.service';
 import type { Transaction, TransactionPage } from '../../../shared/types/api';
 import { createQueryWrapper, createTestQueryClient } from '../../../test/renderWithQueryClient';
 import { FEED_PAGE_SIZE, useTransactionFeed } from './useTransactionFeed';
-import { TRANSACTIONS_REFETCH_INTERVAL_MS } from './useTransactions';
+import { isLiveDataQuery } from '../../../shared/hooks/useDataVersionSync';
 
 vi.mock('../../../shared/services/transaction.service', () => ({
   transactionService: { getFiltered: vi.fn(), getPage: vi.fn() },
@@ -37,13 +37,18 @@ const renderFeed = (queryClient = createTestQueryClient()) =>
 
 /** A feed scrolled two pages deep. */
 const loadTwoPages = async () => {
-  const hook = renderFeed();
+  const queryClient = createTestQueryClient();
+  const hook = renderFeed(queryClient);
   await waitFor(() => expect(hook.result.current.transactions).toHaveLength(2));
   await act(() => hook.result.current.fetchNextPage());
   await waitFor(() => expect(hook.result.current.transactions).toHaveLength(3));
   getPage.mockClear();
-  return hook;
+  return { ...hook, queryClient };
 };
+
+/** What useDataVersionSync does when the server's data version moves. */
+const dataVersionChanged = (queryClient: QueryClient) =>
+  act(() => queryClient.invalidateQueries({ predicate: (q) => isLiveDataQuery(q.queryKey) }));
 
 const refocus = () =>
   act(() => {
@@ -73,42 +78,52 @@ describe('useTransactionFeed background refresh', () => {
     expect(getPage).toHaveBeenCalledWith({}, { cursor: undefined, limit: FEED_PAGE_SIZE });
   });
 
-  it('re-reads only the first page on focus, and keeps the loaded pages when nothing changed', async () => {
+  it('does not re-read anything on focus; the data-version check owns that', async () => {
     serve(() => FIRST);
     const { result } = await loadTwoPages();
 
     refocus();
+    await act(async () => {});
+
+    expect(getPage).not.toHaveBeenCalled();
+    expect(result.current.transactions.map((t) => t.id)).toEqual([3, 2, 1]);
+  });
+
+  it('does not poll on a timer', async () => {
+    // Faked before mount so any poll timer would be armed on the fake clock; time still flows for waitFor.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    serve(() => FIRST);
+    await loadTwoPages();
+
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000));
+
+    expect(getPage).not.toHaveBeenCalled();
+  });
+
+  it('re-reads only the first page on a data-version change, and keeps the loaded pages when nothing changed', async () => {
+    serve(() => FIRST);
+    const { result, queryClient } = await loadTwoPages();
+
+    await dataVersionChanged(queryClient);
 
     await waitFor(() => expect(getPage).toHaveBeenCalledTimes(1));
-    expect(getPage).toHaveBeenCalledWith({}, { cursor: undefined, limit: FEED_PAGE_SIZE });
+    expect(getPage).toHaveBeenCalledWith({}, { limit: FEED_PAGE_SIZE });
     expect(result.current.transactions.map((t) => t.id)).toEqual([3, 2, 1]);
     expect(result.current.hasNextPage).toBe(false);
   });
 
-  it('resets to the fresh first page when it changed', async () => {
+  it('resets to the fresh first page on a data-version change when page 1 differs', async () => {
     let head = FIRST;
     serve(() => head);
-    const { result } = await loadTwoPages();
+    const { result, queryClient } = await loadTwoPages();
 
     head = FIRST_AFTER_SYNC;
-    refocus();
+    await dataVersionChanged(queryClient);
 
     await waitFor(() => expect(result.current.transactions.map((t) => t.id)).toEqual([4, 3]));
     expect(getPage).toHaveBeenCalledTimes(1);
     // Scrolling on continues from the fresh page's own cursor.
     expect(result.current.hasNextPage).toBe(true);
-  });
-
-  it('polls with one request per interval, however many pages are loaded', async () => {
-    // Faked before mount so the poll timer is armed on the fake clock; time still flows for waitFor.
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    serve(() => FIRST);
-    await loadTwoPages();
-
-    await act(() => vi.advanceTimersByTimeAsync(TRANSACTIONS_REFETCH_INTERVAL_MS));
-
-    expect(getPage).toHaveBeenCalledTimes(1);
-    expect(getPage).toHaveBeenCalledWith({}, { cursor: undefined, limit: FEED_PAGE_SIZE });
   });
 
   it('still re-reads every loaded page when the ledger is invalidated after an edit', async () => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sheet } from '../ui';
+import { useDataVersionSync } from '../../hooks/useDataVersionSync';
 import { useScrollDirection } from '../../hooks/useScrollDirection';
 import MobileNavPanel from './MobileNavPanel';
 import TopNav from './TopNav';
@@ -17,6 +18,8 @@ const AppShell = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { direction, atTop } = useScrollDirection();
+  // One cheap check keeps every authenticated page's budget data fresh (replaces per-query polling).
+  useDataVersionSync();
 
   // Stay expanded while the mobile sheet is open — the trigger must not move.
   const navCompact = direction === 'down' && !atTop && !mobileOpen;

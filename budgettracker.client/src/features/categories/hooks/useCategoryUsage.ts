@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { categoryService } from '../../../shared/services/category.service';
 import type { CategoryUsage } from '../../../shared/types/api';
-import { TRANSACTIONS_REFETCH_INTERVAL_MS } from '../../transactions/hooks/useTransactions';
 
 /**
  * Per-category usage since a date. Derived from transactions, so it lives under the
@@ -12,6 +11,4 @@ export const useCategoryUsage = (since: string) =>
     queryKey: ['transactions', 'category-usage', since],
     queryFn: () => categoryService.getUsage(since),
     retry: 1,
-    refetchInterval: TRANSACTIONS_REFETCH_INTERVAL_MS,
-    refetchOnWindowFocus: true,
   });
