@@ -22,6 +22,7 @@ public class PlaidManager(
     ICategoryAccessor categoryAccessor,
     IPlaidEngine engine,
     IPlaidWebhookEngine webhookEngine,
+    IDataVersionAccessor dataVersion,
     IOptions<PlaidOptions> options,
     ILogger<PlaidManager> logger) : IPlaidManager
 {
@@ -169,6 +170,9 @@ public class PlaidManager(
             return Result<PlaidSyncSummary>.Failure("Could not save the new bank connection. Please try again.");
         }
 
+        // The new connection is visible now, even if the initial sync below fails.
+        await dataVersion.BumpAsync(userId);
+
         // Initial sync (~30 days delivered automatically by Plaid via /transactions/sync with null cursor)
         return await RunSyncAsync(userId, newPlaidItemId, accessToken, cursor: null, accountsLookup: allAccounts, plaidAccountSnapshots: accountSnapshots);
     }
@@ -268,9 +272,11 @@ public class PlaidManager(
                 break;
         }
 
-        return await itemAccessor.DeactivateAsync(userId, plaidItemId)
-            ? Result.Success()
-            : Result.Failure(ConnectionNotFoundMessage);
+        if (!await itemAccessor.DeactivateAsync(userId, plaidItemId))
+            return Result.Failure(ConnectionNotFoundMessage);
+
+        await dataVersion.BumpAsync(userId);
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -281,6 +287,7 @@ public class PlaidManager(
             return Result.Failure(ConnectionNotFoundMessage);
 
         await itemAccessor.SetNeedsReconnectAsync(plaidItemId, false);
+        await dataVersion.BumpAsync(userId);
         return Result.Success();
     }
 
@@ -318,6 +325,7 @@ public class PlaidManager(
         if (action != WebhookAction.Sync)
         {
             await itemAccessor.SetNeedsReconnectAsync(item.Id, action == WebhookAction.FlagReconnect);
+            await dataVersion.BumpAsync(item.UserId);
             return Result.Success();
         }
 
@@ -501,6 +509,7 @@ public class PlaidManager(
         {
             // The bank wants the user to sign in again; the flag makes the client offer update-mode Link (Reconnect).
             await itemAccessor.SetNeedsReconnectAsync(plaidItemId, true);
+            await dataVersion.BumpAsync(userId);
             return Result<PlaidSyncSummary>.Failure(LoginRequiredMessage);
         }
         catch (Exception)
@@ -573,6 +582,9 @@ public class PlaidManager(
         await itemAccessor.UpdateSyncStateAsync(plaidItemId, syncResult.NextCursor, syncedAt);
 
         await PairOwnAccountTransfersAsync(userId, userCategories);
+
+        // Bumped on every completed sync, even with no rows: the sync time and balances shown have changed.
+        await dataVersion.BumpAsync(userId);
 
         return Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, syncedAt));
     }

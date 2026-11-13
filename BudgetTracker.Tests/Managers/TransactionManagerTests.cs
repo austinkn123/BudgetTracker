@@ -11,9 +11,20 @@ public class TransactionManagerTests
     private readonly Mock<ITransactionAccessor> _accessor = new(MockBehavior.Strict);
     private readonly Mock<ICategoryAccessor> _categoryAccessor = new(MockBehavior.Strict);
 
+    private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
+    private readonly List<string> _calls = [];
+
     private readonly TransactionEngine _transactionEngine = new();
 
-    private TransactionManager BuildSut() => new(_accessor.Object, _categoryAccessor.Object, new PlaidEngine(), _transactionEngine);
+    public TransactionManagerTests()
+    {
+        _dataVersion.Setup(d => d.BumpAsync(It.IsAny<int>()))
+            .Callback<int>(userId => _calls.Add($"bump:{userId}"))
+            .ReturnsAsync(true);
+    }
+
+    private TransactionManager BuildSut() =>
+        new(_accessor.Object, _categoryAccessor.Object, new PlaidEngine(), _transactionEngine, _dataVersion.Object);
 
     private static Transaction Row(int id, string type, string? plaidCategory = "GENERAL_MERCHANDISE") => new()
     {
@@ -232,5 +243,68 @@ public class TransactionManagerTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Transaction not found", result.Error);
+    }
+
+    // ── Data version (live refresh) ─────────────────────────────────────────
+
+    [Fact]
+    public async Task SetCategory_RowsChanged_BumpsTheDataVersionAfterTheWrite()
+    {
+        _categoryAccessor.Setup(a => a.GetByIdForUserAsync(8, 5))
+            .ReturnsAsync(new Category { Id = 8, UserId = 5, Name = "Food", CategoryType = "Expense" });
+        _accessor.Setup(a => a.GetByIdsAsync(It.IsAny<IEnumerable<int>>(), 5)).ReturnsAsync([Row(1, "Expense")]);
+        _accessor.Setup(a => a.SetCategoryAsync(It.IsAny<IReadOnlyDictionary<int, string>>(), 8, 5))
+            .Callback(() => _calls.Add("write"))
+            .ReturnsAsync(1);
+
+        var result = await BuildSut().SetCategoryAsync([1], categoryId: 8, userId: 5);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task SetCategory_NothingChanged_DoesNotBump()
+    {
+        _accessor.Setup(a => a.GetByIdsAsync(It.IsAny<IEnumerable<int>>(), 5)).ReturnsAsync([]);
+        _accessor.Setup(a => a.SetCategoryAsync(It.IsAny<IReadOnlyDictionary<int, string>>(), null, 5)).ReturnsAsync(0);
+
+        var result = await BuildSut().SetCategoryAsync([1], categoryId: null, userId: 5);
+
+        Assert.True(result.IsSuccess);
+        _dataVersion.Verify(d => d.BumpAsync(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetCategory_Rejected_DoesNotBump()
+    {
+        _categoryAccessor.Setup(a => a.GetByIdForUserAsync(99, 5)).ReturnsAsync((Category?)null);
+
+        await BuildSut().SetCategoryAsync([1], categoryId: 99, userId: 5);
+        await BuildSut().SetCategoryAsync([], categoryId: 8, userId: 5);
+
+        _dataVersion.Verify(d => d.BumpAsync(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetNotes_Updated_BumpsTheDataVersionAfterTheWrite()
+    {
+        _accessor.Setup(a => a.SetNotesAsync(4, "x", 5)).Callback(() => _calls.Add("write")).ReturnsAsync(true);
+
+        var result = await BuildSut().SetNotesAsync(4, "x", userId: 5);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["write", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task SetNotes_NotFoundOrTooLong_DoesNotBump()
+    {
+        _accessor.Setup(a => a.SetNotesAsync(99, "x", 5)).ReturnsAsync(false);
+
+        await BuildSut().SetNotesAsync(99, "x", userId: 5);
+        await BuildSut().SetNotesAsync(4, new string('x', 1001), userId: 5);
+
+        _dataVersion.Verify(d => d.BumpAsync(It.IsAny<int>()), Times.Never);
     }
 }

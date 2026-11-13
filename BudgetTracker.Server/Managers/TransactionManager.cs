@@ -15,7 +15,8 @@ public class TransactionManager(
     ITransactionAccessor accessor,
     ICategoryAccessor categoryAccessor,
     IPlaidEngine plaidEngine,
-    ITransactionEngine transactionEngine) : ITransactionManager
+    ITransactionEngine transactionEngine,
+    IDataVersionAccessor dataVersion) : ITransactionManager
 {
     private const string FilterRequired =
         "At least one filter is required; read the whole ledger a page at a time from GET /api/transactions/page.";
@@ -74,6 +75,9 @@ public class TransactionManager(
             r => plaidEngine.ClassifyTransactionType(r.PlaidCategoryPrimary, category?.CategoryType, r.TransactionType));
 
         var changed = await accessor.SetCategoryAsync(types, categoryId, userId);
+        if (changed > 0)
+            await dataVersion.BumpAsync(userId);
+
         return Result<int>.Success(changed);
     }
 
@@ -86,8 +90,10 @@ public class TransactionManager(
         var normalised = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
 
         var updated = await accessor.SetNotesAsync(id, normalised, userId);
-        return updated
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("Transaction not found");
+        if (!updated)
+            return Result<bool>.Failure("Transaction not found");
+
+        await dataVersion.BumpAsync(userId);
+        return Result<bool>.Success(true);
     }
 }

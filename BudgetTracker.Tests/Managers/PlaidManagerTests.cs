@@ -23,9 +23,16 @@ public class PlaidManagerTests
     private readonly PlaidEngine _engine = new();
     private readonly PlaidOptions _options = new();
     private readonly Mock<ILogger<PlaidManager>> _logger = new();
+    private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
+    private readonly List<string> _calls = [];
 
     public PlaidManagerTests()
     {
+        // Every user-visible write bumps the user's data version; tests that care about order read _calls.
+        _dataVersion.Setup(d => d.BumpAsync(It.IsAny<int>()))
+            .Callback<int>(userId => _calls.Add($"bump:{userId}"))
+            .ReturnsAsync(true);
+
         // Sync resolves Plaid's suggested category against the user's categories (BUD-9).
         // Default to "no mappings configured"; tests that care override this.
         _categoryAccessor
@@ -53,6 +60,7 @@ public class PlaidManagerTests
         _categoryAccessor.Object,
         _engine,
         _webhookEngine.Object,
+        _dataVersion.Object,
         Options.Create(_options),
         _logger.Object);
 
@@ -1879,6 +1887,252 @@ public class PlaidManagerTests
         Assert.Equal(812.40m, Assert.Single(snapshots!).CurrentBalance);
     }
 
+    // ── Data version (live refresh) ─────────────────────────────────────────
+
+    private void VerifyNeverBumped() => _dataVersion.Verify(d => d.BumpAsync(It.IsAny<int>()), Times.Never);
+
+    [Fact]
+    public async Task Sync_EvenWithNoChanges_BumpsAfterTransferPairing()
+    {
+        StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor"));
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, "next-cursor", It.IsAny<DateTime>()))
+            .Callback(() => _calls.Add("sync-state"))
+            .Returns(Task.CompletedTask);
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+            .Callback(() => _calls.Add("pair"))
+            .ReturnsAsync([]);
+
+        var result = await BuildSut().SyncAsync(5);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["sync-state", "pair", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Sync_TransferPairingFails_StillBumps()
+    {
+        StubSyncWith(new PlaidSyncResult([], [], [], "next-cursor"));
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+            .ThrowsAsync(new InvalidOperationException("db blip"));
+
+        await BuildSut().SyncAsync(5);
+
+        _dataVersion.Verify(d => d.BumpAsync(5), Times.Once);
+    }
+
+    [Fact]
+    public async Task Sync_PlaidFailsWithAnotherErrorCode_DoesNotBump()
+    {
+        ArrangeItemSyncThrows(PlaidError("INSTITUTION_DOWN"));
+
+        await BuildSut().SyncAsync(userId: 5);
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Sync_NothingDue_DoesNotBump()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([]);
+
+        await BuildSut().SyncAsync(5);
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Sync_ItemLoginRequired_BumpsAfterFlaggingTheItem()
+    {
+        ArrangeItemSyncThrows(PlaidError("ITEM_LOGIN_REQUIRED"));
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(1, true)).Callback(() => _calls.Add("flag")).Returns(Task.CompletedTask);
+
+        await BuildSut().SyncAsync(userId: 5);
+
+        Assert.Equal(["flag", "bump:5"], _calls);
+    }
+
+    /// <summary>Arranges an exchange for user 5 that persists item 11; the follow-up sync is left to the caller.</summary>
+    private void ArrangeExchangeThatPersists()
+    {
+        _plaidAccessor.Setup(a => a.ExchangePublicTokenAsync("public-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidExchangeResult("access-token-xyz", "plaid-item-1"));
+        _plaidAccessor.Setup(a => a.GetItemMetadataAsync("access-token-xyz", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidItemMetadata("plaid-item-1", "ins_3", "Chase", null));
+        _plaidAccessor.Setup(a => a.GetAccountsAsync("access-token-xyz", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PlaidAccountDto>());
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([]);
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(5)).ReturnsAsync(Array.Empty<Account>());
+        _itemAccessor.Setup(a => a.AddAsync(5, "access-token-xyz", "plaid-item-1", "ins_3", "Chase", null, It.IsAny<IReadOnlyList<PlaidAccount>>()))
+            .Callback(() => _calls.Add("add"))
+            .ReturnsAsync(11);
+    }
+
+    [Fact]
+    public async Task Exchange_Persisted_BumpsRightAfterTheItemIsAdded_AndAgainAfterTheSync()
+    {
+        ArrangeExchangeThatPersists();
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", null, It.IsAny<CancellationToken>()))
+            .Callback(() => _calls.Add("plaid-sync"))
+            .ReturnsAsync(new PlaidSyncResult([], [], [], "cursor-after"));
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>())).ReturnsAsync((0, 0));
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, "cursor-after", It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+
+        var result = await BuildSut().ExchangePublicTokenAsync(5, "public-token");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["add", "bump:5", "plaid-sync", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Exchange_FollowUpSyncFails_StillBumpsForTheNewConnection()
+    {
+        ArrangeExchangeThatPersists();
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Plaid down"));
+
+        var result = await BuildSut().ExchangePublicTokenAsync(5, "public-token");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(["add", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Exchange_AlreadyLinked_DoesNotBump()
+    {
+        ArrangeDuplicateChaseExchange();
+        _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-dup", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await BuildSut().ExchangePublicTokenAsync(userId: 5, "public-token-dup");
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Exchange_PersistFailsOrTokenMissing_DoesNotBump()
+    {
+        ArrangeExchangeWhosePersistFails();
+        _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await BuildSut().ExchangePublicTokenAsync(userId: 5, "public-token");
+        await BuildSut().ExchangePublicTokenAsync(userId: 5, "");
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Disconnect_Deactivated_BumpsAfterTheWrite()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).Callback(() => _calls.Add("deactivate")).ReturnsAsync(true);
+
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["deactivate", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Disconnect_NotFoundOrDeactivatedConcurrently_DoesNotBump()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 99)).ReturnsAsync(AccessTokenLookup.NotFound);
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Undecryptable);
+        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).ReturnsAsync(false);
+
+        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 99);
+        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task MarkReconnected_OwnedItem_BumpsAfterClearingTheFlag()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([ChaseItem()]);
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(11, false)).Callback(() => _calls.Add("clear")).Returns(Task.CompletedTask);
+
+        await BuildSut().MarkReconnectedAsync(userId: 5, plaidItemId: 11);
+
+        Assert.Equal(["clear", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task MarkReconnected_NotFound_DoesNotBump()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([]);
+
+        await BuildSut().MarkReconnectedAsync(userId: 5, plaidItemId: 11);
+
+        VerifyNeverBumped();
+    }
+
+    [Theory]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"PENDING_EXPIRATION","item_id":"plaid-item-1"}""", true)]
+    [InlineData("""{"webhook_type":"ITEM","webhook_code":"LOGIN_REPAIRED","item_id":"plaid-item-1"}""", false)]
+    public async Task Webhook_ItemEvent_BumpsTheItemOwnersVersionAfterTheFlagWrite(string body, bool flag)
+    {
+        ArrangeVerifiedWebhook(body);
+        var item = ItemFor("plaid-item-1");
+        item.UserId = 42;
+        _itemAccessor.Setup(a => a.GetByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(item);
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(11, flag)).Callback(() => _calls.Add("flag")).Returns(Task.CompletedTask);
+
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["flag", "bump:42"], _calls);
+    }
+
+    [Fact]
+    public async Task Webhook_TransactionsSync_BumpsTheItemOwnersVersion()
+    {
+        var body = """{"webhook_type":"TRANSACTIONS","webhook_code":"SYNC_UPDATES_AVAILABLE","item_id":"plaid-item-1"}""";
+        ArrangeVerifiedWebhook(body);
+        var item = ItemFor("plaid-item-1");
+        item.UserId = 42;
+        ArrangeSyncForItem("plaid-item-1", item);
+
+        var result = await BuildSut().HandleWebhookAsync(ValidJwt, body);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["bump:42"], _calls);
+    }
+
+    [Fact]
+    public async Task Webhook_UnverifiedNoOpOrUnknownItem_DoesNotBump()
+    {
+        const string unverified = """{"webhook_type":"ITEM","webhook_code":"PENDING_EXPIRATION","item_id":"plaid-item-x"}""";
+        _webhookEngine.Setup(e => e.ExtractKeyId(ValidJwt)).Returns("kid-1");
+        _plaidAccessor.Setup(a => a.GetWebhookVerificationKeyAsync("kid-1", It.IsAny<CancellationToken>())).ReturnsAsync(TestJwk);
+        _webhookEngine.Setup(e => e.VerifyWebhook(ValidJwt, TestJwk, unverified)).Returns(false);
+        await BuildSut().HandleWebhookAsync(ValidJwt, unverified);
+
+        const string noOp = """{"webhook_type":"TRANSACTIONS","webhook_code":"RECURRING_TRANSACTIONS_UPDATE","item_id":"plaid-item-1"}""";
+        ArrangeVerifiedWebhook(noOp);
+        await BuildSut().HandleWebhookAsync(ValidJwt, noOp);
+
+        const string unknownItem = """{"webhook_type":"ITEM","webhook_code":"PENDING_DISCONNECT","item_id":"plaid-item-gone"}""";
+        ArrangeVerifiedWebhook(unknownItem);
+        _itemAccessor.Setup(a => a.GetByPlaidItemIdAsync("plaid-item-gone")).ReturnsAsync((PlaidItem?)null);
+        await BuildSut().HandleWebhookAsync(ValidJwt, unknownItem);
+
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Sweep_BumpsEachSyncedItemsOwner()
+    {
+        var itemA = new PlaidItem { Id = 1, UserId = 10, PlaidItemId = "item-a", SyncCursor = "c-a", Accounts = [] };
+        var itemB = new PlaidItem { Id = 2, UserId = 20, PlaidItemId = "item-b", SyncCursor = "c-b", Accounts = [] };
+        _itemAccessor.Setup(a => a.GetAllActiveAsync()).ReturnsAsync([itemA, itemB]);
+        ArrangeSweepSyncForItem(itemA);
+        ArrangeSweepSyncForItem(itemB);
+
+        await BuildSut().SweepAllAsync();
+
+        Assert.Equal(["bump:10", "bump:20"], _calls);
+    }
+
     // ── Real-engine harness helpers ─────────────────────────────────────────
 
     private PlaidManager BuildSutWithRealWebhookEngine() => new(
@@ -1889,6 +2143,7 @@ public class PlaidManagerTests
         _categoryAccessor.Object,
         _engine,
         new PlaidWebhookEngine(),
+        _dataVersion.Object,
         Options.Create(_options),
         NullLogger<PlaidManager>.Instance);
 

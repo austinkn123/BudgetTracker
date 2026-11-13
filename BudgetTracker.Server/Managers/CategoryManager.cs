@@ -12,7 +12,8 @@ public class CategoryManager(
     ICategoryEngine engine,
     ICategoryAccessor accessor,
     ITransactionAccessor transactionAccessor,
-    IPlaidEngine plaidEngine) : ICategoryManager
+    IPlaidEngine plaidEngine,
+    IDataVersionAccessor dataVersion) : ICategoryManager
 {
     public async Task<Result<Category>> GetByIdAsync(int id, int userId)
     {
@@ -50,14 +51,18 @@ public class CategoryManager(
             ? null
             : category.PlaidCategoryPrimary.Trim();
 
+        int id;
         try
         {
-            return Result<int>.Success(await accessor.CreateAsync(category));
+            id = await accessor.CreateAsync(category);
         }
         catch (UniqueNameViolationException)
         {
             return Result<int>.Failure(engine.DuplicateNameError(category.Name));
         }
+
+        await dataVersion.BumpAsync(category.UserId);
+        return Result<int>.Success(id);
     }
 
     public async Task<Result<bool>> UpdateAsync(Category category)
@@ -114,6 +119,7 @@ public class CategoryManager(
             await transactionAccessor.SetCategoryAsync(types, existing.Id, existing.UserId);
         }
 
+        await dataVersion.BumpAsync(existing.UserId);
         return Result<bool>.Success(true);
     }
 
@@ -130,8 +136,10 @@ public class CategoryManager(
             return Result<bool>.Failure("Category is in use and cannot be deleted");
         }
 
-        return deleted
-            ? Result<bool>.Success(true)
-            : Result<bool>.Failure("Category not found");
+        if (!deleted)
+            return Result<bool>.Failure("Category not found");
+
+        await dataVersion.BumpAsync(userId);
+        return Result<bool>.Success(true);
     }
 }
