@@ -3,8 +3,9 @@
 The logging, monitoring, and health-check plan for BudgetTracker: what exists today, what we've
 decided, and the phased work to get there.
 
-> **Status: Proposed — not implemented.** Nothing below beyond "Current state" exists in the
-> codebase yet. Items marked *Proposed* inside the plan still need approval on top of that.
+> **Status: Phase 1 implemented.** Phase 2, the deferred email alerts, Phase 3, and the
+> multi-user checklist (§8) are still to do. Items marked *Proposed* inside the plan still need
+> approval.
 
 BudgetTracker runs as a single AWS Lambda behind a Function URL (`deploy/template.yaml`), backed
 by Neon Postgres. Lambda output goes to the CloudWatch log group `/aws/lambda/<function>`, kept
@@ -16,19 +17,37 @@ for 14 days. See [`deploy/README.md`](../deploy/README.md) for the hosting setup
 
 ### Backend
 
-- **Logging:** default `Microsoft.Extensions.Logging`. No JSON output, no Serilog, no OpenTelemetry.
+- **Wiring:** lives in `BudgetTracker.Server/Utilities/Observability/`, through
+  `AddBudgetTrackerObservability()`, `UseBudgetTrackerObservability()`, and
+  `UseBudgetTrackerRequestUser()`. The last one sits between `UseAuthentication` and
+  `UseAuthorization`.
+- **Logging:** built-in `Microsoft.Extensions.Logging` with the JSON console formatter and scopes
+  on. Each scope carries `CorrelationId`, `AwsRequestId`, and `UserId`. No Serilog, no
+  OpenTelemetry.
 - **Where `ILogger` is used:** only in Managers and background services — `PlaidManager`,
   `WebullManager`, `WebullTradesManager`, `SandboxSeedManager`, `PlaidSyncSweepService`, and
   `WebullCloseSnapshotService`. Endpoints, Engines, and Accessors don't log.
-- **Errors:** no `UseExceptionHandler` and no ProblemDetails. No correlation IDs.
-- **Error shapes:** `Result<T>.Error` is free text, and endpoints return errors in mixed shapes.
-- **Health:** no health checks.
+- **Errors:** `UseExceptionHandler` plus ProblemDetails responses that carry `correlationId` and
+  no stack trace.
+- **Correlation IDs:** middleware reads `X-Correlation-ID` and keeps it if it is 1–64 characters
+  of `[A-Za-z0-9-_.]`; otherwise it generates a new GUID. The ID is echoed on every response.
+- **Error shapes:** `Result<T>.Error` is still free text, and endpoints still return errors in
+  mixed shapes.
+- **Health:** anonymous `/health`, with no database call. No `/health/ready` yet.
+- **Security signal:** the `BudgetTracker.Security` log category records failed JWT
+  authentication and 401/403 responses: status, method, and path. For exceptions, only the type
+  name is logged.
+- **Production log levels:** EF `Database.Command` and `HttpClient` are capped at `Warning`
+  outside Development. This is set in code.
 - **EF Core:** sensitive-data logging is not enabled. This is good, and we keep it that way.
+- **Redaction:** none yet (see §3 and Phase 2).
 
 ### Frontend
 
-- Client errors only go to `console.error` ([`budgettracker.client/src/shared/api.ts`](../budgettracker.client/src/shared/api.ts)).
-- No React `ErrorBoundary`.
+- The API client ([`budgettracker.client/src/shared/api.ts`](../budgettracker.client/src/shared/api.ts))
+  sends a per-request `X-Correlation-ID`. Failed requests are logged to the console as method,
+  path (no query string), status, and correlation ID.
+- No React `ErrorBoundary` yet.
 
 ---
 
@@ -109,7 +128,7 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 
 ## 7. Phases
 
-### Phase 1
+### Phase 1 — done
 
 - JSON console logs, with the production level overrides from §3.
 - Exception handler plus ProblemDetails responses that carry a correlation ID.
