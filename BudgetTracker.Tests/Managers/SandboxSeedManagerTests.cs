@@ -68,6 +68,8 @@ public class SandboxSeedManagerTests
         _budgetPlanAccessor.Object,
         _categoryAccessor.Object,
         _dataVersion.Object,
+        new SandboxSeedEngine(),
+        new BudgetPlanEngine(),
         Options.Create(_options),
         logger ?? NullLogger<SandboxSeedManager>.Instance);
 
