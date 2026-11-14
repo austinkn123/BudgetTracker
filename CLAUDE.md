@@ -42,53 +42,18 @@ You are an expert developer working on the BudgetTracker application. This proje
   - Examples: `feat(transactions): add infinite-scroll ledger feed`, `fix(plaid): revert windowed transfer pairing`, `feat(db): add Users.DataVersion change counter`.
 - One logical change per commit; don't mix unrelated types in one commit.
 - **PR titles** follow the same format, since PRs are squash-merged and the title becomes the commit on `main`.
-- Applies to every agent in the roster — anyone who commits follows this.
 
 ## Context
 - Always check `project-docs/` for architectural decisions before suggesting major changes.
-- Refer to `.claude/agents/chrissy-product-manager.md` for product vision if unclear on requirements.
+- If requirements are unclear, ask the user rather than guessing.
 - Jira project: **BUD** on `austinkn123.atlassian.net` — check for existing issues before creating new ones, and link completed work to its ticket when relevant.
 - **Jira access via MCP**: The Atlassian MCP server is configured in `.mcp.json` and provides direct Jira access. When asked about any BUD ticket, **ALWAYS call the Atlassian MCP tools** — never say "I can't connect to Jira" without first attempting the call. Common tools: `mcp__atlassian__getIssue` (fetch a specific ticket), `mcp__atlassian__searchIssues` (JQL search), `mcp__atlassian__getAccessibleAtlassianResources` (list resources). If the call fails, report the actual error returned by the tool, not a pre-emptive refusal.
 - Local database: **PostgreSQL**. Local dev reads `ConnectionStrings:BudgetTrackerConnection` from `BudgetTracker.Server/appsettings.Development.json` (points at Postgres on `localhost`); the gitignored `appsettings.Local.json` can override it. Production uses Neon, with the connection string in SSM (see `deploy/README.md`). Use the `postgres` MCP server (`.mcp.json`, Postgres MCP Pro via `uvx`, **read-only** `--access-mode=restricted`) to inspect schema, run read queries, and verify migrations. It connects to `BUDGETTRACKER_DATABASE_URI` if set (use a read-only role for Neon), otherwise to the local dev database.
 
-## Agent Roster
-
-| Agent | Role | Use when |
-|---|---|---|
-| chrissy | Product Manager | Requirements, user stories, backlog priority, "what should we build" |
-| tony | Software Architect | Service boundaries, IDesign decisions, new feature impact analysis |
-| richie | Senior DBA | Schema design, indexes, query tuning, EF migration review |
-| paulie | Senior Backend Dev | C#/.NET implementation, TDD, bug fixes |
-| silvio | Senior UI Dev | React/TS/Tailwind/MUI implementation, design system, component library |
-| johnny | Senior QA | Test plans, coverage review, TDD verification, edge cases |
-| bobby | Docs Specialist | README and standalone .md files only — never code |
-
-## Common Workflows
-
-Default agent sequences. Delegate via the Task tool; chain by invoking the next agent with the prior agent's output as context.
-
-**Notation:**
-- `A → B` — **sequential**. B depends on A's output; finish A before starting B.
-- `[A ∥ B]` — **parallel**. No data dependency between A and B; launch them in a **single response with multiple Agent calls** so they run concurrently.
-
-**Execution rule:** a `[ ∥ ]` group only runs in parallel if its Agent calls are issued in the *same* message. Issuing them across separate turns silently degrades to sequential. Parallel agents start cold and cannot talk to each other mid-flight — so a step only belongs in a `[ ∥ ]` group if neither member needs the other's output. This is why **contracts come first**: once interfaces are defined, the frontend and backend slices have no runtime dependency and parallelize cleanly.
-
-- **New feature**: chrissy (story + AC) → tony (service boundaries + contracts) → `[silvio (frontend) ∥ paulie (backend)]` → johnny (test review) → bobby (README/docs touch-up if user-facing)
-- **Bug fix**: paulie or silvio (failing test + fix) → johnny (regression coverage review)
-- **Schema change**: tony (architectural impact) → richie (schema + index design) → paulie (EF migration + code) → johnny (data + integration tests)
-- **Docs-only update**: bobby
-- **Pre-commit review**: `[tony ∥ johnny]` (already automated via `/review`)
-
-Within a single workflow, only the bracketed groups are parallel; everything joined by `→` is a genuine data dependency and stays serial.
-
-## Auto-delegation Rules
-
-- Default to delegating. The main thread is a router, not an implementer.
-- Only handle inline for purely conversational questions with no code or domain component (e.g. "how does Claude Code work?"). Any question about code, architecture, tests, UI, schema, or requirements routes to the relevant agent — even if the answer seems obvious.
-- When multiple agents match, prefer the earliest in the relevant workflow chain.
-- For multi-step work, delegate each step to its specialist rather than asking one agent to cross lanes.
-- When a workflow step is a `[A ∥ B]` group, issue both Agent calls in a single response so they run concurrently — don't degrade it to sequential by splitting across turns. If a dependency is discovered mid-flight, fall back to serial and say why.
-- Surface the chosen agent and reason in one short sentence before invoking (e.g., "Routing to paulie — C#/.NET question").
+## How to Work
+- Do the work in the main thread. Don't spawn subagents unless the user asks, or for a broad read-only search where only the conclusion matters.
+- Before backend, test, database, frontend or Jira work, read the matching section of `project-docs/engineering-standards.md` (once per session, not per step).
+- `/review` runs the read-only `reviewer` agent (Sonnet) only for large diffs; small diffs are reviewed inline.
 
 ## Guardrails
 
