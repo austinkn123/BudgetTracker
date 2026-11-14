@@ -58,4 +58,53 @@ public class BudgetPlanEngineTests
         Assert.Equal(string.Empty, plan.Name);
         Assert.Equal("Plan name is required", _engine.ValidateBudgetPlan(plan));
     }
+
+    private static BudgetPlan Plan(int id, DateTime planMonth, bool isActive = true) =>
+        new() { Id = id, UserId = 1, Name = $"Plan {id}", PlanMonth = planMonth, IsActive = isActive };
+
+    [Fact]
+    public void Should_PickNewestEffectivePlan_When_SeveralHaveTakenEffect()
+    {
+        var plans = new[] { Plan(1, new DateTime(2026, 1, 1)), Plan(2, new DateTime(2026, 5, 1)), Plan(3, new DateTime(2026, 3, 1)) };
+
+        Assert.Equal(2, _engine.SelectEffectivePlan(plans, new DateTime(2026, 6, 1))?.Id);
+    }
+
+    [Fact]
+    public void Should_IncludePlanDatedThatMonth_When_SelectingEffectivePlan()
+    {
+        var plans = new[] { Plan(1, new DateTime(2026, 1, 1)), Plan(2, new DateTime(2026, 6, 1)) };
+
+        Assert.Equal(2, _engine.SelectEffectivePlan(plans, new DateTime(2026, 6, 1))?.Id);
+    }
+
+    [Fact]
+    public void Should_IgnoreFuturePlans_When_SelectingEffectivePlan()
+    {
+        var plans = new[] { Plan(1, new DateTime(2026, 1, 1)), Plan(2, new DateTime(2026, 7, 1)) };
+
+        Assert.Equal(1, _engine.SelectEffectivePlan(plans, new DateTime(2026, 6, 1))?.Id);
+    }
+
+    [Fact]
+    public void Should_IgnoreInactivePlans_When_SelectingEffectivePlan()
+    {
+        var plans = new[] { Plan(1, new DateTime(2026, 1, 1)), Plan(2, new DateTime(2026, 5, 1), isActive: false) };
+
+        Assert.Equal(1, _engine.SelectEffectivePlan(plans, new DateTime(2026, 6, 1))?.Id);
+    }
+
+    [Fact]
+    public void Should_ReturnNull_When_NoPlanHasTakenEffect()
+    {
+        var plans = new[] { Plan(1, new DateTime(2026, 7, 1)), Plan(2, new DateTime(2026, 1, 1), isActive: false) };
+
+        Assert.Null(_engine.SelectEffectivePlan(plans, new DateTime(2026, 6, 1)));
+    }
+
+    [Fact]
+    public void Should_ReturnNull_When_UserHasNoPlans()
+    {
+        Assert.Null(_engine.SelectEffectivePlan([], new DateTime(2026, 6, 1)));
+    }
 }

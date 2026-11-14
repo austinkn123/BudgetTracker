@@ -10,7 +10,8 @@ namespace BudgetTracker.Server.Managers;
 public class BudgetAnalysisManager(
     IBudgetAnalysisEngine engine,
     ITransactionAccessor transactionAccessor,
-    IBudgetPlanAccessor budgetPlanAccessor) : IBudgetAnalysisManager
+    IBudgetPlanAccessor budgetPlanAccessor,
+    IBudgetPlanEngine budgetPlanEngine) : IBudgetAnalysisManager
 {
     public async Task<Result<BudgetAnalysis>> GetAnalysisAsync(int userId, DateTime from, DateTime to, int trendMonths)
     {
@@ -47,13 +48,7 @@ public class BudgetAnalysisManager(
         var categoryIdsInUse = await transactionAccessor.GetCategoryIdsInUseAsync(userId);
         var budgetPlans = await budgetPlanAccessor.GetByUserIdAsync(userId);
 
-        // Plans roll forward: PlanMonth is the month a plan takes effect, so the one governing the
-        // analysed month is the NEWEST active plan dated on or before it. Picking the first active
-        // plan regardless of date meant a stale plan reported its own month forever.
-        var governingPlan = budgetPlans
-            .Where(p => p.IsActive && p.PlanMonth <= analyzedMonth)
-            .OrderByDescending(p => p.PlanMonth)
-            .FirstOrDefault();
+        var governingPlan = budgetPlanEngine.SelectEffectivePlan(budgetPlans, analyzedMonth);
 
         var analysis = new BudgetAnalysis(
             governingPlan is null ? null : engine.AnalyzeMonth(transactions, governingPlan, asOf),

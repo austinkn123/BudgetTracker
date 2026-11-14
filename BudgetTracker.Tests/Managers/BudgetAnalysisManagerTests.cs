@@ -14,7 +14,7 @@ public class BudgetAnalysisManagerTests
     private readonly BudgetAnalysisEngine _engine = new();
 
     private BudgetAnalysisManager BuildSut() =>
-        new(_engine, _transactionAccessor.Object, _budgetPlanAccessor.Object);
+        new(_engine, _transactionAccessor.Object, _budgetPlanAccessor.Object, new BudgetPlanEngine());
 
     private const int UserId = 7;
 

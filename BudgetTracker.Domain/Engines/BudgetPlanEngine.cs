@@ -97,4 +97,15 @@ public class BudgetPlanEngine : IBudgetPlanEngine
         var canonical = validValues.FirstOrDefault(v => string.Equals(v, trimmed, StringComparison.OrdinalIgnoreCase));
         return canonical ?? trimmed;
     }
+
+    /// <inheritdoc />
+    public BudgetPlan? SelectEffectivePlan(IEnumerable<BudgetPlan> plans, DateTime month)
+    {
+        ArgumentNullException.ThrowIfNull(plans);
+
+        return plans
+            .Where(p => p.IsActive && p.PlanMonth <= month)
+            .OrderByDescending(p => p.PlanMonth)
+            .FirstOrDefault();
+    }
 }

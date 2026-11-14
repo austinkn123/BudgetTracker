@@ -68,7 +68,7 @@ public class WebullSeparationTests : IDisposable
     private async Task<string> BudgetOutputsAsync(DateTime month)
     {
         var to = month.AddMonths(1).AddDays(-1);
-        var analysis = await new BudgetAnalysisManager(new BudgetAnalysisEngine(), new TransactionAccessor(_context), new BudgetPlanAccessor(_context))
+        var analysis = await new BudgetAnalysisManager(new BudgetAnalysisEngine(), new TransactionAccessor(_context), new BudgetPlanAccessor(_context), new BudgetPlanEngine())
             .GetAnalysisAsync(UserId, month.AddMonths(-1), to, 6);
         var cashFlow = await new CashFlowManager(new CashFlowEngine(), new TransactionAccessor(_context), new PlaidItemAccessor(_context, _keyRing))
             .GetReportAsync(UserId, new CashFlowQuery(month.AddMonths(-1), to, CashFlowGrouping.Month));
