@@ -38,4 +38,7 @@ public class CategoryEngine : ICategoryEngine
 
     /// <inheritdoc />
     public string DuplicateNameError(string name) => $"A category named \"{name}\" already exists";
+
+    /// <inheritdoc />
+    public string InUseError() => "Category is in use and cannot be deleted";
 }

@@ -452,11 +452,36 @@ public class CategoryManagerTests
     public async Task Delete_NotFoundOrInUse_DoesNotBump()
     {
         _accessor.Setup(a => a.DeleteAsync(99, 5)).ReturnsAsync(false);
-        _accessor.Setup(a => a.DeleteAsync(8, 5)).ThrowsAsync(new DbUpdateException("FK"));
+        _accessor.Setup(a => a.DeleteAsync(8, 5))
+            .ThrowsAsync(new EntityInUseException("FK_Transactions_Categories_CategoryId", new Exception("23503")));
 
         await BuildSut().DeleteAsync(99, 5);
         await BuildSut().DeleteAsync(8, 5);
 
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Delete_InUse_ReturnsInUseFailure()
+    {
+        _accessor.Setup(a => a.DeleteAsync(8, 5))
+            .ThrowsAsync(new EntityInUseException("FK_BudgetPlanEntries_Categories_CategoryId", new Exception("23503")));
+
+        var result = await BuildSut().DeleteAsync(8, 5);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(_engine.InUseError(), result.Error);
+    }
+
+    [Fact]
+    public async Task Delete_UnrelatedDbFailure_Propagates()
+    {
+        var failure = new DbUpdateException("connection reset");
+        _accessor.Setup(a => a.DeleteAsync(8, 5)).ThrowsAsync(failure);
+
+        var thrown = await Assert.ThrowsAsync<DbUpdateException>(() => BuildSut().DeleteAsync(8, 5));
+
+        Assert.Same(failure, thrown);
         VerifyNeverBumped();
     }
 }

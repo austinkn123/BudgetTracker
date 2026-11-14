@@ -3,11 +3,9 @@ using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Engines;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace BudgetTracker.Server.Managers;
 
-// TODO: CategoryManager violates IDesign layering (references Microsoft.EntityFrameworkCore for DbUpdateException) — consult tony.
 public class CategoryManager(
     ICategoryEngine engine,
     ICategoryAccessor accessor,
@@ -130,7 +128,6 @@ public class CategoryManager(
         return Result<bool>.Success(true);
     }
 
-    // TODO: CategoryManager violates IDesign layering (catches an EF exception type) — consult tony.
     public async Task<Result<bool>> DeleteAsync(int id, int userId)
     {
         bool deleted;
@@ -138,9 +135,9 @@ public class CategoryManager(
         {
             deleted = await accessor.DeleteAsync(id, userId);
         }
-        catch (DbUpdateException)
+        catch (EntityInUseException)
         {
-            return Result<bool>.Failure("Category is in use and cannot be deleted");
+            return Result<bool>.Failure(engine.InUseError());
         }
 
         if (!deleted)

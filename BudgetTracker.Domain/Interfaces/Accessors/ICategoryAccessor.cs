@@ -26,5 +26,11 @@ public interface ICategoryAccessor
     /// <returns>True when a row was written.</returns>
     /// <exception cref="UniqueNameViolationException">The user already has a category with this name, ignoring case.</exception>
     Task<bool> UpdateAsync(Category category);
+
+    /// <summary>Deletes the user's category <paramref name="id"/>.</summary>
+    /// <param name="id">The category to delete.</param>
+    /// <param name="userId">The owning user.</param>
+    /// <returns>True when a row was deleted; false when the user has no such category.</returns>
+    /// <exception cref="EntityInUseException">Transactions or budget plan entries still reference the category.</exception>
     Task<bool> DeleteAsync(int id, int userId);
 }

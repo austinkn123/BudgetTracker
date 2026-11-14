@@ -67,4 +67,39 @@ public class CategoryAccessorTests : IDisposable
 
         await Assert.ThrowsAsync<DbUpdateException>(() => BuildSut().CreateAsync(BuildCategory()));
     }
+
+    [Theory]
+    [InlineData("FK_Transactions_Categories_CategoryId")]
+    [InlineData("FK_BudgetPlanEntries_Categories_CategoryId")]
+    public async Task Delete_ReferencedByForeignKey_ThrowsEntityInUse(string foreignKey)
+    {
+        var category = BuildCategory();
+        await BuildSut().CreateAsync(category);
+        _interceptor.FailNextSaveWith(PostgresErrorCodes.ForeignKeyViolation, foreignKey);
+
+        var ex = await Assert.ThrowsAsync<EntityInUseException>(() => BuildSut().DeleteAsync(category.Id, category.UserId));
+
+        Assert.Equal(foreignKey, ex.ConstraintName);
+        Assert.IsType<DbUpdateException>(ex.InnerException);
+    }
+
+    [Fact]
+    public async Task Delete_OtherForeignKeyViolated_RethrowsOriginalException()
+    {
+        var category = BuildCategory();
+        await BuildSut().CreateAsync(category);
+        _interceptor.FailNextSaveWith(PostgresErrorCodes.ForeignKeyViolation, "FK_Accounts_Users_UserId");
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => BuildSut().DeleteAsync(category.Id, category.UserId));
+    }
+
+    [Fact]
+    public async Task Delete_OtherSqlStateOnCategoryForeignKey_RethrowsOriginalException()
+    {
+        var category = BuildCategory();
+        await BuildSut().CreateAsync(category);
+        _interceptor.FailNextSaveWith(PostgresErrorCodes.UniqueViolation, "FK_Transactions_Categories_CategoryId");
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => BuildSut().DeleteAsync(category.Id, category.UserId));
+    }
 }
