@@ -68,7 +68,7 @@ const TransactionList = ({
 
   return (
     <div className="overflow-x-auto">
-      {/* Native <table>: per-row selected highlight and a select-all header checkbox the shared Table can't style. */}
+      {/* Native <table>: the shared Table has no per-row styling hook for the selected-row highlight, and its margins and header styles differ. */}
       <table className="w-full min-w-[720px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-ink-muted">
