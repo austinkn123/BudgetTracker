@@ -1,4 +1,5 @@
 using System.Net;
+using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Server.Managers;
@@ -9,6 +10,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -63,6 +66,18 @@ public class ProgramWiringTests
 
         // Managers and Accessors are registered by name scan; this fails if either new class falls outside it.
         Assert.IsType<ReadinessManager>(scope.ServiceProvider.GetRequiredService<IReadinessManager>());
+    }
+
+    [Fact]
+    public async Task Should_AttachTheSlowQueryInterceptorToTheDbContext_When_ProgramIsHosted()
+    {
+        await using var factory = CreateFactory(new Mock<ICurrentUserProvider>().Object);
+        using var scope = factory.Services.CreateScope();
+
+        var options = scope.ServiceProvider.GetRequiredService<DbContextOptions<BudgetTrackerDbContext>>();
+
+        var interceptors = options.FindExtension<CoreOptionsExtension>()?.Interceptors ?? [];
+        Assert.Contains(interceptors, i => i is SlowQueryInterceptor);
     }
 
     [Fact]

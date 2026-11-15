@@ -41,8 +41,10 @@ builder.AddBudgetTrackerObservability();
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 
 // Add services to the container.
-builder.Services.AddDbContext<BudgetTrackerDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("BudgetTrackerConnection")));
+builder.Services.AddDbContext<BudgetTrackerDbContext>((services, options) =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("BudgetTrackerConnection"))
+        // Warns on slow commands without logging SQL text or parameters (project-docs/observability.md).
+        .AddInterceptors(services.GetRequiredService<SlowQueryInterceptor>()));
 
 // Data Protection — used by PlaidItemAccessor to encrypt access_tokens at rest. Keys are persisted in the
 // database so every Lambda instance (and every cold start) shares one key ring.

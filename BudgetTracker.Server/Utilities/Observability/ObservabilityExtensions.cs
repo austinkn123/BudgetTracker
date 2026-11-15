@@ -56,6 +56,10 @@ public static class ObservabilityExtensions
                 context.ProblemDetails.Extensions["correlationId"] = CorrelationId.Get(context.HttpContext));
 
         builder.Services.AddExceptionHandler<UnhandledExceptionLogger>();
+        // Registered here, attached to the DbContext in Program.cs (AddDbContext).
+        builder.Services.Configure<SlowQueryOptions>(builder.Configuration.GetSection(SlowQueryOptions.SectionName));
+        builder.Services.AddSingleton<SlowQueryInterceptor>();
+
         builder.Services.AddHealthChecks()
             .AddCheck<ReadinessHealthCheck>("database", tags: [ReadyTag]);
 
