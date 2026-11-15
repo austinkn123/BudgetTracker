@@ -1,16 +1,26 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging.Console;
 
 namespace BudgetTracker.Server.Utilities.Observability;
 
 /// <summary>
 /// The observability Utility (project-docs/observability.md §5): structured JSON logs, correlation IDs, ProblemDetails
-/// errors, <c>/health</c>, and security logging. Endpoints and Engines do not log; this wiring covers them.
+/// errors, <c>/health</c>, <c>/health/ready</c>, and security logging. Endpoints and Engines do not log; this wiring covers them.
 /// </summary>
 public static class ObservabilityExtensions
 {
     /// <summary>The anonymous liveness endpoint. It runs no health checks, so it never touches the database.</summary>
     public const string HealthPath = "/health";
+
+    /// <summary>
+    /// The on-demand readiness endpoint: signed-in callers only, and it checks the database. Never poll it: regular
+    /// database calls keep Neon from scaling to zero (project-docs/observability.md §4).
+    /// </summary>
+    public const string ReadyPath = "/health/ready";
+
+    /// <summary>Tag on the checks that only <see cref="ReadyPath"/> runs.</summary>
+    public const string ReadyTag = "ready";
 
     private const string BuiltInExceptionHandlerCategory = "Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware";
 
@@ -46,7 +56,8 @@ public static class ObservabilityExtensions
                 context.ProblemDetails.Extensions["correlationId"] = CorrelationId.Get(context.HttpContext));
 
         builder.Services.AddExceptionHandler<UnhandledExceptionLogger>();
-        builder.Services.AddHealthChecks();
+        builder.Services.AddHealthChecks()
+            .AddCheck<ReadinessHealthCheck>("database", tags: [ReadyTag]);
 
         builder.Services.PostConfigureAll<JwtBearerOptions>(options =>
         {
@@ -66,7 +77,8 @@ public static class ObservabilityExtensions
     }
 
     /// <summary>
-    /// Adds the correlation, exception-handling and denied-request middleware, and maps <see cref="HealthPath"/>.
+    /// Adds the correlation, exception-handling and denied-request middleware, and maps <see cref="HealthPath"/> and
+    /// <see cref="ReadyPath"/>.
     /// Call first in the pipeline, before static files, authentication and endpoints.
     /// </summary>
     /// <param name="app">The application.</param>
@@ -76,7 +88,10 @@ public static class ObservabilityExtensions
         app.UseMiddleware<RequestCorrelationMiddleware>();
         app.UseExceptionHandler();
         app.UseMiddleware<DeniedRequestLoggingMiddleware>();
-        app.MapHealthChecks(HealthPath).AllowAnonymous();
+        // Liveness runs no checks at all, so it can be probed freely without waking the database.
+        app.MapHealthChecks(HealthPath, new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+        app.MapHealthChecks(ReadyPath, new HealthCheckOptions { Predicate = check => check.Tags.Contains(ReadyTag) })
+            .RequireAuthorization();
         return app;
     }
 

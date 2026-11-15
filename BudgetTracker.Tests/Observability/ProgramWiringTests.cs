@@ -1,5 +1,7 @@
 using System.Net;
+using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
+using BudgetTracker.Server.Managers;
 using BudgetTracker.Server.Services;
 using BudgetTracker.Server.Utilities.Observability;
 using Microsoft.AspNetCore.Authentication;
@@ -39,6 +41,28 @@ public class ProgramWiringTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("wiring-1", Assert.Single(response.Headers.GetValues(CorrelationId.HeaderName)));
         currentUser.VerifyGet(u => u.UserId, Times.Never());
+    }
+
+    [Fact]
+    public async Task Should_RequireSignInForReadiness_When_ProgramIsHosted()
+    {
+        var currentUser = new Mock<ICurrentUserProvider>(MockBehavior.Strict);
+        await using var factory = CreateFactory(currentUser.Object);
+        using var client = CreateClient(factory);
+
+        var response = await client.GetAsync(ObservabilityExtensions.ReadyPath);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Should_ResolveTheReadinessChain_When_ProgramIsHosted()
+    {
+        await using var factory = CreateFactory(new Mock<ICurrentUserProvider>().Object);
+        using var scope = factory.Services.CreateScope();
+
+        // Managers and Accessors are registered by name scan; this fails if either new class falls outside it.
+        Assert.IsType<ReadinessManager>(scope.ServiceProvider.GetRequiredService<IReadinessManager>());
     }
 
     [Fact]

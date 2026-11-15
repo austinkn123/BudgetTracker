@@ -1,4 +1,5 @@
 using System.Net;
+using BudgetTracker.Server.Utilities.Observability;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -29,13 +30,14 @@ public class HealthEndpointTests
     }
 
     [Fact]
-    public async Task Should_RegisterNoHealthChecks_SoHealthNeverCallsTheDatabase()
+    public async Task Should_TagEveryRegisteredCheckAsReadyOnly_SoHealthNeverCallsTheDatabase()
     {
         await using var host = await StartHostAsync();
 
         var options = host.Services.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
 
-        Assert.Empty(options.Registrations);
+        // /health runs no checks at all; anything registered must be opt-in through the readiness tag.
+        Assert.All(options.Registrations, r => Assert.Contains(ObservabilityExtensions.ReadyTag, r.Tags));
     }
 
     private static Task<ObservabilityTestHost> StartHostAsync() =>
