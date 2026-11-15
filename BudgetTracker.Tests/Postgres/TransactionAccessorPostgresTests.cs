@@ -24,9 +24,37 @@ public sealed class TransactionAccessorPostgresTests(PostgresFixture fixture)
     private static readonly TransactionEngine Engine = new();
     private static readonly TransactionFilter NoFilter = new();
 
-    private async Task<T> WithAccessorAsync<T>(Func<TransactionAccessor, Task<T>> act)
+    /// <summary>
+    /// Planner switches for the tests that pin an ORDER BY. On these small tables PostgreSQL otherwise picks plans that
+    /// return rows in the asserted order as a side effect, so the test would pass with the ORDER BY removed.
+    /// </summary>
+    private static class Planner
+    {
+        /// <summary>
+        /// No index scans: IX_Transactions_AccountId_LowerPayee_OccurredAt ends in ("OccurredAt" DESC, "Id" DESC) and
+        /// would hand the per-payee lookup its rows already tie-broken by id.
+        /// </summary>
+        public const string NoIndexScans =
+            "SET enable_indexscan = off; SET enable_indexonlyscan = off; SET enable_bitmapscan = off";
+
+        /// <summary>No sort-based grouping: GROUP BY runs as a HashAggregate, whose output is in hash order, not key order.</summary>
+        public const string HashedGrouping = "SET enable_sort = off";
+    }
+
+    /// <param name="act">The accessor call under test.</param>
+    /// <param name="plannerSettings">
+    /// Optional <see cref="Planner"/> SET statements for this call's session only: the connection is held open for the
+    /// call and Npgsql resets session state when it goes back to the pool.
+    /// </param>
+    private async Task<T> WithAccessorAsync<T>(Func<TransactionAccessor, Task<T>> act, string? plannerSettings = null)
     {
         await using var context = fixture.CreateContext();
+        if (plannerSettings is not null)
+        {
+            await context.Database.OpenConnectionAsync();
+            await context.Database.ExecuteSqlRawAsync(plannerSettings);
+        }
+
         return await act(new TransactionAccessor(context));
     }
 
@@ -145,6 +173,20 @@ public sealed class TransactionAccessorPostgresTests(PostgresFixture fixture)
         var page = await WithAccessorAsync(a => a.GetPageAsync(user.Id, NoFilter, after, 10));
 
         Assert.Equal([older.Id], page.Select(t => t.Id).ToArray());
+    }
+
+    [PostgresFact]
+    public async Task Should_ReturnOnlyTheNewestTakeRows_When_MoreRowsMatchThanTake()
+    {
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var day = new DateTime(2026, 4, 3, 9, 0, 0);
+        var rows = Enumerable.Range(0, 5).Select(i => Row(account.Id, day.AddHours(i))).ToArray();
+        await fixture.TransactionsAsync(rows);
+
+        var page = await WithAccessorAsync(a => a.GetPageAsync(user.Id, NoFilter, null, take: 2));
+
+        Assert.Equal([rows[4].Id, rows[3].Id], page.Select(t => t.Id).ToArray());
     }
 
     // ── GetFilteredAsync ────────────────────────────────────────────────────
@@ -398,6 +440,172 @@ public sealed class TransactionAccessorPostgresTests(PostgresFixture fixture)
     }
 
     [PostgresFact]
+    public async Task Should_LeavePendingRowsWithoutAPlaidAccountOutOfPendingByAccount_When_GettingSummary()
+    {
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var at = new DateTime(2026, 2, 12, 10, 0, 0);
+        await fixture.TransactionsAsync(
+            Row(account.Id, at, -4.00m, pending: true),
+            Row(account.Id, at, -6.00m, plaidAccountId: "pa-1", pending: true));
+
+        var summary = await WithAccessorAsync(a => a.GetSummaryAsync(user.Id));
+
+        Assert.Equal(2, summary.UncategorizedCount);
+        Assert.Equal([new PendingAccountTotal("pa-1", -6.00m)], summary.PendingByAccount);
+    }
+
+    [PostgresFact]
+    public async Task Should_CountInflowAndOutflowDatedExactlyAtSince_When_GettingCategoryUsage()
+    {
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var category = await fixture.CategoryAsync(user.Id, "Side gig", Income);
+        var since = new DateTime(2026, 1, 20, 6, 30, 0);
+        var justBefore = since.AddTicks(-TimeSpan.TicksPerMicrosecond);
+        await fixture.TransactionsAsync(
+            Row(account.Id, since, 75.50m, Income, category.Id),
+            Row(account.Id, since, -3.25m, Expense, category.Id),
+            Row(account.Id, justBefore, 1000.00m, Income, category.Id),
+            Row(account.Id, justBefore, -500.00m, Expense, category.Id));
+
+        var usage = await WithAccessorAsync(a => a.GetCategoryUsageAsync(user.Id, since));
+
+        Assert.Equal([new CategoryUsage(category.Id, 4, 75.50m, -3.25m)], usage);
+    }
+
+    [PostgresFact]
+    public async Task Should_StartAtMidnightAfterTheDayWhateverTheTimeOfDay_When_GettingPostedSumByPlaidAccount()
+    {
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var nextMidnight = new DateTime(2026, 3, 6);
+        await fixture.TransactionsAsync(
+            Row(account.Id, nextMidnight.AddTicks(-TimeSpan.TicksPerMicrosecond), -1.00m, plaidAccountId: "pa-last-instant-of-day"),
+            Row(account.Id, nextMidnight, -2.00m, plaidAccountId: "pa-next-midnight"),
+            Row(account.Id, nextMidnight.AddHours(5), -4.00m, plaidAccountId: "pa-next-day-0500"),
+            Row(account.Id, nextMidnight.AddHours(5), -8.00m, plaidAccountId: "pa-next-day-0500-pending", pending: true));
+
+        // 10:00 on the 5th: the bound is the 6th at 00:00 inclusive, not 24 hours later (the 6th at 10:00).
+        var sums = await WithAccessorAsync(a => a.GetPostedSumByPlaidAccountAfterAsync(user.Id, new DateTime(2026, 3, 5, 10, 0, 0)));
+
+        Assert.Equal(
+            new Dictionary<string, decimal> { ["pa-next-midnight"] = -2.00m, ["pa-next-day-0500"] = -4.00m },
+            sums);
+    }
+
+    [PostgresFact]
+    public async Task Should_NotReturnAnotherUsersIncome_When_ItsCategoryIdIsAmongTheRequestedCategories()
+    {
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var salary = await fixture.CategoryAsync(user.Id, "Salary", Income);
+        var other = await fixture.UserAsync();
+        var otherAccount = await fixture.AccountAsync(other.Id);
+        var otherSalary = await fixture.CategoryAsync(other.Id, "Salary", Income);
+        var at = new DateTime(2026, 2, 10, 18, 0, 0);
+
+        var mine = Row(account.Id, at, 2000.00m, Income, salary.Id);
+        // Newer and larger than mine, once under their own category and once filed under mine.
+        var theirs = Row(otherAccount.Id, at.AddHours(1), 9999.00m, Income, otherSalary.Id);
+        var theirsInMyCategory = Row(otherAccount.Id, at.AddHours(2), 8888.00m, Income, salary.Id);
+        await fixture.TransactionsAsync(mine, theirs, theirsInMyCategory);
+
+        var newest = await WithAccessorAsync(a =>
+            a.GetNewestIncomeAsync(user.Id, [salary.Id, otherSalary.Id], DateTime.MaxValue, null, 5));
+
+        Assert.Equal([mine.Id], newest.Select(t => t.Id).ToArray());
+    }
+
+    [PostgresFact]
+    public async Task Should_ExcludeNextMidnightAndIncludeTheMinimumAmount_When_GettingNewestIncomeAtTheBounds()
+    {
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var salary = await fixture.CategoryAsync(user.Id, "Salary", Income);
+        var nextMidnight = new DateTime(2026, 2, 11);
+
+        var atNextMidnight = Row(account.Id, nextMidnight, 3000.00m, Income, salary.Id);
+        var lastInstantOfDay = Row(account.Id, nextMidnight.AddTicks(-TimeSpan.TicksPerMicrosecond), 2000.00m, Income, salary.Id);
+        var belowMinimum = Row(account.Id, nextMidnight.AddDays(-1), 1999.99m, Income, salary.Id);
+        await fixture.TransactionsAsync(atNextMidnight, lastInstantOfDay, belowMinimum);
+
+        async Task<int[]> NewestAsync(DateTime onOrBefore, decimal? minAmount) =>
+            (await WithAccessorAsync(a => a.GetNewestIncomeAsync(user.Id, [salary.Id], onOrBefore, minAmount, 5)))
+            .Select(t => t.Id).ToArray();
+
+        Assert.Equal([lastInstantOfDay.Id, belowMinimum.Id], await NewestAsync(new DateTime(2026, 2, 10, 7, 0, 0), null));
+        Assert.Equal([lastInstantOfDay.Id], await NewestAsync(new DateTime(2026, 2, 10), 2000.00m));
+        Assert.Equal([atNextMidnight.Id, lastInstantOfDay.Id], await NewestAsync(nextMidnight, 2000.00m));
+    }
+
+    // ── Ordering of grouped results ─────────────────────────────────────────
+
+    private sealed record ManyGroups(int UserId, int[] CategoryIds, string[] PlaidAccountIds);
+
+    /// <summary>
+    /// Sixteen categories and sixteen Plaid accounts, each with a pending Income and a pending Expense row, inserted
+    /// highest key first and Income before Expense. The ordering tests read it with <see cref="Planner.HashedGrouping"/>:
+    /// without an ORDER BY a HashAggregate returns groups in hash order, which for this many keys is not key order.
+    /// </summary>
+    private async Task<ManyGroups> SeedManyGroupsHighestKeyFirstAsync()
+    {
+        const int groups = 16;
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var categoryIds = new int[groups];
+        for (var i = 0; i < groups; i++)
+            categoryIds[i] = (await fixture.CategoryAsync(user.Id, $"Category {i:00}")).Id;
+        var plaidAccountIds = Enumerable.Range(0, groups).Select(i => $"pa{i:00}").ToArray();
+
+        var at = new DateTime(2026, 10, 1, 12, 0, 0);
+        var rows = Enumerable.Range(0, groups).Reverse().SelectMany(i => new[]
+        {
+            Row(account.Id, at, 100m + i, Income, categoryIds[i], plaidAccountId: plaidAccountIds[i], pending: true),
+            Row(account.Id, at, -1m - i, Expense, categoryIds[i], plaidAccountId: plaidAccountIds[i], pending: true)
+        }).ToArray();
+        await fixture.TransactionsAsync(rows);
+
+        Assert.Equal(categoryIds.Order(), categoryIds);
+        return new ManyGroups(user.Id, categoryIds, plaidAccountIds);
+    }
+
+    [PostgresFact]
+    public async Task Should_OrderPendingTotalsByPlaidAccountId_When_GettingSummary()
+    {
+        var seeded = await SeedManyGroupsHighestKeyFirstAsync();
+
+        var summary = await WithAccessorAsync(a => a.GetSummaryAsync(seeded.UserId), Planner.HashedGrouping);
+
+        Assert.Equal(seeded.PlaidAccountIds, summary.PendingByAccount.Select(p => p.PlaidAccountId).ToArray());
+    }
+
+    [PostgresFact]
+    public async Task Should_OrderUsageByCategoryId_When_GettingCategoryUsage()
+    {
+        var seeded = await SeedManyGroupsHighestKeyFirstAsync();
+
+        var usage = await WithAccessorAsync(a => a.GetCategoryUsageAsync(seeded.UserId, DateTime.MinValue), Planner.HashedGrouping);
+
+        Assert.Equal(seeded.CategoryIds, usage.Select(u => u.CategoryId).ToArray());
+    }
+
+    [PostgresFact]
+    public async Task Should_OrderTotalsByCategoryIdThenType_When_GettingTotalsByCategoryAndType()
+    {
+        var seeded = await SeedManyGroupsHighestKeyFirstAsync();
+
+        var totals = await WithAccessorAsync(a =>
+            a.GetTotalsByCategoryAndTypeAsync(seeded.UserId, new DateTime(2026, 10, 1), new DateTime(2026, 10, 1)),
+            Planner.HashedGrouping);
+
+        // This pins the ORDER BY as a whole. The type tiebreak on its own cannot be pinned: once any ORDER BY on the
+        // category is left, PostgreSQL groups by sorting on both keys, which orders the types as a side effect.
+        var expected = seeded.CategoryIds.SelectMany(id => new[] { ((int?)id, Expense), ((int?)id, Income) }).ToArray();
+        Assert.Equal(expected, totals.Select(t => (t.CategoryId, t.TransactionType)).ToArray());
+    }
+
+    [PostgresFact]
     public async Task Should_ReturnDistinctCategoryIdsIncludingNull_When_GettingCategoryIdsInUse()
     {
         var ledger = await SeedMixedLedgerAsync();
@@ -442,6 +650,70 @@ public sealed class TransactionAccessorPostgresTests(PostgresFixture fixture)
         Assert.Equal(2, latest.Count);
         Assert.Equal(newer.Id, latest["Starbucks"]);
         Assert.Equal(older.Id, latest["Amazon"]);
+    }
+
+    [PostgresFact]
+    public async Task Should_PickByDateNotById_When_TheNewestDatedRowWasInsertedFirst()
+    {
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var older = await fixture.CategoryAsync(user.Id, "Older pick");
+        var newer = await fixture.CategoryAsync(user.Id, "Newer pick");
+        var at = new DateTime(2026, 8, 3, 12, 0, 0);
+
+        var newestDated = Row(account.Id, at, categoryId: newer.Id, payee: "Costco");
+        var backfilled = Row(account.Id, at.AddDays(-30), categoryId: older.Id, payee: "Costco");
+        await fixture.TransactionsAsync(newestDated);
+        await fixture.TransactionsAsync(backfilled);
+        Assert.True(newestDated.Id < backfilled.Id);
+
+        var latest = await WithAccessorAsync(a => a.GetLatestCategoryByPayeeAsync(user.Id, ["Costco"]));
+
+        Assert.Equal(newer.Id, Assert.Single(latest).Value);
+    }
+
+    [PostgresFact]
+    public async Task Should_BreakSameInstantTiesByHighestId_When_PhysicalRowOrderPointsEitherWay()
+    {
+        var user = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var loser = await fixture.CategoryAsync(user.Id, "Lower id");
+        var winner = await fixture.CategoryAsync(user.Id, "Higher id");
+        var at = new DateTime(2026, 8, 5, 12, 0, 0);
+
+        // "Heap": inserted in id order, so the higher id is also the physically later row.
+        var heapLow = Row(account.Id, at, categoryId: loser.Id, payee: "Heap");
+        var heapHigh = Row(account.Id, at, categoryId: winner.Id, payee: "Heap");
+        await fixture.TransactionsAsync(heapLow);
+        await fixture.TransactionsAsync(heapHigh);
+
+        // "Moved": the lower id is re-dated onto the tie afterwards. That UPDATE changes an indexed column, so Postgres
+        // writes a new row version after the higher id's: physical order is now the reverse of id order. Whichever
+        // physical end a tiebreak-less query favours, it gets one of the two payees wrong.
+        var movedLow = Row(account.Id, at.AddDays(-9), categoryId: loser.Id, payee: "Moved");
+        var movedHigh = Row(account.Id, at, categoryId: winner.Id, payee: "Moved");
+        await fixture.TransactionsAsync(movedLow);
+        await fixture.TransactionsAsync(movedHigh);
+        await using (var context = fixture.CreateContext())
+        {
+            var updated = await context.Transactions
+                .Where(t => t.Id == movedLow.Id)
+                .ExecuteUpdateAsync(set => set.SetProperty(t => t.OccurredAt, at));
+            Assert.Equal(1, updated);
+        }
+        Assert.True(heapLow.Id < heapHigh.Id && movedLow.Id < movedHigh.Id);
+
+        // Once with the default plan and once reading the heap directly, where nothing but the query's own
+        // ORDER BY ... "Id" DESC can break the tie.
+        foreach (var plannerSettings in new[] { null, Planner.NoIndexScans })
+        {
+            var latest = await WithAccessorAsync(
+                a => a.GetLatestCategoryByPayeeAsync(user.Id, ["Heap", "Moved"]), plannerSettings);
+
+            Assert.Equal(2, latest.Count);
+            Assert.Equal(winner.Id, latest["Heap"]);
+            Assert.Equal(winner.Id, latest["Moved"]);
+        }
     }
 
     // ── Writes whose SQL or constraints are Postgres-specific ───────────────

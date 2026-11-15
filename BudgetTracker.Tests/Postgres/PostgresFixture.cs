@@ -40,7 +40,7 @@ public sealed class PostgresFixture : IAsyncLifetime
             if (!PostgresTestServer.IsRequired)
                 return;
 
-            throw new InvalidOperationException($"{PostgresTestServer.RequireVariable}=1 but {reason}");
+            throw new InvalidOperationException($"{PostgresTestServer.RequireVariable} is set but {reason}");
         }
 
         var admin = PostgresTestServer.AdminConnection();
