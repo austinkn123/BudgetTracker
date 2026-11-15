@@ -39,6 +39,11 @@ public static class ObservabilityExtensions
             options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
         });
 
+        // Erases any log field tagged with a DataClassifications attribute (§3). Erasing is the fallback redactor,
+        // so a new classification is erased too unless it is given a redactor of its own.
+        builder.Logging.EnableRedaction();
+        builder.Services.AddRedaction();
+
         // The built-in handler logs the full exception, message included; UnhandledExceptionLogger logs a sanitized one.
         builder.Logging.AddFilter(BuiltInExceptionHandlerCategory, LogLevel.None);
 
