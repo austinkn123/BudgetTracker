@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import ErrorBoundary from '../ErrorBoundary';
 import { Sheet } from '../ui';
 import { useDataVersionSync } from '../../hooks/useDataVersionSync';
 import { useScrollDirection } from '../../hooks/useScrollDirection';
@@ -53,7 +54,10 @@ const AppShell = () => {
           // Clear the bar at its tallest so content never jumps as it morphs.
           style={{ paddingTop: NAV_HEIGHT_FULL + NAV_TOP_OFFSET * 2 + 16 }}
         >
-          <Outlet />
+          {/* Per-route boundary: a broken page keeps the nav usable, and navigating clears it. */}
+          <ErrorBoundary resetKey={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
     </div>
