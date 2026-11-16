@@ -5,6 +5,7 @@ using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Plaid;
 using BudgetTracker.Domain.Webull;
 using Microsoft.Extensions.Options;
+using BudgetTracker.Server.Utilities.Observability;
 
 namespace BudgetTracker.Server.Managers;
 
@@ -86,14 +87,13 @@ public class WebullTradesManager(
                 {
                     if (ex.StatusCode == HttpStatusCode.TooManyRequests && ++throttled < MaxThrottledInARow)
                     {
-                        logger.LogWarning("Webull {Operation} hit HTTP 429; retry {Attempt} of {MaxRetries} in {Seconds}s.",
-                            "order history", throttled, MaxThrottledInARow - 1, ThrottleBackoff.TotalSeconds);
+                        logger.Throttled("order history", throttled, MaxThrottledInARow - 1, ThrottleBackoff.TotalSeconds);
                         await Task.Delay(ThrottleBackoff, _clock);
                         continue; // the time box is checked again before the retry
                     }
 
                     // The message is sanitized (HTTP status and error_code only).
-                    logger.LogWarning(ex, "Webull {Operation} failed ({Kind}).", "order history", ex.Kind);
+                    logger.OperationFailed(ex, "order history", ex.Kind);
                     await orders.SavePageAsync(userId, syncEngine.Fail(sync, ex.Kind), []);
                     if (ex.Kind == WebullErrorKind.TokenRejected)
                         await connections.SetLastErrorAsync(userId, WebullErrorKind.TokenRejected);

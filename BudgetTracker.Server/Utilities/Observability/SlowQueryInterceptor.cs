@@ -32,9 +32,7 @@ public sealed partial class SlowQueryInterceptor(IOptions<SlowQueryOptions> opti
             return;
 
         var (statement, tables) = Describe(command.CommandText);
-        logger.LogWarning(
-            "Slow database command: {Statement} on {Tables} took {DurationMs} ms ({Source})",
-            statement, tables, (long)Math.Round(duration.TotalMilliseconds), source);
+        logger.SlowDatabaseCommand(statement, tables, (long)Math.Round(duration.TotalMilliseconds), source);
     }
 
     /// <summary>Reduces SQL text to its statement type and table names.</summary>

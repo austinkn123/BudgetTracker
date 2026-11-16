@@ -17,9 +17,7 @@ public sealed class DeniedRequestLoggingMiddleware(RequestDelegate next, ILogger
 
         if (context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            _logger.LogWarning(
-                "Request denied with {StatusCode} for {Method} {Path}",
-                context.Response.StatusCode, context.Request.Method, context.Request.Path.Value);
+            _logger.RequestDenied(context.Response.StatusCode, context.Request.Method, context.Request.Path.Value);
         }
     }
 }

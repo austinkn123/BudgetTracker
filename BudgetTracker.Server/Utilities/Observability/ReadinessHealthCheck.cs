@@ -22,7 +22,7 @@ public sealed class ReadinessHealthCheck(IReadinessManager readiness, ILogger<Re
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // The type only: driver messages can quote the host, database name or user.
-            logger.LogWarning("Readiness check failed: {FailureType}", ex.GetType().Name);
+            logger.ReadinessCheckFailed(ex.GetType().Name);
             return HealthCheckResult.Unhealthy();
         }
     }

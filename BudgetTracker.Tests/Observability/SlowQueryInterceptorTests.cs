@@ -57,6 +57,7 @@ public sealed class SlowQueryInterceptorTests : IDisposable
 
         var record = Assert.Single(_logger.Collector.GetSnapshot());
         Assert.Equal(LogLevel.Warning, record.Level);
+        Assert.Equal(1006, record.Id.Id);
         var state = record.StructuredState!.ToDictionary(kv => kv.Key, kv => kv.Value);
         Assert.Equal("SELECT", state["Statement"]);
         Assert.Equal("Users", state["Tables"]);

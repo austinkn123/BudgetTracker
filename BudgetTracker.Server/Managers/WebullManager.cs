@@ -5,6 +5,7 @@ using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Plaid;
 using BudgetTracker.Domain.Webull;
 using Microsoft.Extensions.Options;
+using BudgetTracker.Server.Utilities.Observability;
 
 namespace BudgetTracker.Server.Managers;
 
@@ -55,7 +56,7 @@ public class WebullManager(
         catch (WebullApiException ex)
         {
             // The message is sanitized (HTTP status and error_code only); error_code tells a bad key from a bad signature.
-            logger.LogWarning(ex, "Webull {Operation} failed ({Kind}).", "create", ex.Kind);
+            logger.OperationFailed(ex, "create", ex.Kind);
             await connections.SetLastErrorAsync(userId, ex.Kind);
             return Result<WebullConnectionView>.Success(await GetAsync(userId));
         }
@@ -92,7 +93,7 @@ public class WebullManager(
             catch (Exception ex)
             {
                 // One user's failure (e.g. a daily-row key race with a manual refresh) must not stop the others.
-                logger.LogWarning(ex, "Webull close snapshot failed for user {UserId}.", userId);
+                logger.CloseSnapshotFailed(ex, userId);
             }
         }
     }
@@ -153,7 +154,7 @@ public class WebullManager(
     private async Task RecordFailureAsync(int userId, string operation, WebullApiException ex)
     {
         // The message is sanitized (HTTP status and error_code only).
-        logger.LogWarning(ex, "Webull {Operation} failed ({Kind}).", operation, ex.Kind);
+        logger.OperationFailed(ex, operation, ex.Kind);
         await connections.SetLastErrorAsync(userId, ex.Kind);
     }
 }

@@ -77,7 +77,7 @@ public static class ObservabilityExtensions
                 // The exception type only: messages can quote token contents.
                 context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
                     .CreateLogger(SecurityLog.Category)
-                    .LogWarning("Authentication failed: {FailureType}", context.Exception.GetType().Name);
+                    .AuthenticationFailed(context.Exception.GetType().Name);
                 await inner(context);
             };
         });

@@ -21,7 +21,7 @@ public sealed class DataVersionAccessorTests : IDisposable
 
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
     private readonly BudgetTrackerDbContext _context;
-    private readonly Mock<ILogger<DataVersionAccessor>> _logger = new();
+    private readonly Mock<ILogger<DataVersionAccessor>> _logger = TestLoggers.Enabled<DataVersionAccessor>();
 
     public DataVersionAccessorTests()
     {

@@ -21,9 +21,7 @@ public sealed class UnhandledExceptionLogger(ILogger<UnhandledExceptionLogger> l
     /// <returns><c>false</c>, so the default ProblemDetails response is written.</returns>
     public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        logger.LogError(
-            "Unhandled {ExceptionType} for {Method} {Path}\n{StackTrace}",
-            exception.GetType().FullName, httpContext.Request.Method, httpContext.Request.Path.Value, Describe(exception));
+        logger.UnhandledException(exception.GetType().FullName, httpContext.Request.Method, httpContext.Request.Path.Value, Describe(exception));
         return ValueTask.FromResult(false);
     }
 

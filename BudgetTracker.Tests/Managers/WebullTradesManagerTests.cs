@@ -34,7 +34,7 @@ public class WebullTradesManagerTests
     private readonly Mock<IWebullOrderHistoryAccessor> _history = new(MockBehavior.Strict);
     private readonly Mock<IWebullConnectionAccessor> _connections = new(MockBehavior.Strict);
     private readonly Mock<IWebullOrderAccessor> _orders = new(MockBehavior.Strict);
-    private readonly Mock<ILogger<WebullTradesManager>> _logger = new();
+    private readonly Mock<ILogger<WebullTradesManager>> _logger = TestLoggers.Enabled<WebullTradesManager>();
     private readonly FakeClock _clock = new(Now);
     private readonly List<string> _log = [];
 
@@ -283,16 +283,21 @@ public class WebullTradesManagerTests
         _syncEngine.Setup(s => s.NextWindow(done, It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns((WebullOrderWindow?)null);
         _syncEngine.Setup(s => s.NextWindow(SavedSyncs[0], It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns((WebullOrderWindow?)null);
 
+        var logged = TestLoggers.Capture(_logger);
+
         Assert.Equal(Status, await BuildSut().SyncAsync(UserId));
 
         Assert.Equal(["fetch ACC1 k at 0s", "fetch ACC1 k at 2.5s", "save ACC1 "], _log);
         Assert.Equal([TimeSpan.FromSeconds(2.5)], _clock.Delays);
         _syncEngine.Verify(s => s.Fail(It.IsAny<WebullOrderSync>(), It.IsAny<WebullErrorKind>()), Times.Never);
         _connections.Verify(c => c.SetLastErrorAsync(It.IsAny<int>(), It.IsAny<WebullErrorKind>()), Times.Never);
-        // Information or Warning, with the attempt number, and never the token.
-        _logger.Verify(l => l.Log(It.Is<LogLevel>(level => level == LogLevel.Information || level == LogLevel.Warning), It.IsAny<EventId>(),
-            It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("429") && v.ToString()!.Contains("retry 1 of 2") && !v.ToString()!.Contains(Token)),
-            It.IsAny<Exception?>(), It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once);
+        // The throttling event (3003), as a warning, with the attempt number, and never the token.
+        var throttled = Assert.Single(logged, e => e.EventId == 3003);
+        Assert.Equal(LogLevel.Warning, throttled.Level);
+        Assert.Contains("Attempt=1", throttled.Fields);
+        Assert.Contains("MaxRetries=2", throttled.Fields);
+        Assert.Contains("429", throttled.Fields);
+        Assert.All(logged, e => Assert.DoesNotContain(Token, e.Fields));
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Models;
 using BudgetTracker.Domain.Plaid;
 using Microsoft.Extensions.Options;
+using BudgetTracker.Server.Utilities.Observability;
 
 namespace BudgetTracker.Server.Managers;
 
@@ -142,7 +143,7 @@ public class PlaidManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Sandbox seed: creating the custom public_token failed");
+            logger.SandboxSeedTokenFailed(ex);
             return Result<PlaidSyncSummary>.Failure("Could not create the sandbox item. Check the Plaid sandbox credentials.");
         }
 
@@ -207,7 +208,7 @@ public class PlaidManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Sandbox reset_login for PlaidItem {PlaidItemId} failed", plaidItemId);
+            logger.SandboxResetLoginFailed(ex, plaidItemId);
             return Result.Failure("Could not reset the sandbox login. Check the Plaid sandbox credentials.");
         }
     }
@@ -290,7 +291,7 @@ public class PlaidManager(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Persisting new Plaid item {PlaidItemId} failed; revoking it at Plaid.", plaidItemId);
+            logger.PersistNewItemFailed(ex, plaidItemId);
             await RevokeUnkeptItemAsync(accessToken, plaidItemId);
             return Result<PlaidSyncSummary>.Failure("Could not save the new bank connection. Please try again.");
         }
@@ -331,7 +332,7 @@ public class PlaidManager(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "On-demand sync failed for PlaidItem {PlaidItemId}; continuing.", item.Id);
+                logger.OnDemandSyncFailed(ex, item.Id);
                 result = Result<PlaidSyncSummary>.Failure("Could not refresh transactions right now. Please try again.");
             }
 
@@ -379,9 +380,7 @@ public class PlaidManager(
 
             case AccessTokenStatus.Undecryptable:
                 // Without the token Plaid cannot be told to stop billing; the user still needs to be able to unlink.
-                logger.LogWarning(
-                    "Access token for PlaidItem {PlaidItemId} cannot be decrypted; skipping Plaid /item/remove and deactivating locally.",
-                    plaidItemId);
+                logger.DisconnectTokenUndecryptable(plaidItemId);
                 break;
 
             case AccessTokenStatus.Found:
@@ -392,7 +391,7 @@ public class PlaidManager(
                 catch (Exception ex)
                 {
                     // Best-effort: deactivate locally even if Plaid is unreachable.
-                    logger.LogWarning(ex, "Plaid /item/remove failed for PlaidItem {PlaidItemId}; deactivating locally.", plaidItemId);
+                    logger.ItemRemoveFailed(ex, plaidItemId);
                 }
                 break;
         }
@@ -492,7 +491,7 @@ public class PlaidManager(
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, "Webhook registration failed for PlaidItem {PlaidItemId}; syncing anyway.", item.Id);
+                        logger.WebhookRegistrationFailed(ex, item.Id);
                     }
                 }
 
@@ -502,7 +501,7 @@ public class PlaidManager(
             catch (Exception ex)
             {
                 // One bad item must not abort the sweep. Never log the token/body.
-                logger.LogWarning(ex, "Sweep sync failed for PlaidItem {PlaidItemId}; continuing.", item.Id);
+                logger.SweepSyncFailed(ex, item.Id);
             }
         }
 
@@ -535,7 +534,7 @@ public class PlaidManager(
     }
 
     private void LogUndecryptableSkip(int plaidItemId) =>
-        logger.LogWarning("Access token for PlaidItem {PlaidItemId} cannot be decrypted; skipping sync until it is re-linked.", plaidItemId);
+        logger.SyncTokenUndecryptable(plaidItemId);
 
     /// <summary>
     /// Best-effort <c>/item/remove</c> for an item that was exchanged but will not be kept. The exchange already
@@ -549,7 +548,7 @@ public class PlaidManager(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Plaid /item/remove failed for unkept Plaid item {PlaidItemId}; it may still be billed.", plaidItemId);
+            logger.UnkeptItemRemoveFailed(ex, plaidItemId);
         }
     }
 
@@ -565,9 +564,7 @@ public class PlaidManager(
     {
         if (lookup.Status == AccessTokenStatus.Undecryptable)
         {
-            logger.LogWarning(
-                "Sandbox seed: access token for PlaidItem {PlaidItemId} cannot be decrypted; skipping Plaid /item/remove and deactivating locally.",
-                plaidItemId);
+            logger.SandboxSeedTokenUndecryptable(plaidItemId);
         }
 
         if (lookup.AccessToken is not { } accessToken)
@@ -579,7 +576,7 @@ public class PlaidManager(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Sandbox seed: revoking PlaidItem {PlaidItemId} failed; deactivating locally.", plaidItemId);
+            logger.SandboxSeedRevokeFailed(ex, plaidItemId);
         }
     }
 
@@ -595,7 +592,7 @@ public class PlaidManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Sandbox seed: restoring PlaidItem {PlaidItemId} after a failed exchange failed; it is left inactive.", plaidItemId);
+            logger.SandboxSeedRestoreFailed(ex, plaidItemId);
         }
     }
 
@@ -609,7 +606,7 @@ public class PlaidManager(
         catch (Exception ex)
         {
             // PlaidApiException's message is sanitized (error_code/error_message only), so it is safe to log.
-            logger.LogWarning(ex, "Plaid /link/token/create failed (update mode: {IsUpdateMode}).", accessToken is not null);
+            logger.LinkTokenCreateFailed(ex, accessToken is not null);
             // Plain-language error per AC-9 — never echo upstream message (may contain secret/access_token).
             return Result<PlaidLinkTokenResult>.Failure("Unable to start bank link right now. Please try again in a moment.");
         }
@@ -789,7 +786,7 @@ public class PlaidManager(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Transfer pairing failed for user {UserId}; it will retry on the next sync.", userId);
+            logger.TransferPairingFailed(ex, userId);
         }
     }
 }

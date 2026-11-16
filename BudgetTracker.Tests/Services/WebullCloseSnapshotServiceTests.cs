@@ -19,7 +19,7 @@ public class WebullCloseSnapshotServiceTests
         var ran = new TaskCompletionSource();
         var manager = new Mock<IWebullManager>();
         manager.Setup(m => m.RunCloseSnapshotsAsync()).Callback(() => ran.TrySetResult()).ThrowsAsync(failure);
-        var logger = new Mock<ILogger<WebullCloseSnapshotService>>();
+        var logger = TestLoggers.Enabled<WebullCloseSnapshotService>();
         var services = new ServiceCollection().AddScoped(_ => manager.Object).BuildServiceProvider();
         using var service = new WebullCloseSnapshotService(services.GetRequiredService<IServiceScopeFactory>(), logger.Object);
 

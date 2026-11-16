@@ -1,3 +1,4 @@
+using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,7 @@ public class DataVersionAccessor(BudgetTrackerDbContext context, ILogger<DataVer
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Bumping the data version for user {UserId} failed; clients refresh on the next change.", userId);
+            logger.DataVersionBumpFailed(ex, userId);
             return false;
         }
     }

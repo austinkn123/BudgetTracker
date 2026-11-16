@@ -26,7 +26,7 @@ public class WebullManagerTests
     private readonly Mock<IWebullAccessor> _webull = new(MockBehavior.Strict);
     private readonly Mock<IWebullConnectionAccessor> _connections = new(MockBehavior.Strict);
     private readonly Mock<IWebullHoldingsEngine> _holdings = new(MockBehavior.Strict);
-    private readonly Mock<ILogger<WebullManager>> _logger = new();
+    private readonly Mock<ILogger<WebullManager>> _logger = TestLoggers.Enabled<WebullManager>();
 
     private static readonly IReadOnlyList<WebullBalance> Balances = [new("ACC1", "Individual Cash", "CASH", 100m, 25m, "USD")];
     private static readonly IReadOnlyList<WebullAccountPortfolio> Portfolio =

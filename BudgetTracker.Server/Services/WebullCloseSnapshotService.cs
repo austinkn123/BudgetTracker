@@ -1,4 +1,5 @@
 using BudgetTracker.Domain.Interfaces.Managers;
+using BudgetTracker.Server.Utilities.Observability;
 
 namespace BudgetTracker.Server.Services;
 
@@ -33,7 +34,7 @@ public class WebullCloseSnapshotService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Webull close snapshot tick failed; will retry on the next interval.");
+                logger.CloseSnapshotTickFailed(ex);
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }

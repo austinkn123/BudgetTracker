@@ -28,7 +28,7 @@ public sealed class RequestUserMiddleware(RequestDelegate next, ILogger<RequestU
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Only the type: provisioning messages can echo claim values. The endpoint surfaces the real failure.
-                logger.LogWarning("Could not resolve the UserId for the log scope ({ExceptionType})", ex.GetType().Name);
+                logger.UserLookupFailed(ex.GetType().Name);
             }
         }
 

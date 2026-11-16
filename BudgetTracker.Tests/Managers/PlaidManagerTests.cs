@@ -22,7 +22,7 @@ public class PlaidManagerTests
     private readonly Mock<IPlaidWebhookEngine> _webhookEngine = new(MockBehavior.Strict);
     private readonly PlaidEngine _engine = new();
     private readonly PlaidOptions _options = new();
-    private readonly Mock<ILogger<PlaidManager>> _logger = new();
+    private readonly Mock<ILogger<PlaidManager>> _logger = TestLoggers.Enabled<PlaidManager>();
     private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
     private readonly List<string> _calls = [];
 

@@ -270,7 +270,7 @@ public class PlaidManagerSandboxSeedTests
     [Fact]
     public async Task Seed_ExchangeFailsAndReactivationThrows_ReturnsExchangeFailureAndLogsError()
     {
-        var logger = new Mock<ILogger<PlaidManager>>();
+        var logger = TestLoggers.Enabled<PlaidManager>();
         _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([Item(12, new DateTime(2026, 9, 20))]);
         ArrangeTakeOffline(12, AccessTokenLookup.Found("token-12"));
         _itemAccessor.Setup(a => a.ReactivateAsync(UserId, 12)).ThrowsAsync(new InvalidOperationException("db down"));
@@ -307,7 +307,7 @@ public class PlaidManagerSandboxSeedTests
     [Fact]
     public async Task Seed_PreviousItemTokenUndecryptable_SkipsRemoveButStillDeactivates()
     {
-        var logger = new Mock<ILogger<PlaidManager>>();
+        var logger = TestLoggers.Enabled<PlaidManager>();
         _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([Item(12, new DateTime(2026, 9, 20))]);
         ArrangeLinkSucceeds();
         ArrangeTakeOffline(12, AccessTokenLookup.Undecryptable);

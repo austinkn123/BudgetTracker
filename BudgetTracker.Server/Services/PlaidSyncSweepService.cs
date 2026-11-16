@@ -1,6 +1,7 @@
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Plaid;
 using Microsoft.Extensions.Options;
+using BudgetTracker.Server.Utilities.Observability;
 
 namespace BudgetTracker.Server.Services;
 
@@ -39,7 +40,7 @@ public class PlaidSyncSweepService(
             catch (Exception ex)
             {
                 // A failed tick must never terminate the loop.
-                logger.LogError(ex, "Plaid sweep tick failed; will retry on the next interval.");
+                logger.SweepTickFailed(ex);
             }
         }
     }
