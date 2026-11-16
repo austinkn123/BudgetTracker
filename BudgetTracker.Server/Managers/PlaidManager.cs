@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Interfaces.Accessors;
@@ -656,10 +657,40 @@ public class PlaidManager(
             : null;
 
     /// <summary>
+    /// Runs one sync of one item and records the sync metric event (outcome, counts, duration) however it ends.
+    /// Every sync goes through here: the post-exchange sync, on-demand Refresh, webhooks and the sweep.
+    /// </summary>
+    private async Task<Result<PlaidSyncSummary>> RunSyncAsync(
+        int userId,
+        int plaidItemId,
+        string accessToken,
+        string? cursor,
+        IReadOnlyList<Account> accountsLookup,
+        IReadOnlyList<PlaidAccount> plaidAccountSnapshots)
+    {
+        var started = Stopwatch.GetTimestamp();
+        long ElapsedMs() => (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+
+        try
+        {
+            var (result, outcome) = await FetchAndSaveAsync(userId, plaidItemId, accessToken, cursor, accountsLookup, plaidAccountSnapshots);
+            var summary = result.Value;
+            logger.SyncFinished(plaidItemId, outcome, summary?.Inserted ?? 0, summary?.Updated ?? 0, summary?.Removed ?? 0, ElapsedMs());
+            return result;
+        }
+        catch (Exception)
+        {
+            // The caller logs the exception; this only records that the sync did not finish.
+            logger.SyncFinished(plaidItemId, PlaidSyncOutcome.Faulted, 0, 0, 0, ElapsedMs());
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Shared sync routine: pull deltas, map via the engine, upsert by Plaid id, delete removed,
     /// then persist the next cursor. Used for both the initial post-exchange sync and the on-demand Refresh.
     /// </summary>
-    private async Task<Result<PlaidSyncSummary>> RunSyncAsync(
+    private async Task<(Result<PlaidSyncSummary> Result, PlaidSyncOutcome Outcome)> FetchAndSaveAsync(
         int userId,
         int plaidItemId,
         string accessToken,
@@ -677,11 +708,11 @@ public class PlaidManager(
             // The bank wants the user to sign in again; the flag makes the client offer update-mode Link (Reconnect).
             await itemAccessor.SetNeedsReconnectAsync(plaidItemId, true);
             await dataVersion.BumpAsync(userId);
-            return Result<PlaidSyncSummary>.Failure(LoginRequiredMessage);
+            return (Result<PlaidSyncSummary>.Failure(LoginRequiredMessage), PlaidSyncOutcome.LoginRequired);
         }
         catch (Exception)
         {
-            return Result<PlaidSyncSummary>.Failure("Could not refresh transactions right now. Please try again.");
+            return (Result<PlaidSyncSummary>.Failure("Could not refresh transactions right now. Please try again."), PlaidSyncOutcome.FetchFailed);
         }
 
         // Rows the engine rejects ($0) join Plaid's removals: never inserted when new, deleted when they
@@ -761,7 +792,7 @@ public class PlaidManager(
             await dataVersion.BumpAsync(userId);
         }
 
-        return Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, syncedAt));
+        return (Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, syncedAt)), PlaidSyncOutcome.Completed);
     }
 
     /// <summary>

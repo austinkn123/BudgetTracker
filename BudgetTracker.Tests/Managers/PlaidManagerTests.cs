@@ -2018,6 +2018,84 @@ public class PlaidManagerTests
         VerifyNeverBumped();
     }
 
+    // ── Sync metrics (event 2017) ───────────────────────────────────────────
+
+    private const int SyncFinishedEvent = 2017;
+
+    [Fact]
+    public async Task Sync_Completed_LogsOneMetricEventWithCountsAndDuration()
+    {
+        ArrangeRecordedSyncWithRows();
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(5);
+
+        var metric = Assert.Single(logged, e => e.EventId == SyncFinishedEvent);
+        Assert.Equal(LogLevel.Information, metric.Level);
+        Assert.Contains("PlaidItemId=11", metric.Fields);
+        Assert.Contains("Outcome=Completed", metric.Fields);
+        Assert.Contains("Inserted=1", metric.Fields);
+        Assert.Contains("Updated=0", metric.Fields);
+        Assert.Contains("Removed=1", metric.Fields);
+        Assert.Matches(@"DurationMs=\d+", metric.Fields);
+    }
+
+    [Fact]
+    public async Task Sync_MetricEvent_CarriesCountsOnly_NeverTransactionData()
+    {
+        ArrangeRecordedSyncWithRows();
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(5);
+
+        // Exactly these fields: no payee, amount, account name or token can ride along.
+        var names = Assert.Single(logged, e => e.EventId == SyncFinishedEvent).Fields
+            .Split('\n').Select(line => line[..line.IndexOf('=')]).Order();
+        Assert.Equal(
+            new[] { "DurationMs", "Inserted", "Outcome", "PlaidItemId", "Removed", "Updated", "{OriginalFormat}" }.Order(),
+            names);
+    }
+
+    [Theory]
+    [InlineData("ITEM_LOGIN_REQUIRED", "LoginRequired")]
+    [InlineData("INSTITUTION_DOWN", "FetchFailed")]
+    public async Task Sync_PlaidFetchFails_LogsTheMetricEventWithThatOutcome(string errorCode, string outcome)
+    {
+        ArrangeItemSyncThrows(PlaidError(errorCode));
+        _itemAccessor.Setup(a => a.SetNeedsReconnectAsync(1, true)).Returns(Task.CompletedTask);
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(userId: 5);
+
+        var metric = Assert.Single(logged, e => e.EventId == SyncFinishedEvent);
+        Assert.Contains($"Outcome={outcome}", metric.Fields);
+        Assert.Contains("PlaidItemId=1", metric.Fields);
+        Assert.Contains("Inserted=0", metric.Fields);
+    }
+
+    [Fact]
+    public async Task Sync_WriteAfterTheUpsertThrows_LogsTheMetricEventAsFaulted_AndTheFailureStillSurfaces()
+    {
+        ArrangeRecordedSyncWithRows("delete");
+        var logged = TestLoggers.Capture(_logger);
+
+        var result = await BuildSut().SyncAsync(5);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Outcome=Faulted", Assert.Single(logged, e => e.EventId == SyncFinishedEvent).Fields);
+    }
+
+    [Fact]
+    public async Task Sync_NothingDue_LogsNoMetricEvent()
+    {
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(5)).ReturnsAsync([]);
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(5);
+
+        Assert.DoesNotContain(logged, e => e.EventId == SyncFinishedEvent);
+    }
+
     /// <summary>Arranges an exchange for user 5 that persists item 11; the follow-up sync is left to the caller.</summary>
     private void ArrangeExchangeThatPersists()
     {

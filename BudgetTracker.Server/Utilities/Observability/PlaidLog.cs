@@ -1,5 +1,21 @@
 namespace BudgetTracker.Server.Utilities.Observability;
 
+/// <summary>How one Plaid transaction sync ended, as recorded on the sync metric event.</summary>
+public enum PlaidSyncOutcome
+{
+    /// <summary>Transactions were fetched and saved.</summary>
+    Completed,
+
+    /// <summary>The bank wants the user to sign in again; the item is flagged for reconnect.</summary>
+    LoginRequired,
+
+    /// <summary>Plaid could not be reached or rejected the request.</summary>
+    FetchFailed,
+
+    /// <summary>An exception escaped after the fetch (a save step failed); the caller logs the exception itself.</summary>
+    Faulted,
+}
+
 /// <summary>Source-generated log messages for the Plaid link, sync and sandbox workflows. Event IDs 2000–2999.</summary>
 public static partial class PlaidLog
 {
@@ -62,6 +78,13 @@ public static partial class PlaidLog
     /// <summary>Pairing transfer legs failed; the next sync retries it.</summary>
     [LoggerMessage(EventId = 2015, Level = LogLevel.Warning, Message = "Transfer pairing failed for user {UserId}; it will retry on the next sync.")]
     public static partial void TransferPairingFailed(this ILogger logger, Exception exception, int userId);
+
+    /// <summary>
+    /// The sync metric: one event per transaction sync of one item, whatever triggered it (link, refresh, webhook or
+    /// sweep). Counts and duration only, never transaction data, so Logs Insights can aggregate it freely.
+    /// </summary>
+    [LoggerMessage(EventId = 2017, Level = LogLevel.Information, Message = "Plaid sync for PlaidItem {PlaidItemId} finished: {Outcome}; {Inserted} inserted, {Updated} updated, {Removed} removed in {DurationMs} ms")]
+    public static partial void SyncFinished(this ILogger logger, int plaidItemId, PlaidSyncOutcome outcome, int inserted, int updated, int removed, long durationMs);
 
     /// <summary>One tick of the background sweep service failed; the next interval retries.</summary>
     [LoggerMessage(EventId = 2016, Level = LogLevel.Error, Message = "Plaid sweep tick failed; will retry on the next interval.")]
