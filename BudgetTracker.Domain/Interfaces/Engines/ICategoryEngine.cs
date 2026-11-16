@@ -19,4 +19,8 @@ public interface ICategoryEngine
     /// <param name="name">The candidate category name.</param>
     /// <returns>The same message <see cref="ValidateNameIsUnique"/> returns for a taken name.</returns>
     string DuplicateNameError(string name);
+
+    /// <summary>The message shown when a category cannot be deleted because rows still reference it.</summary>
+    /// <returns>The "in use" failure message.</returns>
+    string InUseError();
 }

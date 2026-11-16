@@ -71,6 +71,7 @@ const PlanStoryHero = ({ plan, analyzedMonth, pacing, headline, drifting }: Plan
               valueColor={gaugeColor}
               trackColor="rgb(255 255 255 / 0.12)"
               textColor="rgb(255 255 255)"
+              ariaLabel="Budget spent"
             />
             <p className="numeric -mt-1 text-sm font-semibold text-white/60">{remainingLabel}</p>
           </div>

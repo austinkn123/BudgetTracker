@@ -24,9 +24,9 @@ for 14 days. See [`deploy/README.md`](../deploy/README.md) for the hosting setup
 - **Logging:** built-in `Microsoft.Extensions.Logging` with the JSON console formatter and scopes
   on. Each scope carries `CorrelationId`, `AwsRequestId`, and `UserId`. No Serilog, no
   OpenTelemetry.
-- **Where `ILogger` is used:** only in Managers and background services — `PlaidManager`,
-  `WebullManager`, `WebullTradesManager`, `SandboxSeedManager`, `PlaidSyncSweepService`, and
-  `WebullCloseSnapshotService`. Endpoints, Engines, and Accessors don't log.
+- **Where `ILogger` is used:** only in Managers and background services — `PlaidManager` (which
+  also covers sandbox seeding), `WebullManager`, `WebullTradesManager`, `PlaidSyncSweepService`,
+  and `WebullCloseSnapshotService`. Endpoints, Engines, and Accessors don't log.
 - **Errors:** `UseExceptionHandler` plus ProblemDetails responses that carry `correlationId` and
   no stack trace.
 - **Correlation IDs:** middleware reads `X-Correlation-ID` and keeps it if it is 1–64 characters

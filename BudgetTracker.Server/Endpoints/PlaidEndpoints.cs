@@ -44,14 +44,14 @@ public static class PlaidEndpoints
         // Development, and the manager refuses unless Plaid is configured for sandbox.
         plaidGroup.MapPost("/sandbox/seed", async (
             [FromBody] SandboxSeedRequest? request,
-            ISandboxSeedManager manager,
+            IPlaidManager manager,
             ICurrentUserProvider currentUser,
             IWebHostEnvironment environment,
             CancellationToken cancellationToken) =>
         {
             if (!environment.IsDevelopment()) return Results.NotFound();
 
-            var result = await manager.SeedAsync(currentUser.UserId, request?.Months ?? 4, cancellationToken);
+            var result = await manager.SeedSandboxAsync(currentUser.UserId, request?.Months ?? 4, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Results.BadRequest(new { error = result.Error });
@@ -69,14 +69,14 @@ public static class PlaidEndpoints
         // reconnect flow can be exercised; the next sync flags the item. 204 on success, 400 { error } on failure.
         plaidGroup.MapPost("/sandbox/connections/{plaidItemId:int}/reset-login", async (
             int plaidItemId,
-            ISandboxSeedManager manager,
+            IPlaidManager manager,
             ICurrentUserProvider currentUser,
             IWebHostEnvironment environment,
             CancellationToken cancellationToken) =>
         {
             if (!environment.IsDevelopment()) return Results.NotFound();
 
-            var result = await manager.ResetLoginAsync(currentUser.UserId, plaidItemId, cancellationToken);
+            var result = await manager.ResetSandboxLoginAsync(currentUser.UserId, plaidItemId, cancellationToken);
             return result.IsSuccess
                 ? Results.NoContent()
                 : Results.BadRequest(new { error = result.Error });

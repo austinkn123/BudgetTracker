@@ -63,4 +63,10 @@ public class CategoryEngineTests
 
         Assert.Equal(valid, _engine.ValidateCategory(category) is null);
     }
+
+    [Fact]
+    public void Should_ReturnTheInUseMessage_When_BuildingInUseError()
+    {
+        Assert.Equal("Category is in use and cannot be deleted", _engine.InUseError());
+    }
 }

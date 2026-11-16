@@ -46,6 +46,29 @@ public interface IPlaidManager
     Task<Result<PlaidSyncSummary>> ExchangePublicTokenAsync(int userId, string publicToken);
 
     /// <summary>
+    /// Development-only (BUD-3 dev tooling). Plaid's default Sandbox user returns "Tartan Bank" fixtures whose amounts
+    /// bear no relation to a real budget, so this builds a <c>user_custom</c> Sandbox item derived from the user's
+    /// effective budget plan and runs it through the normal exchange + sync path, so the seeded data arrives via
+    /// exactly the same code as a real link. Replaces only the user's most recent active item. Refused unless Plaid
+    /// is configured for sandbox.
+    /// </summary>
+    /// <param name="userId">Owner of the plan the seed is derived from.</param>
+    /// <param name="months">How many whole months back from today to generate, inclusive of this one.</param>
+    /// <param name="cancellationToken">Cancels the Plaid calls.</param>
+    /// <returns>The initial sync summary of the seeded item, or a failure.</returns>
+    Task<Result<PlaidSyncSummary>> SeedSandboxAsync(int userId, int months, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Force one of the user's Sandbox items into <c>ITEM_LOGIN_REQUIRED</c>, so the reconnect flow can be exercised
+    /// end to end. Refused unless Plaid is configured for sandbox.
+    /// </summary>
+    /// <param name="userId">The owning user.</param>
+    /// <param name="plaidItemId">The PlaidItem row id.</param>
+    /// <param name="cancellationToken">Cancels the Plaid call.</param>
+    /// <returns>Success, or a failure when the item is unknown, unreadable, or Plaid refuses.</returns>
+    Task<Result> ResetSandboxLoginAsync(int userId, int plaidItemId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Re-sync transactions for the user's active PlaidItems and return the counts aggregated across them.
     /// Idempotent via Plaid.transaction_id dedupe. A user with nothing linked (or nothing due) gets a zero summary.
     /// </summary>

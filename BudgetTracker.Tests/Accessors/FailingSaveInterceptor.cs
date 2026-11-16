@@ -16,7 +16,14 @@ internal sealed class FailingSaveInterceptor : SaveChangesInterceptor
     public void FailNextSaveWith(string sqlState, string constraintName) =>
         _next = new DbUpdateException(
             "An error occurred while saving the entity changes.",
-            new PostgresException("duplicate key value", "ERROR", "ERROR", sqlState, constraintName: constraintName));
+            new PostgresException(MessageFor(sqlState), "ERROR", "ERROR", sqlState, constraintName: constraintName));
+
+    private static string MessageFor(string sqlState) => sqlState switch
+    {
+        PostgresErrorCodes.UniqueViolation => "duplicate key value violates unique constraint",
+        PostgresErrorCodes.ForeignKeyViolation => "update or delete violates foreign key constraint",
+        _ => $"simulated Postgres error {sqlState}"
+    };
 
     /// <inheritdoc />
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(

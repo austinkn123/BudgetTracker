@@ -100,4 +100,22 @@ describe('Input', () => {
     expect(field.tagName).toBe('TEXTAREA');
     expect(field).toBeDisabled();
   });
+
+  it('describes the control by its helper text, then by the error once it fails', async () => {
+    const user = userEvent.setup();
+    render(<Harness helperText="Shown on the ledger" />);
+    const field = screen.getByRole('textbox', { name: 'Name' });
+    expect(field).toHaveAccessibleDescription('Shown on the ledger');
+
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    await screen.findByText('Name is required');
+    expect(field).toHaveAccessibleDescription('Name is required');
+  });
+
+  it('sets no aria-describedby when there is neither helper text nor error', () => {
+    render(<Harness />);
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).not.toHaveAttribute('aria-describedby');
+  });
 });

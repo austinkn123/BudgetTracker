@@ -59,10 +59,14 @@ const Button = ({
   component,
   className,
   disabled,
+  type,
   children,
   ...rest
 }: ButtonProps) => {
   const Comp: ElementType = component ?? 'button';
+  // A native <button> defaults to type="submit", so an unannotated Cancel inside a <form>
+  // would submit it. Default to "button"; submitters opt in with type="submit".
+  const resolvedType = Comp === 'button' ? (type ?? 'button') : type;
 
   return (
     <Comp
@@ -75,6 +79,8 @@ const Button = ({
         className,
       )}
       disabled={disabled || loading}
+      type={resolvedType}
+      aria-busy={loading || undefined}
       {...rest}
     >
       {loading ? <Loader2 size={16} className="animate-spin" aria-hidden /> : startIcon}

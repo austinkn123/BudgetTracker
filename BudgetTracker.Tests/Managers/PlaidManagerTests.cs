@@ -61,6 +61,9 @@ public class PlaidManagerTests
         _engine,
         _webhookEngine.Object,
         _dataVersion.Object,
+        new Mock<IBudgetPlanAccessor>(MockBehavior.Strict).Object,
+        new BudgetPlanEngine(),
+        new Mock<ISandboxSeedEngine>(MockBehavior.Strict).Object,
         Options.Create(_options),
         _logger.Object);
 
@@ -2220,6 +2223,9 @@ public class PlaidManagerTests
         _engine,
         new PlaidWebhookEngine(),
         _dataVersion.Object,
+        new Mock<IBudgetPlanAccessor>(MockBehavior.Strict).Object,
+        new BudgetPlanEngine(),
+        new Mock<ISandboxSeedEngine>(MockBehavior.Strict).Object,
         Options.Create(_options),
         NullLogger<PlaidManager>.Instance);
 

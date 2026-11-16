@@ -5,6 +5,7 @@ import { Controller } from 'react-hook-form';
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 import { cn } from '../../utils/cn';
 import FieldShell from './FieldShell';
+import { EMPTY_SENTINEL, toRadixValue } from './selectValue';
 
 export interface SelectOption<TValue extends string | number = string> {
   readonly value: TValue;
@@ -32,12 +33,6 @@ export interface SelectProps<
   className?: string;
 }
 
-/**
- * Radix Select.Item throws on value="" (reserved for clearing), so the empty
- * option uses a sentinel translated back at the form boundary.
- */
-const EMPTY_SENTINEL = '__empty__';
-
 /** Form select field (BUD-20), built on Radix Select + RHF Controller. */
 const Select = <TFieldValues extends FieldValues, TValue extends string | number = string>({
   control,
@@ -54,6 +49,7 @@ const Select = <TFieldValues extends FieldValues, TValue extends string | number
   className,
 }: SelectProps<TFieldValues, TValue>) => {
   const id = useId();
+  const messageId = `${id}-message`;
 
   return (
     <Controller
@@ -66,16 +62,17 @@ const Select = <TFieldValues extends FieldValues, TValue extends string | number
           required={required}
           error={fieldState.error?.message}
           helperText={helperText}
+          messageId={messageId}
           fullWidth={fullWidth}
           className={className}
         >
           <RadixSelect.Root
-            value={
-              field.value == null || field.value === '' ? EMPTY_SENTINEL : String(field.value)
-            }
+            value={toRadixValue(field.value as unknown, emptyOptionLabel !== undefined)}
             onValueChange={(value) => {
               if (value === EMPTY_SENTINEL) {
-                field.onChange(undefined);
+                // null, not undefined: RHF's Controller renders the field's default for
+                // undefined, so the trigger would snap back instead of showing the empty label.
+                field.onChange(null);
                 return;
               }
               field.onChange(valueAs === 'number' ? Number(value) : value);
@@ -87,6 +84,7 @@ const Select = <TFieldValues extends FieldValues, TValue extends string | number
               ref={field.ref}
               onBlur={field.onBlur}
               aria-invalid={fieldState.error ? true : undefined}
+              aria-describedby={fieldState.error?.message || helperText ? messageId : undefined}
               className={cn(
                 'focus-ring flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 text-[14px] text-ink shadow-xs transition-colors duration-120 hover:border-border-strong disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-muted',
                 'data-[placeholder]:text-ink-muted/60',

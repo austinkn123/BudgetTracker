@@ -20,4 +20,13 @@ public interface IBudgetPlanEngine
     /// <param name="name">The candidate plan name.</param>
     /// <returns>The same message <see cref="ValidateNameIsUnique"/> returns for a taken name.</returns>
     string DuplicateNameError(string name);
+
+    /// <summary>
+    /// Plans roll forward: PlanMonth is the month a plan takes effect, so the plan governing <paramref name="month"/>
+    /// is the newest active plan dated on or before it.
+    /// </summary>
+    /// <param name="plans">The user's plans.</param>
+    /// <param name="month">The first day of the month being governed.</param>
+    /// <returns>The governing plan, or null when no active plan has taken effect by <paramref name="month"/>.</returns>
+    BudgetPlan? SelectEffectivePlan(IEnumerable<BudgetPlan> plans, DateTime month);
 }

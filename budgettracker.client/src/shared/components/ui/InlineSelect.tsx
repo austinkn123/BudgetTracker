@@ -1,10 +1,10 @@
 import * as RadixSelect from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { EMPTY_SENTINEL, toRadixValue } from './selectValue';
 import type { SelectOption } from './Select';
 
-export interface InlineSelectProps<TValue extends string | number = string> {
-  value: TValue | null | undefined;
+interface InlineSelectBaseProps<TValue extends string | number> {
   onChange: (value: TValue | null) => void;
   options: readonly SelectOption<TValue>[];
   /** Leading blank choice, e.g. "Uncategorized". Selecting it emits null. */
@@ -18,15 +18,32 @@ export interface InlineSelectProps<TValue extends string | number = string> {
   className?: string;
 }
 
+/** A field: shows the current value, and a pick replaces it. */
+interface InlineSelectFieldProps<TValue extends string | number> extends InlineSelectBaseProps<TValue> {
+  mode?: 'field';
+  value: TValue | null | undefined;
+}
+
+/**
+ * An action picker (e.g. "apply a category to the selection"): holds no value, always shows its
+ * placeholder, and every pick fires — the empty option included, emitting null.
+ */
+interface InlineSelectActionProps<TValue extends string | number> extends InlineSelectBaseProps<TValue> {
+  mode: 'action';
+  value?: never;
+}
+
+export type InlineSelectProps<TValue extends string | number = string> =
+  | InlineSelectFieldProps<TValue>
+  | InlineSelectActionProps<TValue>;
+
 /**
  * Standalone select for use outside a form (BUD-20 design system). The sibling `Select`
  * wraps react-hook-form; this one is plain value/onChange, for table rows and toolbars.
- *
- * Radix Select.Item throws on value="", so the empty choice uses a sentinel.
  */
-const EMPTY_SENTINEL = '__empty__';
 
 const InlineSelect = <TValue extends string | number = string>({
+  mode = 'field',
   value,
   onChange,
   options,
@@ -39,7 +56,9 @@ const InlineSelect = <TValue extends string | number = string>({
   className,
 }: InlineSelectProps<TValue>) => (
   <RadixSelect.Root
-    value={value == null || value === '' ? EMPTY_SENTINEL : String(value)}
+    // Action mode pins Radix to '' (unset): the placeholder shows, and since no item is ever the
+    // selected one, Radix fires onValueChange for every pick — it skips the already-selected value.
+    value={mode === 'action' ? '' : toRadixValue(value, emptyOptionLabel !== undefined)}
     onValueChange={(next) => {
       if (next === EMPTY_SENTINEL) {
         onChange(null);

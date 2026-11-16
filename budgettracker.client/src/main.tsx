@@ -15,6 +15,7 @@ import './index.css'
 import './auth/amplifyConfig'
 import { AuthProvider } from './auth/AuthContext'
 import { ThemeProvider } from './shared/theme/ThemeProvider'
+import ErrorBoundary from './shared/components/ErrorBoundary'
 import App from './App.tsx'
 
 const queryClient = new QueryClient({
@@ -33,7 +34,10 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider delayDuration={200}>
-              <App />
+              {/* Last-resort boundary for errors outside the app shell (e.g. the auth pages). */}
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
             </TooltipProvider>
             {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
           </QueryClientProvider>

@@ -15,9 +15,9 @@ Steps:
    - `dotnet build BudgetTracker.sln` — backend
    - `npm --prefix budgettracker.client run build` — frontend (this includes `tsc` type-check)
 
-3. **Delegate to agents (run in parallel via the Agent tool):**
-   - `tony-architect` — does anything in the diff violate the IDesign call chain, leak business logic into the wrong layer, or introduce architectural risk? Be specific with file paths and line numbers.
-   - `johnny-senior-qa` — what's the test coverage gap in this diff? Are there edge cases or failure modes worth covering before this ships?
+3. **Review:**
+   - **Small diff** (under ~300 changed lines, from `git diff --stat`): review it yourself against `project-docs/engineering-standards.md` — correctness, IDesign layering, migration safety, test gaps. No subagents.
+   - **Large diff**: launch the `reviewer` agent once with the list of changed files, and use its findings.
 
 4. **Synthesize a final checklist** in this format:
    ```
@@ -29,7 +29,7 @@ Steps:
 
    🚫 Blockers (fix before commit)
    - Build failures
-   - Architectural violations Tony flagged
+   - IDesign violations
    - Security or data-loss issues
    ```
 

@@ -260,8 +260,10 @@ const TransactionsSection = ({
             </span>
             <div className="flex items-center gap-2.5">
               <div className="w-56">
+                {/* Action mode: applies a pick to the selection and resets, so every option
+                    fires — "Uncategorized" included, which clears the category. */}
                 <InlineSelect
-                  value={null}
+                  mode="action"
                   onChange={(categoryId) => review.setCategoryForSelected(categoryId)}
                   options={categoryOptions}
                   emptyOptionLabel="Uncategorized"

@@ -3,6 +3,7 @@ using BudgetTracker.Domain.Data;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Models;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace BudgetTracker.Domain.Accessors;
 
@@ -23,7 +24,15 @@ public class CategoryAccessor(BudgetTrackerDbContext context) : ICategoryAccesso
         if (category is null) return false;
 
         context.Categories.Remove(category);
-        return await context.SaveChangesAsync() > 0;
+        try
+        {
+            return await context.SaveChangesAsync() > 0;
+        }
+        catch (DbUpdateException ex) when (ex.IsForeignKeyViolationOf(ForeignKeyViolation.OntoCategories))
+        {
+            var pg = (PostgresException)ex.InnerException!;
+            throw new EntityInUseException(pg.ConstraintName!, ex);
+        }
     }
 
     public async Task<Category?> GetByIdAsync(int id)

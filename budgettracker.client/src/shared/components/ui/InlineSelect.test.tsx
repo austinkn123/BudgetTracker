@@ -122,10 +122,9 @@ describe('InlineSelect', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  // BUG (reported, not fixed here): a null value maps to the '__empty__' sentinel rather than
-  // '', so Radix never treats the select as unset and the placeholder is not rendered when
-  // there is no emptyOptionLabel. `it.fails` keeps the suite green; flip to `it` once fixed.
-  it.fails('shows the placeholder when value is null and there is no empty option', () => {
+  // Regression: a null value used to map to the '__empty__' sentinel, so Radix never treated
+  // the select as unset and the placeholder was hidden when there is no emptyOptionLabel.
+  it('shows the placeholder when value is null and there is no empty option', () => {
     render(
       <InlineSelect
         value={null}
@@ -138,5 +137,66 @@ describe('InlineSelect', () => {
 
     expect(trigger()).toHaveTextContent('Pick a category');
     expect(trigger()).toHaveAttribute('data-placeholder');
+  });
+
+  // An action picker applies its choice elsewhere and holds no value of its own, so it must keep
+  // showing its placeholder and fire for every option — including the empty one, which a stateful
+  // select treats as "already selected" when its value is null and so never reports.
+  describe('mode="action"', () => {
+    const renderAction = (onChange = vi.fn()) => {
+      render(
+        <InlineSelect<number>
+          mode="action"
+          onChange={onChange}
+          options={NUMERIC_OPTIONS}
+          emptyOptionLabel="Uncategorized"
+          placeholder="Set category…"
+          ariaLabel="Category"
+          valueAs="number"
+        />,
+      );
+      return onChange;
+    };
+
+    it('shows the placeholder rather than the empty option label', () => {
+      renderAction();
+
+      expect(trigger()).toHaveTextContent('Set category…');
+      expect(trigger()).toHaveAttribute('data-placeholder');
+    });
+
+    it('emits null when the empty option is picked', async () => {
+      const user = userEvent.setup();
+      const onChange = renderAction();
+
+      await user.click(trigger());
+      await user.click(await screen.findByRole('option', { name: 'Uncategorized' }));
+
+      expect(onChange).toHaveBeenCalledExactlyOnceWith(null);
+    });
+
+    it('emits the typed id for an option and resets to the placeholder', async () => {
+      const user = userEvent.setup();
+      const onChange = renderAction();
+
+      await user.click(trigger());
+      await user.click(await screen.findByRole('option', { name: 'Rent' }));
+
+      expect(onChange).toHaveBeenCalledExactlyOnceWith(2);
+      expect(trigger()).toHaveTextContent('Set category…');
+    });
+
+    it('fires again when the same option is picked twice', async () => {
+      const user = userEvent.setup();
+      const onChange = renderAction();
+
+      for (let i = 0; i < 2; i += 1) {
+        await user.click(trigger());
+        await user.click(await screen.findByRole('option', { name: 'Groceries' }));
+      }
+
+      expect(onChange).toHaveBeenNthCalledWith(1, 1);
+      expect(onChange).toHaveBeenNthCalledWith(2, 1);
+    });
   });
 });
