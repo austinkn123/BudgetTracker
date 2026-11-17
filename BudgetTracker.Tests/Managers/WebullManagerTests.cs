@@ -233,6 +233,63 @@ public class WebullManagerTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => BuildSut().RefreshAsync(UserId));
     }
 
+    // ── The portfolio-fetch metric event (3006) ─────────────────────────────
+
+    private const int PortfolioFetchFinishedEvent = 3006;
+
+    [Fact]
+    public async Task Refresh_FetchSucceeds_LogsOneMetricEventWithOutcomeAndDuration()
+    {
+        _connections.SetupSequence(c => c.GetAsync(UserId)).ReturnsAsync(NormalSnapshot).ReturnsAsync(FinalSnapshot);
+        _engine.Setup(e => e.DecideRefresh(NormalSnapshot, IsUtcNow())).Returns(WebullRefreshAction.FetchBalances);
+        _connections.Setup(c => c.GetAccessTokenAsync(UserId)).ReturnsAsync(AccessTokenLookup.Found(Token));
+        _webull.Setup(w => w.GetPortfolioAsync(Token, It.IsAny<CancellationToken>())).ReturnsAsync(Portfolio);
+        StubSavePortfolio();
+        StubFinalView(FinalSnapshot, View(WebullState.Connected));
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().RefreshAsync(UserId);
+
+        var metric = Assert.Single(logged, e => e.EventId == PortfolioFetchFinishedEvent);
+        Assert.Equal(LogLevel.Information, metric.Level);
+        // Exactly these fields: no balance, symbol, account ID or token can ride along.
+        var fields = metric.Fields.Split('\n').ToDictionary(line => line[..line.IndexOf('=')], line => line[(line.IndexOf('=') + 1)..]);
+        Assert.Equal(new[] { "DurationMs", "Outcome", "UserId", "{OriginalFormat}" }.Order(), fields.Keys.Order());
+        Assert.Equal(UserId.ToString(), fields["UserId"]);
+        Assert.Equal("Completed", fields["Outcome"]);
+        Assert.True(long.Parse(fields["DurationMs"]) >= 0);
+    }
+
+    [Fact]
+    public async Task Refresh_FetchFails_LogsTheMetricEventAsFailed()
+    {
+        _connections.SetupSequence(c => c.GetAsync(UserId)).ReturnsAsync(NormalSnapshot).ReturnsAsync(NormalSnapshot);
+        _engine.Setup(e => e.DecideRefresh(NormalSnapshot, IsUtcNow())).Returns(WebullRefreshAction.FetchBalances);
+        _connections.Setup(c => c.GetAccessTokenAsync(UserId)).ReturnsAsync(AccessTokenLookup.Found(Token));
+        _webull.Setup(w => w.GetPortfolioAsync(Token, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new WebullApiException(WebullErrorKind.Unreachable, null, "failed", null));
+        _connections.Setup(c => c.SetLastErrorAsync(UserId, WebullErrorKind.Unreachable)).Returns(Task.CompletedTask);
+        StubFinalView(NormalSnapshot, View(WebullState.Connected) with { LastError = WebullErrorKind.Unreachable });
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().RefreshAsync(UserId);
+
+        Assert.Contains("Outcome=Failed", Assert.Single(logged, e => e.EventId == PortfolioFetchFinishedEvent).Fields);
+    }
+
+    [Fact]
+    public async Task Refresh_NothingDue_LogsNoMetricEvent()
+    {
+        _connections.Setup(c => c.GetAsync(UserId)).ReturnsAsync(NormalSnapshot);
+        _engine.Setup(e => e.DecideRefresh(NormalSnapshot, IsUtcNow())).Returns(WebullRefreshAction.None);
+        StubFinalView(NormalSnapshot, View(WebullState.Connected));
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().RefreshAsync(UserId);
+
+        Assert.DoesNotContain(logged, e => e.EventId == PortfolioFetchFinishedEvent);
+    }
+
     // ── StartVerificationAsync ──────────────────────────────────────────────
 
     [Theory]

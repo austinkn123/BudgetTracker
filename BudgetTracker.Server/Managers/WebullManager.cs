@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Engines;
@@ -140,14 +141,22 @@ public class WebullManager(
     /// <summary>Fetches balances and positions and saves them, dated in Eastern time. A Webull failure is stored, not thrown.</summary>
     private async Task FetchPortfolioAsync(int userId, string accessToken, DateTime now)
     {
+        var started = Stopwatch.GetTimestamp();
+        var outcome = WebullPortfolioFetchOutcome.Failed;
         try
         {
             var portfolio = await webull.GetPortfolioAsync(accessToken);
             await connections.SavePortfolioAsync(userId, portfolio, now, engine.ToEasternDate(now));
+            outcome = WebullPortfolioFetchOutcome.Completed;
         }
         catch (WebullApiException ex)
         {
             await RecordFailureAsync(userId, "portfolio", ex);
+        }
+        finally
+        {
+            // Also runs when another exception is on its way out, so every fetch is counted.
+            logger.PortfolioFetchFinished(userId, outcome, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds);
         }
     }
 
