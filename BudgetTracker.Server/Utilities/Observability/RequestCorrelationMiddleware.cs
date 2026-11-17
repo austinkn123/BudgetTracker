@@ -27,7 +27,7 @@ public sealed class RequestCorrelationMiddleware(RequestDelegate next, ILogger<R
 
         // Amazon.Lambda.AspNetCoreServer puts the invocation's ILambdaContext in Items; it is absent when running locally.
         var lambdaContext = context.Items[AbstractAspNetCoreFunction.LAMBDA_CONTEXT] as ILambdaContext;
-        var scope = new RequestLogScope(correlationId, lambdaContext?.AwsRequestId);
+        var scope = new RequestLogScope(correlationId, lambdaContext?.AwsRequestId, XRayTrace.RootId(lambdaContext?.TraceId));
         scope.AttachTo(context);
 
         using (logger.BeginScope(scope))

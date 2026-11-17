@@ -15,6 +15,9 @@ public sealed class RequestLogScope : IReadOnlyList<KeyValuePair<string, object?
     /// <summary>Scope key for the Lambda invocation's request ID.</summary>
     public const string AwsRequestIdKey = "AwsRequestId";
 
+    /// <summary>Scope key for the AWS X-Ray trace ID of the Lambda invocation.</summary>
+    public const string XRayTraceIdKey = "XRayTraceId";
+
     /// <summary>Scope key for the internal BudgetTracker user ID.</summary>
     public const string UserIdKey = "UserId";
 
@@ -23,10 +26,12 @@ public sealed class RequestLogScope : IReadOnlyList<KeyValuePair<string, object?
     /// <summary>Creates the scope for one request.</summary>
     /// <param name="correlationId">The request's correlation ID.</param>
     /// <param name="awsRequestId">The Lambda request ID, or <c>null</c> when not running in Lambda.</param>
-    public RequestLogScope(string correlationId, string? awsRequestId)
+    /// <param name="xrayTraceId">The X-Ray root trace ID, or <c>null</c> when the request is not traced.</param>
+    public RequestLogScope(string correlationId, string? awsRequestId, string? xrayTraceId = null)
     {
         CorrelationId = correlationId;
         AwsRequestId = awsRequestId;
+        XRayTraceId = xrayTraceId;
     }
 
     /// <summary>The request's correlation ID.</summary>
@@ -34,6 +39,9 @@ public sealed class RequestLogScope : IReadOnlyList<KeyValuePair<string, object?
 
     /// <summary>The Lambda request ID, or <c>null</c> when not running in Lambda.</summary>
     public string? AwsRequestId { get; }
+
+    /// <summary>The X-Ray root trace ID, or <c>null</c> when the request is not traced.</summary>
+    public string? XRayTraceId { get; }
 
     /// <summary>The internal user ID, once the request is authenticated and the user resolved.</summary>
     public int? UserId { get; internal set; }
@@ -61,9 +69,11 @@ public sealed class RequestLogScope : IReadOnlyList<KeyValuePair<string, object?
 
     private List<KeyValuePair<string, object?>> Entries()
     {
-        var entries = new List<KeyValuePair<string, object?>>(3) { new(CorrelationIdKey, CorrelationId) };
+        var entries = new List<KeyValuePair<string, object?>>(4) { new(CorrelationIdKey, CorrelationId) };
         if (AwsRequestId is not null)
             entries.Add(new(AwsRequestIdKey, AwsRequestId));
+        if (XRayTraceId is not null)
+            entries.Add(new(XRayTraceIdKey, XRayTraceId));
         if (UserId is not null)
             entries.Add(new(UserIdKey, UserId));
         return entries;

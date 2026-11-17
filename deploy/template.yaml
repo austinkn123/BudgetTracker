@@ -31,6 +31,9 @@ Resources:
       Architectures: [arm64]
       MemorySize: 512
       Timeout: 30
+      # Lambda traces each invocation with X-Ray (duration, cold-start time). SAM adds the X-Ray write permissions to
+      # the role. No X-Ray SDK is used in the app; each log line carries the trace ID as XRayTraceId instead.
+      Tracing: Active
       Environment:
         Variables:
           ASPNETCORE_ENVIRONMENT: !Ref AspNetCoreEnvironment

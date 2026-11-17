@@ -37,6 +37,38 @@ public class RequestLogScopeTests
     }
 
     [Fact]
+    public async Task Should_IncludeTheXRayTraceId_InScope_When_LambdaTracedTheRequest()
+    {
+        var lambda = new Mock<ILambdaContext>();
+        lambda.SetupGet(l => l.AwsRequestId).Returns("lambda-req-1");
+        lambda.SetupGet(l => l.TraceId).Returns("Root=1-5759e988-bd862e3fe1be46a994272793;Parent=53995c3f42cd8ad8;Sampled=1");
+        await using var host = await StartHostAsync(
+            beforePipeline: ctx => ctx.Items[AbstractAspNetCoreFunction.LAMBDA_CONTEXT] = lambda.Object);
+
+        await SendAsync(host, "/anonymous", correlationId: "corr-1");
+
+        var scope = ObservabilityTestHost.ScopeValues(ProbeRecord(host));
+        Assert.Equal("1-5759e988-bd862e3fe1be46a994272793", scope[RequestLogScope.XRayTraceIdKey]);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Root=not-a-trace-id")]
+    public async Task Should_OmitTheXRayTraceId_When_LambdaGivesNoneOrAMalformedOne(string? traceId)
+    {
+        var lambda = new Mock<ILambdaContext>();
+        lambda.SetupGet(l => l.AwsRequestId).Returns("lambda-req-1");
+        lambda.SetupGet(l => l.TraceId).Returns(traceId!);
+        await using var host = await StartHostAsync(
+            beforePipeline: ctx => ctx.Items[AbstractAspNetCoreFunction.LAMBDA_CONTEXT] = lambda.Object);
+
+        await SendAsync(host, "/anonymous", correlationId: "corr-1");
+
+        var scope = ObservabilityTestHost.ScopeValues(ProbeRecord(host));
+        Assert.False(scope.ContainsKey(RequestLogScope.XRayTraceIdKey));
+    }
+
+    [Fact]
     public async Task Should_OmitLambdaRequestIdAndUserId_When_LocalAndAnonymous()
     {
         await using var host = await StartHostAsync();
@@ -47,6 +79,7 @@ public class RequestLogScopeTests
         Assert.Equal("corr-2", scope[RequestLogScope.CorrelationIdKey]);
         Assert.False(scope.ContainsKey(RequestLogScope.AwsRequestIdKey));
         Assert.False(scope.ContainsKey(RequestLogScope.UserIdKey));
+        Assert.False(scope.ContainsKey(RequestLogScope.XRayTraceIdKey));
     }
 
     [Fact]
