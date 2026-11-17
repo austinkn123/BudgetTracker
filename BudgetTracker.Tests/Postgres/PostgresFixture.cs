@@ -24,6 +24,10 @@ public sealed class PostgresFixture : IAsyncLifetime
     /// <summary>The name of the database this fixture created.</summary>
     public string DatabaseName => _databaseName;
 
+    /// <summary>The test database's connection string, for tests that build their own context options.</summary>
+    public string ConnectionString =>
+        _connectionString ?? throw new InvalidOperationException("The PostgreSQL test database was not created.");
+
     /// <summary>A new context on the test database. The caller disposes it.</summary>
     /// <returns>A context with an empty change tracker and its own connection.</returns>
     public BudgetTrackerDbContext CreateContext() =>
