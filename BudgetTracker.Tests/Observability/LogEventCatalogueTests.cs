@@ -27,7 +27,7 @@ public class LogEventCatalogueTests
         select (c.Catalogue, c.Base, method, message);
 
     [Fact]
-    public void Should_FindTheWholeCatalogue() => Assert.Equal(28, Messages().Count());
+    public void Should_FindTheWholeCatalogue() => Assert.Equal(29, Messages().Count());
 
     [Fact]
     public void Should_GiveEveryMessageAUniqueEventId()

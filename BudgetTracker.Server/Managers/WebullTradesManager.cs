@@ -38,8 +38,11 @@ public class WebullTradesManager(
             return NotSetUp(now);
 
         var snapshot = await connections.GetAsync(userId);
-        if (engine.BuildView(true, snapshot, now).State == WebullState.Connected)
-            await FetchPagesAsync(userId, AccountIds(snapshot), now, started);
+        if (engine.BuildView(true, snapshot, now).State == WebullState.Connected
+            && await FetchPagesAsync(userId, AccountIds(snapshot), now, started) is var (outcome, pages, orderCount))
+        {
+            logger.OrderSyncFinished(userId, outcome, pages, orderCount, (long)_clock.GetElapsedTime(started).TotalMilliseconds);
+        }
 
         return await StatusAsync(userId, now);
     }
@@ -59,14 +62,17 @@ public class WebullTradesManager(
     /// the third in a row is a failure. A failure saves the failed progress (no orders), records TokenRejected on the
     /// connection, and ends the call.
     /// </summary>
-    private async Task FetchPagesAsync(int userId, IReadOnlyList<string> accountIds, DateTime now, long started)
+    /// <returns>How the call ended and what it fetched, for the sync metric; null when the token could not be read, so nothing ran.</returns>
+    private async Task<(WebullOrderSyncOutcome Outcome, int Pages, int Orders)?> FetchPagesAsync(
+        int userId, IReadOnlyList<string> accountIds, DateTime now, long started)
     {
         if (await ReadTokenAsync(userId) is not { } accessToken)
-            return;
+            return null;
 
         var syncs = (await orders.GetSyncsAsync(userId)).ToDictionary(s => s.AccountId);
         var savedOrders = await orders.GetOrdersAsync(userId);
         var pages = 0;
+        var fetchedOrders = 0;
         var throttled = 0;
         foreach (var accountId in accountIds)
         {
@@ -76,7 +82,7 @@ public class WebullTradesManager(
             while (syncEngine.NextWindow(sync, accountOrders, now) is { } window)
             {
                 if (pages >= MaxPagesPerCall || _clock.GetElapsedTime(started) >= TimeBox)
-                    return;
+                    return (WebullOrderSyncOutcome.CutShort, pages, fetchedOrders);
 
                 WebullOrderPage page;
                 try
@@ -97,15 +103,18 @@ public class WebullTradesManager(
                     await orders.SavePageAsync(userId, syncEngine.Fail(sync, ex.Kind), []);
                     if (ex.Kind == WebullErrorKind.TokenRejected)
                         await connections.SetLastErrorAsync(userId, WebullErrorKind.TokenRejected);
-                    return;
+                    return (WebullOrderSyncOutcome.Failed, pages, fetchedOrders);
                 }
 
                 pages++;
+                fetchedOrders += page.Orders.Count;
                 throttled = 0;
                 sync = syncEngine.Advance(sync, window, page.NextPaginationKey);
                 await orders.SavePageAsync(userId, sync, page.Orders);
             }
         }
+
+        return (WebullOrderSyncOutcome.Completed, pages, fetchedOrders);
     }
 
     /// <summary>The stored token, or null after recording TokenRejected when it is missing or unreadable.</summary>

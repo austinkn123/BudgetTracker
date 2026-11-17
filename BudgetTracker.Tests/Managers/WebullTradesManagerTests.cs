@@ -432,6 +432,117 @@ public class WebullTradesManagerTests
         _connections.Verify(c => c.SetLastErrorAsync(UserId, WebullErrorKind.TokenRejected), Times.Once);
     }
 
+    // ── SyncAsync: the metric event (3005) ──────────────────────────────────
+
+    private const int OrderSyncFinishedEvent = 3005;
+
+    [Fact]
+    public async Task Sync_Finished_LogsOneMetricEventWithPagesOrdersAndDuration()
+    {
+        StubConnected();
+        var done = Empty("ACC1") with { CoveredFrom = Window(1, null).Start, CoveredTo = Window(1, null).End };
+        _syncEngine.Setup(s => s.NextWindow(Empty("ACC1"), It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns(Window(1, "k"));
+        // One 429 back-off, so the fake clock gives a known duration.
+        StubFetches("ACC1", Window(1, "k"), TooManyRequests(), Page("P1", null));
+        _syncEngine.Setup(s => s.Advance(Empty("ACC1"), Window(1, "k"), null)).Returns(done);
+        StubSave(done, Page("P1", null).Orders);
+        _syncEngine.Setup(s => s.NextWindow(done, It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns((WebullOrderWindow?)null);
+        _syncEngine.Setup(s => s.NextWindow(SavedSyncs[0], It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns((WebullOrderWindow?)null);
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(UserId);
+
+        var metric = Assert.Single(logged, e => e.EventId == OrderSyncFinishedEvent);
+        Assert.Equal(LogLevel.Information, metric.Level);
+        Assert.Contains($"UserId={UserId}", metric.Fields);
+        Assert.Contains("Outcome=Completed", metric.Fields);
+        Assert.Contains("Pages=1", metric.Fields);
+        Assert.Contains("Orders=1", metric.Fields);
+        Assert.Contains("DurationMs=2500", metric.Fields);
+    }
+
+    [Fact]
+    public async Task Sync_MetricEvent_CarriesCountsOnly_NeverOrderData()
+    {
+        StubConnected();
+        var done = Empty("ACC1") with { CoveredFrom = Window(1, null).Start, CoveredTo = Window(1, null).End };
+        _syncEngine.Setup(s => s.NextWindow(Empty("ACC1"), It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns(Window(1, null));
+        StubFetch("ACC1", Window(1, null), Page("P1", null));
+        _syncEngine.Setup(s => s.Advance(Empty("ACC1"), Window(1, null), null)).Returns(done);
+        StubSave(done, Page("P1", null).Orders);
+        _syncEngine.Setup(s => s.NextWindow(done, It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns((WebullOrderWindow?)null);
+        _syncEngine.Setup(s => s.NextWindow(SavedSyncs[0], It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns((WebullOrderWindow?)null);
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(UserId);
+
+        // Exactly these fields: no symbol, price, quantity, account ID or token can ride along.
+        var names = Assert.Single(logged, e => e.EventId == OrderSyncFinishedEvent).Fields
+            .Split('\n').Select(line => line[..line.IndexOf('=')]).Order();
+        Assert.Equal(new[] { "DurationMs", "Orders", "Outcome", "Pages", "UserId", "{OriginalFormat}" }.Order(), names);
+    }
+
+    [Fact]
+    public async Task Sync_WebullFailure_LogsTheMetricEventAsFailed_WithThePagesAlreadySaved()
+    {
+        StubConnected();
+        var paging = Empty("ACC1") with { Window = Window(1, "k") };
+        var failed = paging with { Window = Window(1, null), LastError = WebullErrorKind.Unreachable };
+        var exception = new WebullApiException(WebullErrorKind.Unreachable, null, "Webull failed with HTTP 500: no error_code.", HttpStatusCode.InternalServerError);
+        _syncEngine.Setup(s => s.NextWindow(Empty("ACC1"), It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns(Window(1, null));
+        StubFetch("ACC1", Window(1, null), Page("P1", "k"));
+        _syncEngine.Setup(s => s.Advance(Empty("ACC1"), Window(1, null), "k")).Returns(paging);
+        StubSave(paging, Page("P1", "k").Orders);
+        _syncEngine.Setup(s => s.NextWindow(paging, It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns(Window(1, "k"));
+        _history.Setup(h => h.GetOrderPageAsync(Token, "ACC1", Window(1, "k"), It.IsAny<CancellationToken>())).ThrowsAsync(exception);
+        _syncEngine.Setup(s => s.Fail(paging, WebullErrorKind.Unreachable)).Returns(failed);
+        StubSave(failed, []);
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(UserId);
+
+        var metric = Assert.Single(logged, e => e.EventId == OrderSyncFinishedEvent);
+        Assert.Contains("Outcome=Failed", metric.Fields);
+        Assert.Contains("Pages=1", metric.Fields);
+        Assert.Contains("Orders=1", metric.Fields);
+    }
+
+    [Fact]
+    public async Task Sync_TimeBoxRunsOut_LogsTheMetricEventAsCutShort()
+    {
+        StubConnected();
+        var paging = Empty("ACC1") with { Window = Window(1, "k") };
+        _syncEngine.Setup(s => s.NextWindow(Empty("ACC1"), It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns(Window(1, null));
+        StubFetches("ACC1", Window(1, null), Page("P1", "k"));
+        _syncEngine.Setup(s => s.Advance(Empty("ACC1"), Window(1, null), "k")).Returns(paging);
+        var p1Orders = Page("P1", "k").Orders;
+        _orders.Setup(o => o.SavePageAsync(UserId, paging, p1Orders))
+            .Callback(() => _clock.Advance(TimeSpan.FromSeconds(15)))
+            .Returns(Task.CompletedTask);
+        _syncEngine.Setup(s => s.NextWindow(paging, It.IsAny<IReadOnlyList<WebullOrder>>(), Now)).Returns(Window(1, "k"));
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(UserId);
+
+        var metric = Assert.Single(logged, e => e.EventId == OrderSyncFinishedEvent);
+        Assert.Contains("Outcome=CutShort", metric.Fields);
+        Assert.Contains("Pages=1", metric.Fields);
+        Assert.Contains("DurationMs=15000", metric.Fields);
+    }
+
+    [Fact]
+    public async Task Sync_UnreadableToken_LogsNoMetricEvent_BecauseNothingRan()
+    {
+        StubConnected();
+        _connections.Setup(c => c.GetAccessTokenAsync(UserId)).ReturnsAsync(AccessTokenLookup.Undecryptable);
+        _connections.Setup(c => c.SetLastErrorAsync(UserId, WebullErrorKind.TokenRejected)).Returns(Task.CompletedTask);
+        var logged = TestLoggers.Capture(_logger);
+
+        await BuildSut().SyncAsync(UserId);
+
+        Assert.DoesNotContain(logged, e => e.EventId == OrderSyncFinishedEvent);
+    }
+
     // ── SyncAsync: when nothing is fetched ──────────────────────────────────
 
     [Theory]
