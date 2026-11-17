@@ -61,6 +61,92 @@ Resources:
       LogGroupName: !Sub /aws/lambda/${BudgetTrackerFunction}
       RetentionInDays: 14
 
+  # Saved CloudWatch Logs Insights queries (Logs Insights > Saved queries > BudgetTracker). They read the JSON log
+  # lines the app writes: top-level EventId / LogLevel / Category / Message, the message's fields under State.*, and
+  # the request scope (CorrelationId, UserId, XRayTraceId). Event IDs are catalogued in
+  # BudgetTracker.Server/Utilities/Observability/*Log.cs; a test fails if a query names one that no longer exists.
+  FindRequestQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: BudgetTracker/Find a request by correlation ID
+      LogGroupNames:
+        - !Ref BudgetTrackerLogGroup
+      QueryString: |
+        # Replace PASTE-CORRELATION-ID with the X-Correlation-ID from the browser console or an error response.
+        fields @timestamp, LogLevel, EventId, Category, Message
+        | filter @message like /"CorrelationId":"PASTE-CORRELATION-ID"/
+        | sort @timestamp asc
+
+  WarningsAndErrorsQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: BudgetTracker/Warnings and errors
+      LogGroupNames:
+        - !Ref BudgetTrackerLogGroup
+      QueryString: |
+        fields @timestamp, LogLevel, EventId, Category, Message
+        | filter LogLevel in ["Warning", "Error", "Critical"]
+        | sort @timestamp desc
+        | limit 200
+
+  UnhandledExceptionsQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: BudgetTracker/Unhandled exceptions
+      LogGroupNames:
+        - !Ref BudgetTrackerLogGroup
+      QueryString: |
+        fields @timestamp, State.ExceptionType, State.Method, State.Path, State.StackTrace
+        | filter EventId = 1004
+        | sort @timestamp desc
+        | limit 100
+
+  SecurityEventsQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: BudgetTracker/Security events
+      LogGroupNames:
+        - !Ref BudgetTrackerLogGroup
+      QueryString: |
+        # Failed sign-ins (1001) and denied requests (1002), per hour. A spike is the signal.
+        filter Category = "BudgetTracker.Security"
+        | stats count() as events by bin(1h), EventId, State.StatusCode
+        | sort events desc
+
+  SlowDatabaseCommandsQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: BudgetTracker/Slow database commands
+      LogGroupNames:
+        - !Ref BudgetTrackerLogGroup
+      QueryString: |
+        filter EventId = 1006
+        | stats count() as times, avg(State.DurationMs) as avgMs, max(State.DurationMs) as maxMs by State.Statement, State.Tables
+        | sort times desc
+
+  PlaidSyncOutcomesQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: BudgetTracker/Plaid sync outcomes
+      LogGroupNames:
+        - !Ref BudgetTrackerLogGroup
+      QueryString: |
+        filter EventId = 2017
+        | stats count() as syncs, avg(State.DurationMs) as avgMs, max(State.DurationMs) as maxMs, sum(State.Inserted) as inserted, sum(State.Updated) as updated, sum(State.Removed) as removed by State.Outcome
+        | sort syncs desc
+
+  WebullSyncOutcomesQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: BudgetTracker/Webull sync outcomes
+      LogGroupNames:
+        - !Ref BudgetTrackerLogGroup
+      QueryString: |
+        # 3005 = order-history sync, 3006 = portfolio fetch.
+        filter EventId in [3005, 3006]
+        | stats count() as runs, avg(State.DurationMs) as avgMs, max(State.DurationMs) as maxMs by EventId, State.Outcome
+        | sort runs desc
+
 Outputs:
   FunctionUrl:
     Description: Public URL of the app. Set /budgettracker/Plaid/WebhookUrl to <this>api/plaid/webhook.

@@ -1,6 +1,3 @@
-using System.Reflection;
-using BudgetTracker.Domain.Common;
-using BudgetTracker.Server.Utilities.Observability;
 using Microsoft.Extensions.Logging;
 
 namespace BudgetTracker.Tests.Observability;
@@ -11,20 +8,7 @@ namespace BudgetTracker.Tests.Observability;
 /// </summary>
 public class LogEventCatalogueTests
 {
-    private static readonly (Type Catalogue, int Base)[] Catalogues =
-    [
-        (typeof(ObservabilityLog), LogEvents.ObservabilityBase),
-        (typeof(PlaidLog), LogEvents.PlaidBase),
-        (typeof(WebullLog), LogEvents.WebullBase),
-        (typeof(DataLog), LogEvents.DataBase),
-    ];
-
-    private static IEnumerable<(Type Catalogue, int Base, MethodInfo Method, LoggerMessageAttribute Message)> Messages() =>
-        from c in Catalogues
-        from method in c.Catalogue.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
-        let message = method.GetCustomAttribute<LoggerMessageAttribute>()
-        where message is not null
-        select (c.Catalogue, c.Base, method, message);
+    private static IEnumerable<LogCatalogue.Entry> Messages() => LogCatalogue.All();
 
     [Fact]
     public void Should_FindTheWholeCatalogue() => Assert.Equal(30, Messages().Count());
