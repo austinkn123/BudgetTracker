@@ -174,6 +174,20 @@ Reconnect uses Plaid update mode, which keeps the same Item, so no new Trial slo
 would use one. In Development, `POST /api/plaid/sandbox/connections/{plaidItemId}/reset-login` forces the state on a
 sandbox Item for testing; the next sync flags it.
 
+## Checking on the app
+
+- **Is it up?** `GET <FunctionUrl>health` returns 200 without sign-in and never touches the database.
+- **Can it reach the database?** `GET <FunctionUrl>health/ready` with a signed-in user's token returns 200, or 503 if
+  the database does not answer. Call it by hand only: polling it would keep Neon from scaling to zero.
+- **Logs:** CloudWatch Logs Insights > Saved queries > `BudgetTracker/` has seven queries that deploy with the stack:
+  find a request by correlation ID, warnings and errors, unhandled exceptions, security events, slow database
+  commands, and Plaid and Webull sync outcomes. The correlation ID is in the browser console line for a failed request
+  and in the `correlationId` field of an error response.
+- **Traces:** X-Ray tracing is on (`Tracing: Active`). Each log line carries the trace as `XRayTraceId`. X-Ray bills
+  per trace recorded beyond its free tier.
+
+The deploying identity needs `logs:PutQueryDefinition` for the saved queries.
+
 ## Notes and caveats
 
 - **Stored Plaid tokens from before this change can't be decrypted.** The Data Protection key ring moved from the

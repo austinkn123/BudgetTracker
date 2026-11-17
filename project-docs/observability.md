@@ -3,9 +3,8 @@
 The logging, monitoring, and health-check plan for BudgetTracker: what exists today, what we've
 decided, and the phased work to get there.
 
-> **Status: Phase 1 implemented.** Phase 2, the deferred email alerts, Phase 3, and the
-> multi-user checklist (§8) are still to do. Items marked *Proposed* inside the plan still need
-> approval.
+> **Status: Phases 1 and 2 implemented.** The deferred email alerts, Phase 3, and the multi-user
+> checklist (§8) are still to do. Items marked *Proposed* inside the plan still need approval.
 
 BudgetTracker runs as a single AWS Lambda behind a Function URL (`deploy/template.yaml`), backed
 by Neon Postgres. Lambda output goes to the CloudWatch log group `/aws/lambda/<function>`, kept
@@ -22,8 +21,12 @@ for 14 days. See [`deploy/README.md`](../deploy/README.md) for the hosting setup
   `UseBudgetTrackerRequestUser()`. The last one sits between `UseAuthentication` and
   `UseAuthorization`.
 - **Logging:** built-in `Microsoft.Extensions.Logging` with the JSON console formatter and scopes
-  on. Each scope carries `CorrelationId`, `AwsRequestId`, and `UserId`. No Serilog, no
-  OpenTelemetry.
+  on. Each scope carries `CorrelationId`, `AwsRequestId`, `XRayTraceId`, and `UserId`. No Serilog,
+  no OpenTelemetry.
+- **Log messages:** every message is a source-generated `[LoggerMessage]` method with a stable
+  event ID. They live in four catalogues: `ObservabilityLog` (1000s), `PlaidLog` (2000s), and
+  `WebullLog` (3000s) in `BudgetTracker.Server/Utilities/Observability/`, and `DataLog` (4000s) in
+  `BudgetTracker.Domain/Common/`. IDs are never reused or renumbered.
 - **Where `ILogger` is used:** only in Managers and background services — `PlaidManager` (which
   also covers sandbox seeding), `WebullManager`, `WebullTradesManager`, `PlaidSyncSweepService`,
   and `WebullCloseSnapshotService`. Endpoints, Engines, and Accessors don't log.
@@ -33,21 +36,38 @@ for 14 days. See [`deploy/README.md`](../deploy/README.md) for the hosting setup
   of `[A-Za-z0-9-_.]`; otherwise it generates a new GUID. The ID is echoed on every response.
 - **Error shapes:** `Result<T>.Error` is still free text, and endpoints still return errors in
   mixed shapes.
-- **Health:** anonymous `/health`, with no database call. No `/health/ready` yet.
+- **Health:** anonymous `/health`, with no database call. `/health/ready` requires sign-in and
+  checks that the database answers (see §4).
 - **Security signal:** the `BudgetTracker.Security` log category records failed JWT
   authentication and 401/403 responses: status, method, and path. For exceptions, only the type
   name is logged.
 - **Production log levels:** EF `Database.Command` and `HttpClient` are capped at `Warning`
   outside Development. This is set in code.
 - **EF Core:** sensitive-data logging is not enabled. This is good, and we keep it that way.
-- **Redaction:** none yet (see §3 and Phase 2).
+- **Redaction:** on. A `[LoggerMessage]` parameter tagged `[FinancialData]`, `[CredentialData]`,
+  or `[PersonalData]` (`DataClassifications.cs`) is erased before it is written. No log message
+  carries a tagged field today; this is the safety net for when one does.
+- **Slow queries:** `SlowQueryInterceptor` warns (event 1006) when a database command takes at
+  least `Observability:SlowQuery:ThresholdMs` (default 500). It logs the duration, statement type,
+  and table names, never the SQL text or parameter values.
+- **Sync metrics:** one Information event per sync with outcome, counts, and duration, and no
+  financial data: Plaid transaction sync (2017), Webull order-history sync (3005), and Webull
+  portfolio fetch (3006).
+- **Tracing:** the Lambda has `Tracing: Active`, so the Lambda service records an X-Ray trace per
+  invocation. The app uses no X-Ray SDK: it is in maintenance mode and ends support on
+  2027-02-25. Traces therefore have no per-call timings for Plaid, Webull, or the database; that
+  waits for OpenTelemetry (Phase 3).
+- **Saved queries:** seven Logs Insights queries deploy with the stack (`deploy/template.yaml`),
+  under "BudgetTracker/" in Saved queries.
 
 ### Frontend
 
 - The API client ([`budgettracker.client/src/shared/api.ts`](../budgettracker.client/src/shared/api.ts))
   sends a per-request `X-Correlation-ID`. Failed requests are logged to the console as method,
   path (no query string), status, and correlation ID.
-- No React `ErrorBoundary` yet.
+- An `ErrorBoundary` (`src/shared/components/ErrorBoundary.tsx`) wraps each routed page and the
+  whole app. A render error shows a fallback with "Try again" and "Reload page"; navigating to
+  another page clears it. The error stays in the browser console.
 
 ---
 
@@ -89,7 +109,7 @@ the default is to log **less**.
 | Endpoint | Auth | Checks | Caller |
 |---|---|---|---|
 | `/health` | Anonymous | Process is up. **No database call.** | Anything, including automated probes. |
-| `/health/ready` | Not decided | Includes a database check. | **Manual only.** |
+| `/health/ready` | Signed-in users | The database accepts a connection. 200 or 503, with no detail in the body. | **Manual only.** |
 
 `/health/ready` must not be polled: regular database calls keep Neon from scaling to zero.
 
@@ -144,13 +164,14 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 - `/health` returns 200 without sign-in.
 - A `FakeLogger` test (from `Microsoft.Extensions.Diagnostics.Testing`) checks that the correlation fields are present and that no PII appears.
 
-### Phase 2
+### Phase 2 — done
 
 - Source-generated `LoggerMessage` methods with event IDs.
 - Redaction tags on sensitive fields.
 - `/health/ready`.
 - An EF Core slow-query interceptor.
-- AWS X-Ray tracing.
+- AWS X-Ray tracing. Done as Lambda active tracing plus the trace ID on each log line; the X-Ray
+  SDK was left out (see §1, Tracing).
 - The `ErrorBoundary` (fallback screen only; see §6).
 - Plaid and Webull sync metrics.
 - Saved CloudWatch Logs Insights queries.
