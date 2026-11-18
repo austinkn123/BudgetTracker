@@ -213,6 +213,15 @@ const TransactionRow = ({
             </span>
           )}
 
+          {/* Overridden: keep what Plaid suggested in view, for a later "remap all similar". */}
+          {transaction.categoryId != null &&
+            transaction.plaidCategoryPrimary &&
+            suggestion?.id !== transaction.categoryId && (
+              <span className="text-xs text-ink-muted">
+                Plaid suggested {suggestion?.name ?? formatPlaidCategory(transaction.plaidCategoryPrimary)}
+              </span>
+            )}
+
           {editingNote ? (
             // Native <input>: inline-edit note cell (Enter commits, Escape reverts); Input is react-hook-form-bound.
             <input
