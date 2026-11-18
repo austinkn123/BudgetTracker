@@ -40,7 +40,8 @@ const ToggleGroup = <TValue extends string = string>({
       }}
       aria-label={ariaLabel}
       className={cn(
-        'relative isolate inline-flex items-center gap-0.5 rounded-md border border-border bg-background p-0.5 shadow-xs',
+        // Scrolls in place when the options outgrow a phone, instead of widening the page.
+        'relative isolate inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-border bg-background p-0.5 shadow-xs [scrollbar-width:none]',
         className,
       )}
     >

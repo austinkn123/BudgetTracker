@@ -216,21 +216,24 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
           </Tooltip>
 
           <Tooltip title="Settings">
-            <NavLink
-              to="/settings"
-              aria-label="Settings"
-              className={({ isActive }) =>
-                cn(
-                  'focus-ring inline-flex items-center justify-center rounded-full transition-all duration-240 ease-out-soft motion-reduce:transition-none',
-                  isActive
-                    ? 'bg-white/[0.12] text-primary-light'
-                    : 'text-white/45 hover:bg-white/[0.06] hover:text-white/90',
-                  compact ? 'h-8 w-8' : 'h-9 w-9',
-                )
-              }
-            >
-              <Settings size={16} />
-            </NavLink>
+            {/* Span, not the NavLink, is the trigger — see CompactTip. */}
+            <span className="inline-flex">
+              <NavLink
+                to="/settings"
+                aria-label="Settings"
+                className={({ isActive }) =>
+                  cn(
+                    'focus-ring inline-flex items-center justify-center rounded-full transition-all duration-240 ease-out-soft motion-reduce:transition-none',
+                    isActive
+                      ? 'bg-white/[0.12] text-primary-light'
+                      : 'text-white/45 hover:bg-white/[0.06] hover:text-white/90',
+                    compact ? 'h-8 w-8' : 'h-9 w-9',
+                  )
+                }
+              >
+                <Settings size={16} />
+              </NavLink>
+            </span>
           </Tooltip>
 
           {loadingUser ? (

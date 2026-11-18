@@ -145,7 +145,8 @@ const CategoryDrillGrid = ({ cards, rangeFilter, transactionLimit }: CategoryDri
                     expanded && 'bg-primary/[0.04]',
                   )}
                 >
-                  <td className="px-6 py-3">
+                  {/* Phones only: max-w-0 + w-full lets the name truncate instead of widening the table. */}
+                  <td className="w-full max-w-0 px-6 py-3 sm:w-auto sm:max-w-none">
                     <div className="flex items-center gap-2.5">
                       {/* Status tick — the only colour in the row until something drifts */}
                       <span
