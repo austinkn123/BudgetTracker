@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { fetchAuthSession, getCurrentUser, signIn, signOut } from 'aws-amplify/auth';
+import { confirmSignIn, fetchAuthSession, getCurrentUser, signIn, signOut } from 'aws-amplify/auth';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthProvider } from './AuthContext';
@@ -10,6 +10,7 @@ vi.mock('aws-amplify/auth', () => ({
   getCurrentUser: vi.fn(),
   fetchAuthSession: vi.fn(),
   signIn: vi.fn(),
+  confirmSignIn: vi.fn(),
   signOut: vi.fn(),
   resetPassword: vi.fn(),
   confirmResetPassword: vi.fn(),
@@ -77,5 +78,104 @@ describe('AuthProvider signIn', () => {
     expect(signOut).not.toHaveBeenCalled();
     expect(signIn).toHaveBeenCalledTimes(1);
     expect(result.current.user).toBeNull();
+  });
+});
+
+describe('AuthProvider TOTP MFA', () => {
+  const signedInSession = () => {
+    vi.mocked(fetchAuthSession).mockResolvedValue({
+      tokens: { idToken: { toString: () => 'id-token' } },
+    } as never);
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      username: 'user-1',
+      userId: 'user-1',
+      signInDetails: { loginId: 'me@example.com' },
+    });
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getCurrentUser).mockRejectedValueOnce(new Error('No current user'));
+  });
+
+  it('asks for a code, then signs in once the code is confirmed', async () => {
+    vi.mocked(signIn).mockResolvedValue({
+      isSignedIn: false,
+      nextStep: { signInStep: 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' },
+    } as never);
+    vi.mocked(confirmSignIn).mockResolvedValue({ isSignedIn: true, nextStep: { signInStep: 'DONE' } });
+    const { result } = await renderAuth();
+
+    let step: unknown;
+    await act(async () => {
+      step = await result.current.signIn('me@example.com', 'hunter22');
+    });
+    expect(step).toEqual({ step: 'totp' });
+    expect(result.current.isAuthenticated).toBe(false);
+
+    signedInSession();
+    await act(() => result.current.confirmMfa('123456'));
+
+    expect(confirmSignIn).toHaveBeenCalledWith({ challengeResponse: '123456' });
+    expect(result.current.isAuthenticated).toBe(true);
+  });
+
+  it('hands back the secret and setup link when an authenticator must be set up', async () => {
+    vi.mocked(signIn).mockResolvedValue({
+      isSignedIn: false,
+      nextStep: {
+        signInStep: 'CONTINUE_SIGN_IN_WITH_TOTP_SETUP',
+        totpSetupDetails: {
+          sharedSecret: 'SECRET123',
+          getSetupUri: (app: string, account?: string) =>
+            new URL(`otpauth://totp/${app}:${account}?secret=SECRET123`),
+        },
+      },
+    } as never);
+    const { result } = await renderAuth();
+
+    let step: unknown;
+    await act(async () => {
+      step = await result.current.signIn('me@example.com', 'hunter22');
+    });
+
+    expect(step).toEqual({
+      step: 'totpSetup',
+      sharedSecret: 'SECRET123',
+      setupUri: 'otpauth://totp/BudgetTracker:me@example.com?secret=SECRET123',
+    });
+  });
+
+  it('picks TOTP when Cognito asks which MFA to set up', async () => {
+    vi.mocked(signIn).mockResolvedValue({
+      isSignedIn: false,
+      nextStep: { signInStep: 'CONTINUE_SIGN_IN_WITH_MFA_SETUP_SELECTION', allowedMFATypes: ['EMAIL', 'TOTP'] },
+    } as never);
+    vi.mocked(confirmSignIn).mockResolvedValue({
+      isSignedIn: false,
+      nextStep: { signInStep: 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' },
+    } as never);
+    const { result } = await renderAuth();
+
+    let step: unknown;
+    await act(async () => {
+      step = await result.current.signIn('me@example.com', 'hunter22');
+    });
+
+    expect(confirmSignIn).toHaveBeenCalledWith({ challengeResponse: 'TOTP' });
+    expect(step).toEqual({ step: 'totp' });
+  });
+
+  it('stays signed out when the code is wrong', async () => {
+    vi.mocked(signIn).mockResolvedValue({
+      isSignedIn: false,
+      nextStep: { signInStep: 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' },
+    } as never);
+    vi.mocked(confirmSignIn).mockRejectedValue(amplifyError('CodeMismatchException', 'Invalid code received for user'));
+    const { result } = await renderAuth();
+    await act(() => result.current.signIn('me@example.com', 'hunter22'));
+
+    await expect(result.current.confirmMfa('000000')).rejects.toThrow('Invalid code received for user');
+    expect(result.current.isAuthenticated).toBe(false);
   });
 });

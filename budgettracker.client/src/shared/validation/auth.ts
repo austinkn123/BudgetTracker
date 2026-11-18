@@ -16,6 +16,12 @@ export const loginSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
+export const mfaCodeSchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+
+export type MfaCodeFormData = z.infer<typeof mfaCodeSchema>;
+
 export const forgotPasswordSchema = z.object({
   email: emailSchema,
 });
