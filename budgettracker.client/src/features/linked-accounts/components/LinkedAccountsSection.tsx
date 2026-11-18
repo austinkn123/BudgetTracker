@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Alert, Button, Card, ConfirmModal, Spinner } from '../../../shared/components/ui';
+import { Alert, Button, Card, ConfirmModal, InlineCheckbox, Spinner } from '../../../shared/components/ui';
 import type { PlaidConnectionView } from '../../../shared/types/api';
 import { useLinkedAccounts } from '../hooks/useLinkedAccounts';
 import LinkedAccountCard from './LinkedAccountCard';
@@ -34,6 +34,12 @@ const LinkedAccountsSection = () => {
   } = useLinkedAccounts();
 
   const [pendingDisconnect, setPendingDisconnect] = useState<PlaidConnectionView | null>(null);
+  const [deleteTransactions, setDeleteTransactions] = useState(false);
+
+  const openDisconnect = (connection: PlaidConnectionView | null) => {
+    setDeleteTransactions(false);
+    setPendingDisconnect(connection);
+  };
 
   const isLinking =
     isPreparingLink || isExchanging || linkToken !== null || reconnectingItemId !== null;
@@ -41,9 +47,9 @@ const LinkedAccountsSection = () => {
 
   const handleConfirmDisconnect = async () => {
     if (!pendingDisconnect) return;
-    await disconnect(pendingDisconnect.plaidItemId);
+    await disconnect(pendingDisconnect.plaidItemId, deleteTransactions);
     // Close on failure too: the error Alert below the list explains what happened.
-    setPendingDisconnect(null);
+    openDisconnect(null);
   };
 
   const addLabel = isPreparingLink ? 'Preparing…' : isExchanging ? 'Linking…' : 'Add institution';
@@ -91,7 +97,7 @@ const LinkedAccountsSection = () => {
                 isDisconnecting={disconnectingItemId === connection.plaidItemId}
                 disabled={isBusy}
                 onReconnect={prepareReconnect}
-                onDisconnect={setPendingDisconnect}
+                onDisconnect={openDisconnect}
               />
             </li>
           ))}
@@ -127,15 +133,28 @@ const LinkedAccountsSection = () => {
         title={`Disconnect ${pendingDisconnect?.institutionName ?? 'this bank'}?`}
         message={
           <>
-            Imported transactions stay in your history, but no new transactions will sync from{' '}
-            <strong>{pendingDisconnect?.institutionName ?? 'it'}</strong> afterwards. Your other
-            linked banks aren't affected.
+            <span className="block">
+              {deleteTransactions
+                ? 'Every transaction imported from '
+                : 'Imported transactions stay in your history, but no new transactions will sync from '}
+              <strong>{pendingDisconnect?.institutionName ?? 'it'}</strong>
+              {deleteTransactions ? ' will be deleted. This can’t be undone.' : ' afterwards.'} Your other
+              linked banks aren't affected.
+            </span>
+            <label className="mt-4 flex items-center gap-2.5 text-ink">
+              <InlineCheckbox
+                checked={deleteTransactions}
+                onCheckedChange={setDeleteTransactions}
+                ariaLabel={`Also delete transactions imported from ${pendingDisconnect?.institutionName ?? 'this bank'}`}
+              />
+              Also delete its imported transactions
+            </label>
           </>
         }
-        confirmLabel="Disconnect"
+        confirmLabel={deleteTransactions ? 'Disconnect and delete' : 'Disconnect'}
         destructive
         isPending={disconnectingItemId !== null}
-        onCancel={() => setPendingDisconnect(null)}
+        onCancel={() => openDisconnect(null)}
         onConfirm={handleConfirmDisconnect}
       />
     </Card>

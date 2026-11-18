@@ -371,7 +371,7 @@ public class PlaidManager(
     }
 
     /// <inheritdoc />
-    public async Task<Result> DisconnectAsync(int userId, int plaidItemId)
+    public async Task<Result> DisconnectAsync(int userId, int plaidItemId, bool deleteTransactions)
     {
         var lookup = await itemAccessor.GetActiveAccessTokenAsync(userId, plaidItemId);
         switch (lookup.Status)
@@ -399,6 +399,10 @@ public class PlaidManager(
 
         if (!await itemAccessor.DeactivateAsync(userId, plaidItemId))
             return Result.Failure(ConnectionNotFoundMessage);
+
+        // After deactivating, so a sync racing the disconnect can't re-import what was just deleted.
+        if (deleteTransactions)
+            await transactionAccessor.DeleteImportedByPlaidItemAsync(userId, plaidItemId);
 
         await dataVersion.BumpAsync(userId);
         return Result.Success();

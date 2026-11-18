@@ -139,6 +139,34 @@ describe('LinkedAccountsSection', () => {
     expect(apiMock.delete).not.toHaveBeenCalled();
   });
 
+  it('keeps imported transactions unless the delete box is checked', async () => {
+    const user = userEvent.setup();
+    apiMock.get.mockResolvedValue({ data: [CHASE, ALLY] });
+    apiMock.delete.mockResolvedValue({ data: undefined });
+
+    renderSection();
+
+    await user.click(await screen.findByRole('button', { name: 'Disconnect Ally Bank' }));
+    let dialog = await screen.findByRole('dialog', { name: 'Disconnect Ally Bank?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Disconnect' }));
+    await waitFor(() =>
+      expect(apiMock.delete).toHaveBeenLastCalledWith(`/plaid/connections/${ALLY.plaidItemId}`, {
+        params: { deleteTransactions: false },
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Disconnect Chase' }));
+    dialog = await screen.findByRole('dialog', { name: 'Disconnect Chase?' });
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Also delete transactions imported from Chase' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Disconnect and delete' }));
+    await waitFor(() =>
+      expect(apiMock.delete).toHaveBeenLastCalledWith(`/plaid/connections/${CHASE.plaidItemId}`, {
+        params: { deleteTransactions: true },
+      }),
+    );
+  });
+
   it('shows the server message when re-linking an already-linked bank, and it can be dismissed', async () => {
     const user = userEvent.setup();
     apiMock.get.mockResolvedValue({ data: [CHASE] });

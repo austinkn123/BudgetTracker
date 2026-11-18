@@ -183,7 +183,9 @@ describe('useLinkedAccounts', () => {
       await waitFor(() => expect(result.current.disconnectingItemId).toBe(ALLY.plaidItemId));
       expect(result.current.disconnectingItemId).not.toBe(CHASE.plaidItemId);
       expect(apiMock.delete).toHaveBeenCalledTimes(1);
-      expect(apiMock.delete).toHaveBeenCalledWith(`/plaid/connections/${ALLY.plaidItemId}`);
+      expect(apiMock.delete).toHaveBeenCalledWith(`/plaid/connections/${ALLY.plaidItemId}`, {
+        params: { deleteTransactions: false },
+      });
 
       await act(async () => {
         pendingDelete.resolve({ data: undefined });
@@ -192,6 +194,19 @@ describe('useLinkedAccounts', () => {
 
       await waitFor(() => expect(result.current.disconnectingItemId).toBeNull());
       expect(result.current.errorMessage).toBeNull();
+    });
+
+    it('asks the server to delete imported transactions when told to', async () => {
+      apiMock.delete.mockResolvedValue({ data: undefined });
+
+      const { result } = renderLinkedAccounts(queryClient);
+      await waitFor(() => expect(result.current.connections).toHaveLength(2));
+
+      await act(() => result.current.disconnect(CHASE.plaidItemId, true));
+
+      expect(apiMock.delete).toHaveBeenCalledWith(`/plaid/connections/${CHASE.plaidItemId}`, {
+        params: { deleteTransactions: true },
+      });
     });
 
     it('clears disconnectingItemId and reports an error when the delete fails', async () => {

@@ -404,4 +404,20 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
         await context.SaveChangesAsync();
         return toRemove.Count;
     }
+
+    /// <inheritdoc />
+    public async Task<int> DeleteImportedByPlaidItemAsync(int userId, int plaidItemId)
+    {
+        var plaidAccountIds = context.PlaidAccounts
+            .Where(a => a.PlaidItemId == plaidItemId && a.Item.UserId == userId)
+            .Select(a => a.PlaidAccountId);
+
+        var toRemove = await context.Transactions
+            .Where(t => t.IsImported && t.PlaidAccountId != null && plaidAccountIds.Contains(t.PlaidAccountId))
+            .ToListAsync();
+
+        context.Transactions.RemoveRange(toRemove);
+        await context.SaveChangesAsync();
+        return toRemove.Count;
+    }
 }

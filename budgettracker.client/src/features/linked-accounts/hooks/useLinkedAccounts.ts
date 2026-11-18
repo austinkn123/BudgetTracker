@@ -64,7 +64,7 @@ export interface UseLinkedAccountsResult {
   /** Re-pull transactions from every linked institution. */
   refresh: () => Promise<void>;
   /** Revoke a single institution. */
-  disconnect: (plaidItemId: number) => Promise<void>;
+  disconnect: (plaidItemId: number, deleteTransactions?: boolean) => Promise<void>;
   /** Dismiss the current error message. */
   clearError: () => void;
 }
@@ -149,7 +149,8 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: plaidService.disconnect,
+    mutationFn: ({ plaidItemId, deleteTransactions }: { plaidItemId: number; deleteTransactions: boolean }) =>
+      plaidService.disconnect(plaidItemId, deleteTransactions),
     onSuccess: () => {
       setErrorMessage(null);
       void queryClient.invalidateQueries({ queryKey: PLAID_CONNECTIONS_QUERY_KEY });
@@ -218,9 +219,9 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
     }
   }, [reconnectingItemId, reconnectedMutation, refresh, exchangeMutation]);
 
-  const disconnect = useCallback(async (plaidItemId: number) => {
+  const disconnect = useCallback(async (plaidItemId: number, deleteTransactions = false) => {
     try {
-      await disconnectMutation.mutateAsync(plaidItemId);
+      await disconnectMutation.mutateAsync({ plaidItemId, deleteTransactions });
     } catch {
       /* surfaced via errorMessage */
     }
@@ -234,7 +235,7 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
     isExchanging: exchangeMutation.isPending,
     isSyncing: syncMutation.isPending,
     reconnectingItemId,
-    disconnectingItemId: disconnectMutation.isPending ? (disconnectMutation.variables ?? null) : null,
+    disconnectingItemId: disconnectMutation.isPending ? (disconnectMutation.variables?.plaidItemId ?? null) : null,
     errorMessage,
     lastSync,
     prepareLink,

@@ -64,8 +64,11 @@ export const plaidService = {
     return response.data;
   },
 
-  /** Revoke one institution server-side (Plaid /item/remove) and soft-delete its PlaidItem row. */
-  disconnect: async (plaidItemId: number): Promise<void> => {
-    await api.delete(`/plaid/connections/${plaidItemId}`);
+  /**
+   * Revoke one institution server-side (Plaid /item/remove) and soft-delete its PlaidItem row. With
+   * deleteTransactions, the transactions imported from it are deleted too.
+   */
+  disconnect: async (plaidItemId: number, deleteTransactions = false): Promise<void> => {
+    await api.delete(`/plaid/connections/${plaidItemId}`, { params: { deleteTransactions } });
   },
 };

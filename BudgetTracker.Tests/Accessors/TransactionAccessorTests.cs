@@ -592,4 +592,47 @@ public class TransactionAccessorTests : IDisposable
         Assert.Equal(("Income", (int?)null), (reverted.TransactionType, reverted.TransferAccountId));
         Assert.Equal("Expense", (await ReloadAsync(4)).TransactionType);
     }
+
+    // ── DeleteImportedByPlaidItemAsync ──────────────────────────────────────
+
+    private async Task SeedItemAsync(int itemId, int userId, params string[] plaidAccountIds)
+    {
+        _context.PlaidItems.Add(new PlaidItem
+        {
+            Id = itemId, UserId = userId, PlaidItemId = $"item-{itemId}", InstitutionId = "ins", InstitutionName = "Bank",
+            AccessTokenEncrypted = "x",
+            Accounts = plaidAccountIds.Select(id => new PlaidAccount { PlaidAccountId = id, Name = id, AccountType = "depository" }).ToList()
+        });
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+    }
+
+    [Fact]
+    public async Task Should_DeleteOnlyThatItemsImportedRows_When_DeletingImportedByPlaidItem()
+    {
+        await SeedItemAsync(11, UserId, "chk", "card");
+        await SeedItemAsync(12, UserId, "other");
+        await SeedAsync(
+            Row(1, plaidId: "p1", plaidAccountId: "chk"),
+            Row(2, plaidId: "p2", plaidAccountId: "card"),
+            Row(3, plaidId: null, plaidAccountId: "chk"),
+            Row(4, plaidId: "p4", plaidAccountId: "other"));
+
+        var deleted = await BuildSut().DeleteImportedByPlaidItemAsync(UserId, 11);
+
+        Assert.Equal(2, deleted);
+        Assert.Equal([3, 4], await _context.Transactions.Select(t => t.Id).OrderBy(id => id).ToListAsync());
+    }
+
+    [Fact]
+    public async Task Should_DeleteNothing_When_ThePlaidItemBelongsToAnotherUser()
+    {
+        await SeedItemAsync(11, userId: 6, "chk");
+        await SeedAsync(Row(1, plaidId: "p1", plaidAccountId: "chk"));
+
+        var deleted = await BuildSut().DeleteImportedByPlaidItemAsync(UserId, 11);
+
+        Assert.Equal(0, deleted);
+        Assert.Equal(1, await _context.Transactions.CountAsync());
+    }
 }

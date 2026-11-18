@@ -64,22 +64,33 @@ public class PlaidConnectionEndpointTests
     [Fact]
     public async Task DeleteConnection_Success_Returns204()
     {
-        _manager.Setup(m => m.DisconnectAsync(5, 11)).ReturnsAsync(Result.Success());
+        _manager.Setup(m => m.DisconnectAsync(5, 11, false)).ReturnsAsync(Result.Success());
 
-        var result = await PlaidEndpoints.DeleteConnectionAsync(11, _manager.Object, _currentUser.Object);
+        var result = await PlaidEndpoints.DeleteConnectionAsync(11, false, _manager.Object, _currentUser.Object);
 
         Assert.Equal(StatusCodes.Status204NoContent, StatusOf(result));
-        _manager.Verify(m => m.DisconnectAsync(5, 11), Times.Once);
+        _manager.Verify(m => m.DisconnectAsync(5, 11, false), Times.Once);
     }
 
     [Fact]
     public async Task DeleteConnection_NotFoundNotOwnedOrInactive_Returns404()
     {
-        _manager.Setup(m => m.DisconnectAsync(5, 99)).ReturnsAsync(Result.Failure("Bank connection not found"));
+        _manager.Setup(m => m.DisconnectAsync(5, 99, false)).ReturnsAsync(Result.Failure("Bank connection not found"));
 
-        var result = await PlaidEndpoints.DeleteConnectionAsync(99, _manager.Object, _currentUser.Object);
+        var result = await PlaidEndpoints.DeleteConnectionAsync(99, false, _manager.Object, _currentUser.Object);
 
         Assert.Equal(StatusCodes.Status404NotFound, StatusOf(result));
+    }
+
+    [Fact]
+    public async Task Should_PassDeleteTransactionsThrough_When_DeletingAConnection()
+    {
+        _manager.Setup(m => m.DisconnectAsync(5, 11, true)).ReturnsAsync(Result.Success());
+
+        var result = await PlaidEndpoints.DeleteConnectionAsync(11, true, _manager.Object, _currentUser.Object);
+
+        Assert.Equal(StatusCodes.Status204NoContent, StatusOf(result));
+        _manager.Verify(m => m.DisconnectAsync(5, 11, true), Times.Once);
     }
 
     // ── POST /connections/{plaidItemId}/link-token ──────────────────────────
