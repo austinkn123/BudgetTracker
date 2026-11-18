@@ -41,7 +41,7 @@ const BudgetTable = ({ lines, months, income, plan, actual }: BudgetTableProps) 
           <th className="px-3 py-2.5 text-right font-semibold">{months === 1 ? 'Spent' : 'Avg / mo'}</th>
           <th className="px-3 py-2.5 text-right font-semibold">Plan / mo</th>
           <th className="hidden w-56 px-3 py-2.5 font-semibold md:table-cell">Avg as % of plan</th>
-          <th className="px-5 py-2.5 font-semibold">Status</th>
+          <th className="hidden px-5 py-2.5 font-semibold sm:table-cell">Status</th>
         </tr>
       </thead>
       {groupLines(lines).map((group) => {
@@ -69,6 +69,8 @@ const BudgetTable = ({ lines, months, income, plan, actual }: BudgetTableProps) 
                   <td className="px-5 py-3">
                     <p className="font-medium text-ink">{line.name}</p>
                     {detail && <p className="text-xs text-ink-muted">{detail}</p>}
+                    {/* Status column is hidden on phones; it rides under the name instead. */}
+                    <p className={cn('mt-0.5 text-xs font-semibold sm:hidden', TONE_TEXT[status.tone])}>{status.label}</p>
                   </td>
                   <td className="numeric px-3 py-3 text-right text-ink-muted">{currency.format(line.actualMonthly)}</td>
                   <td className="numeric px-3 py-3 text-right font-semibold text-ink">
@@ -83,7 +85,7 @@ const BudgetTable = ({ lines, months, income, plan, actual }: BudgetTableProps) 
                       />
                     )}
                   </td>
-                  <td className={cn('px-5 py-3 text-xs font-semibold', TONE_TEXT[status.tone])}>{status.label}</td>
+                  <td className={cn('hidden px-5 py-3 text-xs font-semibold sm:table-cell', TONE_TEXT[status.tone])}>{status.label}</td>
                 </tr>
               );
             })}

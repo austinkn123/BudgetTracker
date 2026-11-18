@@ -47,7 +47,7 @@ export interface InputProps<TFieldValues extends FieldValues> {
 }
 
 const CONTROL_CLASSES =
-  'focus-ring w-full rounded-lg border border-border bg-surface text-[14px] text-ink shadow-xs transition-colors duration-120 placeholder:text-ink-muted/60 hover:border-border-strong disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-muted';
+  'focus-ring w-full rounded-lg border border-border bg-surface text-[16px] text-ink shadow-xs transition-colors duration-120 sm:text-[14px] placeholder:text-ink-muted/60 hover:border-border-strong disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-muted';
 
 const ERROR_CLASSES = 'border-error focus-visible:border-error focus-visible:ring-error/25';
 

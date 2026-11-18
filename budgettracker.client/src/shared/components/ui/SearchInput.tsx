@@ -22,7 +22,7 @@ const SearchInput = ({ value, onChange, placeholder, ariaLabel, className }: Sea
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
       aria-label={ariaLabel}
-      className="focus-ring h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[14px] text-ink shadow-xs transition-colors duration-120 hover:border-border-strong placeholder:text-ink-muted/60"
+      className="focus-ring h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[16px] text-ink sm:text-[14px] shadow-xs transition-colors duration-120 hover:border-border-strong placeholder:text-ink-muted/60"
     />
     {value && (
       <button

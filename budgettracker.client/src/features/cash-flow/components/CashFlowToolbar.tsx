@@ -70,7 +70,7 @@ const CashFlowToolbar = ({ controls, connections, categories }: CashFlowToolbarP
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex max-w-full flex-wrap items-center gap-2">
           <ToggleGroup<CashFlowRangeKey>
             value={controls.range}
             // Custom only takes effect once dates are applied; until then the old range stays.
