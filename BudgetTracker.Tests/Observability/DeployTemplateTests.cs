@@ -8,7 +8,8 @@ namespace BudgetTracker.Tests.Observability;
 /// </summary>
 public class DeployTemplateTests
 {
-    private static readonly string Template = File.ReadAllText(FindTemplate());
+    // A Windows checkout has CRLF endings; the patterns below match on \n.
+    private static readonly string Template = File.ReadAllText(FindTemplate()).ReplaceLineEndings("\n");
 
     [Fact]
     public void Should_TurnOnActiveXRayTracing_ForTheFunction() =>
