@@ -1,5 +1,6 @@
 import api from '../api';
 import type { BudgetAnalysis } from '../types/api';
+import { localToday } from '../utils/localToday';
 
 export const budgetAnalysisService = {
   /**
@@ -8,7 +9,7 @@ export const budgetAnalysisService = {
    */
   getAnalysis: async (from: string, to: string, trendMonths: number): Promise<BudgetAnalysis> => {
     const response = await api.get<BudgetAnalysis>('/budget-analysis', {
-      params: { from, to, trendMonths },
+      params: { from, to, trendMonths, today: localToday() },
     });
     return response.data;
   },
