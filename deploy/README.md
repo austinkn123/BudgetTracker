@@ -188,6 +188,26 @@ sandbox Item for testing; the next sync flags it.
 
 The deploying identity needs `logs:PutQueryDefinition` for the saved queries.
 
+### Email alerts
+
+Two alarms email you: when the Lambda crashes or times out, and when a request fails with an unhandled exception
+(HTTP 500). Each emails again when it recovers. An optional monthly cost budget emails at 80% of actual and 100% of
+forecast spend. The budget covers the whole AWS account, not just this stack.
+
+Pass the address and budget on the command line. `parameter_overrides` replaces the whole list, so repeat the
+existing two:
+
+```bash
+sam deploy --parameter-overrides \
+  SsmParameterPath=/budgettracker AspNetCoreEnvironment=Production \
+  AlertEmail=you@example.com MonthlyBudgetUsd=10
+```
+
+Don't add them with `sam deploy --guided`: it saves its answers to `samconfig.toml`, which is committed.
+
+After the deploy, AWS emails a confirmation link. Nothing is sent until you click it. With `AlertEmail` empty (the
+default) the alarms still exist in CloudWatch but email nobody, and with `MonthlyBudgetUsd` 0 no budget is created.
+
 ## Notes and caveats
 
 - **Stored Plaid tokens from before this change can't be decrypted.** The Data Protection key ring moved from the

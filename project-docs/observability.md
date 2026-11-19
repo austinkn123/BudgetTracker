@@ -3,7 +3,7 @@
 The logging, monitoring, and health-check plan for BudgetTracker: what exists today, what we've
 decided, and the phased work to get there.
 
-> **Status: Phases 1 and 2 implemented.** The deferred email alerts, Phase 3, and the multi-user
+> **Status: Phases 1 and 2 and the email alerts are implemented.** Phase 3 and the multi-user
 > checklist (§8) are still to do. Items marked *Proposed* inside the plan still need approval.
 
 BudgetTracker runs as a single AWS Lambda behind a Function URL (`deploy/template.yaml`), backed
@@ -178,14 +178,21 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
 
 **Tests:** one for each item above.
 
-### Deferred: email alerts
+### Email alerts — done
 
-Not set up yet; until then, problems are found by checking the CloudWatch logs. When added:
+In `deploy/template.yaml`, all emailing the `budgettracker-alerts` SNS topic:
 
-- CloudWatch alarms on the Lambda `Errors` metric and on a 5xx metric filter, notifying through an
-  SNS topic with an **email** subscription.
-- Optional: an AWS Budgets cost alert by email, to catch runaway costs from a bug or from abuse of
-  the public Function URL.
+- `budgettracker-function-errors`: the Lambda `Errors` metric, for crashes and timeouts.
+- `budgettracker-server-errors`: a log metric filter counting event 1004, which the exception handler
+  writes for every 500 response. A handled 500 still completes the invocation, so `Errors` alone
+  would miss it. It counts from the app's logs rather than the Function URL `Url5xxCount` metric,
+  whose dimensions are not clearly documented; a wrong dimension would be an alarm that never fires.
+- Each alarm fires on the first occurrence in a 5-minute window, and emails again on recovery.
+- Optional AWS Budgets cost alert: 80% of actual and 100% of forecast monthly cost. It covers the
+  whole account, to catch runaway costs from a bug or abuse of the public Function URL.
+
+The address (`AlertEmail`) and budget (`MonthlyBudgetUsd`) are deploy parameters, so neither is
+committed. Empty or 0 means no email subscription and no budget. See `deploy/README.md`.
 
 ### Phase 3
 
