@@ -481,6 +481,40 @@ public class TransactionAccessorTests : IDisposable
         Assert.Equal("Expense", (await ReloadAsync(1)).TransactionType);
     }
 
+    [Fact]
+    public async Task Upsert_RowTheUserCategorized_KeepsTheUsersCategory_WhenPlaidSuggestsAnother()
+    {
+        // BUD-9: "my choice sticks on future syncs of the same transaction".
+        await SeedAsync(Row(1, plaidId: "p1", plaidCategory: "GENERAL_MERCHANDISE", categoryId: 7));
+
+        await BuildSut().UpsertImportedAsync([Row(0, plaidId: "p1", plaidCategory: "FOOD_AND_DRINK", categoryId: 9)]);
+
+        Assert.Equal(7, (await ReloadAsync(1)).CategoryId);
+    }
+
+    [Fact]
+    public async Task Upsert_KeepsPlaidsLatestSuggestion_AlongsideTheUsersCategory()
+    {
+        // BUD-9: the original suggestion stays visible after an override, so it is stored, not discarded.
+        await SeedAsync(Row(1, plaidId: "p1", plaidCategory: "GENERAL_MERCHANDISE", categoryId: 7));
+
+        await BuildSut().UpsertImportedAsync([Row(0, plaidId: "p1", plaidCategory: "FOOD_AND_DRINK", categoryId: 9)]);
+
+        var row = await ReloadAsync(1);
+        Assert.Equal("FOOD_AND_DRINK", row.PlaidCategoryPrimary);
+        Assert.Equal(7, row.CategoryId);
+    }
+
+    [Fact]
+    public async Task Upsert_UncategorizedRow_TakesTheIncomingCategory()
+    {
+        await SeedAsync(Row(1, plaidId: "p1", categoryId: null));
+
+        await BuildSut().UpsertImportedAsync([Row(0, plaidId: "p1", categoryId: 9)]);
+
+        Assert.Equal(9, (await ReloadAsync(1)).CategoryId);
+    }
+
     // ── Reads ───────────────────────────────────────────────────────────────
 
     [Fact]
