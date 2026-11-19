@@ -30,6 +30,7 @@ public static class CashFlowEndpoints
     /// <param name="search">Payee/notes substring.</param>
     /// <param name="manager">Cash-flow workflow.</param>
     /// <param name="currentUser">The authenticated user.</param>
+    /// <param name="today">The caller's local date (yyyy-MM-dd); used when within a day of UTC, else the UTC date.</param>
     /// <returns>The HTTP result.</returns>
     public static async Task<IResult> GetAsync(
         DateTime? from,
@@ -41,7 +42,8 @@ public static class CashFlowEndpoints
         int? categoryId,
         string? search,
         ICashFlowManager manager,
-        ICurrentUserProvider currentUser)
+        ICurrentUserProvider currentUser,
+        DateTime? today = null)
     {
         // Match on names: Enum.TryParse alone would also accept "7" or "Day,Week".
         if (groupBy is null || !Enum.GetNames<CashFlowGrouping>().Contains(groupBy, StringComparer.OrdinalIgnoreCase))
@@ -52,7 +54,8 @@ public static class CashFlowEndpoints
             currentUser.UserId,
             new CashFlowQuery(
                 WallClock.Unzoned(from), WallClock.Unzoned(to), grouping, WallClock.Unzoned(compareFrom), WallClock.Unzoned(compareTo),
-                plaidAccountId, categoryId, search));
+                plaidAccountId, categoryId, search),
+            WallClock.Unzoned(today));
 
         return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(new { error = result.Error });
     }

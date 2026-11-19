@@ -106,7 +106,7 @@ public class BudgetAnalysisManagerTests
         var priorFrom = PriorMonth;
         var priorTo = PriorMonth.AddMonths(1).AddDays(-1);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, priorFrom, priorTo, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, priorFrom, priorTo, trendMonths: 3, clientToday: null);
 
         Assert.True(result.IsSuccess);
         var planMonth = result.Value!.PlanMonth;
@@ -116,13 +116,30 @@ public class BudgetAnalysisManagerTests
     }
 
     [Fact]
+    public async Task GetAnalysis_PacesByTheClientsLocalDay_NotTheUtcDay()
+    {
+        // In the US evening UTC is already tomorrow; pacing must count the user's own day.
+        var localToday = DateTime.UtcNow.Date.AddDays(-1);
+        var localMonth = new DateTime(localToday.Year, localToday.Month, 1);
+        StubLedger([]);
+        _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([Plan(isActive: true, monthsBeforeNow: 6)]);
+
+        var result = await BuildSut().GetAnalysisAsync(
+            UserId, localMonth, localMonth.AddMonths(1).AddDays(-1), trendMonths: 3, clientToday: localToday);
+
+        var pacing = result.Value!.PlanMonth!.Pacing;
+        Assert.Equal(localMonth, result.Value.PlanMonth.AnalyzedMonth);
+        Assert.Equal(localToday.Day, pacing.DaysElapsed);
+    }
+
+    [Fact]
     public async Task GetAnalysis_OpenEndedAllTimeWindow_AnalysesTheCurrentMonth()
     {
         // The dashboard's ALL range sends 9999-12-31; stepping a month past it used to overflow DateTime.
         StubLedger([Expense(1, -40m, CurrentMonth.AddDays(1))]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([Plan(isActive: true, monthsBeforeNow: 6)]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3, clientToday: null);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(CurrentMonth, result.Value!.PlanMonth!.AnalyzedMonth);
@@ -136,7 +153,7 @@ public class BudgetAnalysisManagerTests
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([plan]);
 
         var result = await BuildSut().GetAnalysisAsync(
-            UserId, PriorMonth, PriorMonth.AddMonths(1).AddDays(-1), trendMonths: 3);
+            UserId, PriorMonth, PriorMonth.AddMonths(1).AddDays(-1), trendMonths: 3, clientToday: null);
 
         var pacing = result.Value!.PlanMonth!.Pacing;
         // A month that has already ended is fully elapsed, so no days remain to spread spend over.
@@ -151,7 +168,7 @@ public class BudgetAnalysisManagerTests
         StubLedger([Expense(1, -40m, InsideMonth)]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([plan]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         var pacing = result.Value!.PlanMonth!.Pacing;
         // Asking for the whole current month must not pretend the month is over.
@@ -167,7 +184,7 @@ public class BudgetAnalysisManagerTests
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([plan]);
 
         var result = await BuildSut().GetAnalysisAsync(
-            UserId, PriorMonth, PriorMonth.AddMonths(1).AddDays(-1), trendMonths: 3);
+            UserId, PriorMonth, PriorMonth.AddMonths(1).AddDays(-1), trendMonths: 3, clientToday: null);
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.PlanMonth);
@@ -180,7 +197,7 @@ public class BudgetAnalysisManagerTests
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId))
             .ReturnsAsync([Plan(isActive: false, "Stale"), Plan(isActive: true, "Current")]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Current", result.Value!.PlanMonth!.Plan.Name);
@@ -198,7 +215,7 @@ public class BudgetAnalysisManagerTests
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId))
             .ReturnsAsync([Plan(isActive: true, "Baseline", monthsBeforeNow: 3)]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         var performance = result.Value!.PlanMonth!;
         Assert.Equal("Baseline", performance.Plan.Name);
@@ -218,7 +235,7 @@ public class BudgetAnalysisManagerTests
             Plan(isActive: true, "Middle", monthsBeforeNow: 3, id: 3)
         ]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         Assert.Equal("Newest", result.Value!.PlanMonth!.Plan.Name);
     }
@@ -234,7 +251,7 @@ public class BudgetAnalysisManagerTests
             Plan(isActive: true, "Future", monthsBeforeNow: -1, id: 2)
         ]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         Assert.Equal("InForce", result.Value!.PlanMonth!.Plan.Name);
     }
@@ -246,7 +263,7 @@ public class BudgetAnalysisManagerTests
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId))
             .ReturnsAsync([Plan(isActive: false)]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.PlanMonth);
@@ -265,7 +282,7 @@ public class BudgetAnalysisManagerTests
         ]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         // Only transactions 2 and 3 fall inside, totalling 5.
         Assert.Equal(5m, Assert.Single(result.Value!.WindowSpend).Amount);
@@ -277,7 +294,7 @@ public class BudgetAnalysisManagerTests
         StubLedger([Expense(1, -10m, DateTime.UtcNow)]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 6);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 6, clientToday: null);
 
         // One category present, so the flat trend list is one row per requested month.
         Assert.Equal(6, result.Value!.MonthlyTrend.Count);
@@ -293,7 +310,7 @@ public class BudgetAnalysisManagerTests
         var windowFrom = PriorMonth.AddDays(4);
         var windowTo = PriorMonth.AddDays(9);
 
-        await BuildSut().GetAnalysisAsync(UserId, windowFrom, windowTo, trendMonths: 6);
+        await BuildSut().GetAnalysisAsync(UserId, windowFrom, windowTo, trendMonths: 6, clientToday: null);
 
         // Analysed month is PriorMonth (from `to`); its trend reaches back five more months and on to its last day.
         var filter = Assert.Single(_filters);
@@ -306,7 +323,7 @@ public class BudgetAnalysisManagerTests
         StubLedger([]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
 
-        await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3);
+        await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3, clientToday: null);
 
         // The ALL range no longer drags the whole ledger in: rows cover only the trend through the current month's end.
         Assert.Equal(
@@ -320,7 +337,7 @@ public class BudgetAnalysisManagerTests
         StubLedger([]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
 
-        await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3);
+        await BuildSut().GetAnalysisAsync(UserId, new DateTime(1970, 1, 1), new DateTime(9999, 12, 31), trendMonths: 3, clientToday: null);
 
         Assert.Equal((new DateTime(1970, 1, 1), new DateTime(9999, 12, 31)), Assert.Single(_totalWindows));
     }
@@ -332,7 +349,7 @@ public class BudgetAnalysisManagerTests
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
         var windowFrom = CurrentMonth.AddYears(-3);
 
-        await BuildSut().GetAnalysisAsync(UserId, windowFrom, To, trendMonths: 3);
+        await BuildSut().GetAnalysisAsync(UserId, windowFrom, To, trendMonths: 3, clientToday: null);
 
         Assert.Equal(new TransactionFilter(From: CurrentMonth.AddMonths(-2), To: To), Assert.Single(_filters));
         Assert.Equal((windowFrom, To), Assert.Single(_totalWindows));
@@ -349,7 +366,7 @@ public class BudgetAnalysisManagerTests
         StubLedger([Expense(1, -80m, InsideMonth), refund, transfer, income]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         Assert.Equal(new CategorySpend(1, 50m), Assert.Single(result.Value!.WindowSpend));
     }
@@ -363,7 +380,7 @@ public class BudgetAnalysisManagerTests
         StubLedger([old, Expense(2, -25m, InsideMonth)]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths: 3, clientToday: null);
 
         var series = result.Value!.MonthlyTrend.Where(p => p.CategoryId == 9).ToList();
         Assert.Equal(3, series.Count);
@@ -376,7 +393,7 @@ public class BudgetAnalysisManagerTests
     [InlineData(25)]
     public async Task Should_ReturnError_When_TrendMonthsIsOutOfRange(int trendMonths)
     {
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths, clientToday: null);
 
         Assert.False(result.IsSuccess);
         Assert.Contains("24", result.Error);
@@ -391,7 +408,7 @@ public class BudgetAnalysisManagerTests
         StubLedger([Expense(1, -10m, InsideMonth)]);
         _budgetPlanAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
 
-        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths);
+        var result = await BuildSut().GetAnalysisAsync(UserId, From, To, trendMonths, clientToday: null);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(trendMonths, result.Value!.MonthlyTrend.Count);

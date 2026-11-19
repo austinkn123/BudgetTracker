@@ -1,3 +1,4 @@
+using BudgetTracker.Server.Utilities;
 using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
 
@@ -23,15 +24,18 @@ public static class BudgetAnalysisEndpoints
     /// <param name="manager">Budget analysis workflow.</param>
     /// <param name="currentUser">The authenticated user.</param>
     /// <param name="trendMonths">Trend length in months; 3 by default.</param>
+    /// <param name="today">The caller's local date (yyyy-MM-dd); used when within a day of UTC, else the UTC date.</param>
     /// <returns>The HTTP result.</returns>
     public static async Task<IResult> GetAsync(
         DateTime from,
         DateTime to,
         IBudgetAnalysisManager manager,
         ICurrentUserProvider currentUser,
-        int? trendMonths)
+        int? trendMonths,
+        DateTime? today = null)
     {
-        var result = await manager.GetAnalysisAsync(currentUser.UserId, from, to, trendMonths ?? DefaultTrendMonths);
+        var result = await manager.GetAnalysisAsync(
+            currentUser.UserId, from, to, trendMonths ?? DefaultTrendMonths, WallClock.Unzoned(today));
         return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(new { error = result.Error });
     }
 }

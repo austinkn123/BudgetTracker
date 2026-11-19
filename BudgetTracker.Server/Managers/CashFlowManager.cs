@@ -14,7 +14,7 @@ public class CashFlowManager(
     IPlaidItemAccessor itemAccessor) : ICashFlowManager
 {
     /// <inheritdoc />
-    public async Task<Result<CashFlowReport>> GetReportAsync(int userId, CashFlowQuery query)
+    public async Task<Result<CashFlowReport>> GetReportAsync(int userId, CashFlowQuery query, DateTime? clientToday)
     {
         // One read covers the window and the compare window (either may start or end first). Rows after To only matter
         // to period balances, which need just their per-account sum, so the database aggregates them instead.
@@ -30,6 +30,6 @@ public class CashFlowManager(
         var postedAfterTo = await transactionAccessor.GetPostedSumByPlaidAccountAfterAsync(userId, query.To);
         var items = await itemAccessor.GetAllActiveByUserIdAsync(userId);
 
-        return engine.BuildReport(query, transactions, items.SelectMany(i => i.Accounts).ToList(), postedAfterTo, DateTime.UtcNow.Date);
+        return engine.BuildReport(query, transactions, items.SelectMany(i => i.Accounts).ToList(), postedAfterTo, LocalToday.Resolve(clientToday, DateTime.UtcNow));
     }
 }

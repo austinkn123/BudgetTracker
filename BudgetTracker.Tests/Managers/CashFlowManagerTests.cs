@@ -44,9 +44,27 @@ public class CashFlowManagerTests
         _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([]);
         StubEngine(query);
 
-        var result = await BuildSut().GetReportAsync(UserId, query);
+        var result = await BuildSut().GetReportAsync(UserId, query, clientToday: null);
 
         Assert.True(result.IsSuccess);
+        Assert.Same(Report, result.Value);
+    }
+
+    [Fact]
+    public async Task GetReport_PassesTheClientsLocalDate_AsToday()
+    {
+        var localToday = DateTime.UtcNow.Date.AddDays(-1);
+        var query = new CashFlowQuery(new DateTime(2026, 10, 1), new DateTime(2026, 10, 31), CashFlowGrouping.Week);
+        _txnAccessor.Setup(a => a.GetFilteredAsync(UserId, It.IsAny<TransactionFilter>())).ReturnsAsync([]);
+        StubTail(query.To);
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([]);
+        _engine.Setup(e => e.BuildReport(
+                query, It.IsAny<IReadOnlyList<Transaction>>(), It.IsAny<IReadOnlyList<PlaidAccount>>(),
+                It.IsAny<IReadOnlyDictionary<string, decimal>>(), localToday))
+            .Returns(Result<CashFlowReport>.Success(Report));
+
+        var result = await BuildSut().GetReportAsync(UserId, query, clientToday: localToday);
+
         Assert.Same(Report, result.Value);
     }
 
@@ -60,7 +78,7 @@ public class CashFlowManagerTests
         _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([]);
         StubEngine(query);
 
-        var result = await BuildSut().GetReportAsync(UserId, query);
+        var result = await BuildSut().GetReportAsync(UserId, query, clientToday: null);
 
         Assert.True(result.IsSuccess);
     }
@@ -87,7 +105,7 @@ public class CashFlowManagerTests
                 It.Is<DateTime>(today => today.TimeOfDay == TimeSpan.Zero)))
             .Returns(Result<CashFlowReport>.Success(Report));
 
-        var result = await BuildSut().GetReportAsync(UserId, query);
+        var result = await BuildSut().GetReportAsync(UserId, query, clientToday: null);
 
         Assert.True(result.IsSuccess);
     }
@@ -104,7 +122,7 @@ public class CashFlowManagerTests
                 It.IsAny<IReadOnlyDictionary<string, decimal>>(), It.IsAny<DateTime>()))
             .Returns(Result<CashFlowReport>.Failure("bad window"));
 
-        var result = await BuildSut().GetReportAsync(UserId, query);
+        var result = await BuildSut().GetReportAsync(UserId, query, clientToday: null);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("bad window", result.Error);
@@ -121,7 +139,7 @@ public class CashFlowManagerTests
         _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(UserId)).ReturnsAsync([]);
         StubEngine(query);
 
-        var result = await BuildSut().GetReportAsync(UserId, query);
+        var result = await BuildSut().GetReportAsync(UserId, query, clientToday: null);
 
         Assert.True(result.IsSuccess);
     }

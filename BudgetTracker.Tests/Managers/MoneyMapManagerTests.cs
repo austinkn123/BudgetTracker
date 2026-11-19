@@ -21,7 +21,8 @@ public class MoneyMapManagerTests
     private MoneyMapManager BuildSut(IMoneyMapEngine? engine = null) =>
         new(engine ?? _engine.Object, _txnAccessor.Object, _planAccessor.Object, _categoryAccessor.Object);
 
-    private static DateTime Today => DateTime.UtcNow.Date;
+    // Timezone-free, like stored transaction dates and the manager's own "today" (LocalToday).
+    private static DateTime Today => DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Unspecified);
 
     [Fact]
     public async Task Should_FetchOnlyTheHistoryTheEngineDescribes_AndHandItWithPlansAndCategoriesToTheEngine()
@@ -39,7 +40,27 @@ public class MoneyMapManagerTests
         _engine.Setup(e => e.Build(plans, It.Is<IReadOnlyList<Transaction>>(t => t.Single().Id == 2), categories, Today, 6))
             .Returns(Result<MoneyMap>.Success(map));
 
-        var result = await BuildSut().GetAsync(UserId, 6);
+        var result = await BuildSut().GetAsync(UserId, 6, clientToday: null);
+
+        Assert.Same(map, result.Value);
+    }
+
+    [Fact]
+    public async Task Should_UseTheClientsLocalDate_AsToday_When_ItIsTheEveningBeforeInUtc()
+    {
+        // 8 pm in Central is already tomorrow in UTC; the map must still be built for the user's today.
+        var localToday = Today.AddDays(-1);
+        var map = new MoneyMap("Plan", localToday, localToday, 6, 0m, 0m, [], []);
+        _planAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
+        _engine.Setup(e => e.DescribeHistory(It.IsAny<IEnumerable<BudgetPlan>>(), localToday, 6))
+            .Returns(Result<MoneyMapHistory>.Success(new MoneyMapHistory(localToday.AddMonths(-12), [], 6)));
+        var window = new TransactionFilter(From: localToday.AddMonths(-12), To: localToday);
+        _txnAccessor.Setup(a => a.GetFilteredAsync(UserId, window)).ReturnsAsync([]);
+        _categoryAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
+        _engine.Setup(e => e.Build(It.IsAny<IEnumerable<BudgetPlan>>(), It.IsAny<IReadOnlyList<Transaction>>(), It.IsAny<IEnumerable<Category>>(), localToday, 6))
+            .Returns(Result<MoneyMap>.Success(map));
+
+        var result = await BuildSut().GetAsync(UserId, 6, clientToday: localToday);
 
         Assert.Same(map, result.Value);
     }
@@ -51,7 +72,7 @@ public class MoneyMapManagerTests
         _engine.Setup(e => e.DescribeHistory(It.IsAny<IEnumerable<BudgetPlan>>(), Today, 99))
             .Returns(Result<MoneyMapHistory>.Failure("months must be between 1 and 24"));
 
-        var result = await BuildSut().GetAsync(UserId, 99);
+        var result = await BuildSut().GetAsync(UserId, 99, clientToday: null);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("months must be between 1 and 24", result.Error);
@@ -79,7 +100,7 @@ public class MoneyMapManagerTests
             .Callback<IEnumerable<BudgetPlan>, IReadOnlyList<Transaction>, IEnumerable<Category>, DateTime, int>((_, t, _, _, _) => handed = t)
             .Returns(Result<MoneyMap>.Success(new MoneyMap(null, Today, Today, 12, 0m, 0m, [], [])));
 
-        await BuildSut().GetAsync(UserId, 12);
+        await BuildSut().GetAsync(UserId, 12, clientToday: null);
 
         Assert.Equal([2, 50, 49], handed!.Select(t => t.Id));
     }
@@ -139,7 +160,7 @@ public class MoneyMapManagerTests
         var plans = new[] { PayPlan() };
         StubLedger(ledger, plans, PayCategories);
 
-        var bounded = await BuildSut(engine).GetAsync(UserId, months);
+        var bounded = await BuildSut(engine).GetAsync(UserId, months, clientToday: null);
         var whole = engine.Build(plans, ledger, PayCategories, Today, months);
 
         Assert.True(bounded.IsSuccess, bounded.Error);

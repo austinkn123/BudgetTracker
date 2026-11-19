@@ -104,7 +104,7 @@ public class BudgetAnalysisEquivalenceTests : IDisposable
         var expected = await LegacyGetAnalysisAsync(accessor, from, to, trendMonths);
 
         var actual = await new BudgetAnalysisManager(_engine, accessor, _plans.Object, new BudgetPlanEngine())
-            .GetAnalysisAsync(UserId, from, to, trendMonths);
+            .GetAnalysisAsync(UserId, from, to, trendMonths, clientToday: null);
 
         Assert.True(actual.IsSuccess);
         AssertEquivalent(expected, actual.Value!);
@@ -185,7 +185,7 @@ public class BudgetAnalysisEquivalenceTests : IDisposable
 
         await AssertNewPathEqualsOldPath(PriorMonth, to);
         var window = (await new BudgetAnalysisManager(_engine, new TransactionAccessor(_context), _plans.Object, new BudgetPlanEngine())
-            .GetAnalysisAsync(UserId, PriorMonth, to, 3)).Value!.WindowSpend;
+            .GetAnalysisAsync(UserId, PriorMonth, to, 3, clientToday: null)).Value!.WindowSpend;
         Assert.Equal(new CategorySpend(1, 5m), Assert.Single(window));
     }
 

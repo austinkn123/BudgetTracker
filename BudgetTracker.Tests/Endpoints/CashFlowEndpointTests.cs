@@ -32,7 +32,7 @@ public class CashFlowEndpointTests
     public async Task Get_GroupByIsCaseInsensitive_AndFiltersReachTheManager(string groupBy)
     {
         var expected = new CashFlowQuery(From, To, CashFlowGrouping.Week, null, null, "chk", 3, "rent");
-        _manager.Setup(m => m.GetReportAsync(5, expected)).ReturnsAsync(Result<CashFlowReport>.Success(Report));
+        _manager.Setup(m => m.GetReportAsync(5, expected, null)).ReturnsAsync(Result<CashFlowReport>.Success(Report));
 
         var result = await Get(groupBy);
 
@@ -55,12 +55,26 @@ public class CashFlowEndpointTests
     [Fact]
     public async Task Get_ManagerFailure_Returns400WithError()
     {
-        _manager.Setup(m => m.GetReportAsync(5, It.IsAny<CashFlowQuery>())).ReturnsAsync(Result<CashFlowReport>.Failure("bad window"));
+        _manager.Setup(m => m.GetReportAsync(5, It.IsAny<CashFlowQuery>(), null)).ReturnsAsync(Result<CashFlowReport>.Failure("bad window"));
 
         var result = await Get("Month");
 
         Assert.Equal(StatusCodes.Status400BadRequest, EndpointAssert.StatusOf(result));
         Assert.Equal("bad window", EndpointAssert.ErrorOf(result));
+    }
+
+    [Fact]
+    public async Task Should_PassTheCallersLocalDateThrough_Unzoned()
+    {
+        DateTime? passed = null;
+        _manager.Setup(m => m.GetReportAsync(5, It.IsAny<CashFlowQuery>(), It.IsAny<DateTime?>()))
+            .Callback<int, CashFlowQuery, DateTime?>((_, _, today) => passed = today)
+            .ReturnsAsync(Result<CashFlowReport>.Success(Report));
+
+        await CashFlowEndpoints.GetAsync(null, To, "Month", null, null, null, null, null, _manager.Object, _currentUser.Object,
+            today: new DateTime(2026, 11, 15, 0, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal((new DateTime(2026, 11, 15), DateTimeKind.Unspecified), (passed!.Value, passed.Value.Kind));
     }
 
     [Theory]
@@ -70,8 +84,8 @@ public class CashFlowEndpointTests
     {
         // "…T00:00:00Z" binds as Kind=Utc, which Npgsql refuses against the timestamp-without-time-zone column.
         CashFlowQuery? passed = null;
-        _manager.Setup(m => m.GetReportAsync(5, It.IsAny<CashFlowQuery>()))
-            .Callback<int, CashFlowQuery>((_, q) => passed = q)
+        _manager.Setup(m => m.GetReportAsync(5, It.IsAny<CashFlowQuery>(), null))
+            .Callback<int, CashFlowQuery, DateTime?>((_, q, _) => passed = q)
             .ReturnsAsync(Result<CashFlowReport>.Success(Report));
 
         var result = await CashFlowEndpoints.GetAsync(
@@ -90,8 +104,8 @@ public class CashFlowEndpointTests
     public async Task Should_LeaveAbsentOptionalDatesNull_When_NormalisingKinds()
     {
         CashFlowQuery? passed = null;
-        _manager.Setup(m => m.GetReportAsync(5, It.IsAny<CashFlowQuery>()))
-            .Callback<int, CashFlowQuery>((_, q) => passed = q)
+        _manager.Setup(m => m.GetReportAsync(5, It.IsAny<CashFlowQuery>(), null))
+            .Callback<int, CashFlowQuery, DateTime?>((_, q, _) => passed = q)
             .ReturnsAsync(Result<CashFlowReport>.Success(Report));
 
         await CashFlowEndpoints.GetAsync(null, To, "Month", null, null, null, null, null, _manager.Object, _currentUser.Object);

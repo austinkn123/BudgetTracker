@@ -13,12 +13,13 @@ public class BudgetAnalysisManager(
     IBudgetPlanAccessor budgetPlanAccessor,
     IBudgetPlanEngine budgetPlanEngine) : IBudgetAnalysisManager
 {
-    public async Task<Result<BudgetAnalysis>> GetAnalysisAsync(int userId, DateTime from, DateTime to, int trendMonths)
+    public async Task<Result<BudgetAnalysis>> GetAnalysisAsync(int userId, DateTime from, DateTime to, int trendMonths, DateTime? clientToday)
     {
         if (engine.ValidateTrendMonths(trendMonths) is string error)
             return Result<BudgetAnalysis>.Failure(error);
 
-        var now = DateTime.UtcNow;
+        // The user's date, not the server's UTC one: UTC is already tomorrow every US evening.
+        var now = LocalToday.Resolve(clientToday, DateTime.UtcNow);
 
         // The analysed month follows the requested window rather than the wall clock, so browsing
         // to June returns June's plan-vs-actual instead of today's. The engine derives the month it

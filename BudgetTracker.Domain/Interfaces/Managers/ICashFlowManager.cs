@@ -7,5 +7,5 @@ namespace BudgetTracker.Domain.Interfaces.Managers;
 public interface ICashFlowManager
 {
     /// <summary>The cash-flow report for <paramref name="query"/>; a failure when the window is invalid.</summary>
-    Task<Result<CashFlowReport>> GetReportAsync(int userId, CashFlowQuery query);
+    Task<Result<CashFlowReport>> GetReportAsync(int userId, CashFlowQuery query, DateTime? clientToday);
 }

@@ -69,9 +69,9 @@ public class WebullSeparationTests : IDisposable
     {
         var to = month.AddMonths(1).AddDays(-1);
         var analysis = await new BudgetAnalysisManager(new BudgetAnalysisEngine(), new TransactionAccessor(_context), new BudgetPlanAccessor(_context), new BudgetPlanEngine())
-            .GetAnalysisAsync(UserId, month.AddMonths(-1), to, 6);
+            .GetAnalysisAsync(UserId, month.AddMonths(-1), to, 6, clientToday: null);
         var cashFlow = await new CashFlowManager(new CashFlowEngine(), new TransactionAccessor(_context), new PlaidItemAccessor(_context, _keyRing))
-            .GetReportAsync(UserId, new CashFlowQuery(month.AddMonths(-1), to, CashFlowGrouping.Month));
+            .GetReportAsync(UserId, new CashFlowQuery(month.AddMonths(-1), to, CashFlowGrouping.Month), clientToday: null);
         var transactions = await new TransactionManager(new TransactionAccessor(_context), new CategoryAccessor(_context), new PlaidEngine(), new TransactionEngine(), Moq.Mock.Of<IDataVersionAccessor>())
             .GetPageAsync(UserId, new TransactionFilter(), cursor: null, limit: 200);
 

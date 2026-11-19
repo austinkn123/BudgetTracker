@@ -24,7 +24,7 @@ public class BudgetAnalysisEndpointTests
     [Fact]
     public async Task Should_DefaultTrendMonthsToThree()
     {
-        _manager.Setup(m => m.GetAnalysisAsync(5, From, To, 3))
+        _manager.Setup(m => m.GetAnalysisAsync(5, From, To, 3, null))
             .ReturnsAsync(Result<BudgetAnalysis>.Success(new BudgetAnalysis(null, [], [])));
 
         var result = await BudgetAnalysisEndpoints.GetAsync(From, To, _manager.Object, _currentUser.Object, null);
@@ -33,9 +33,23 @@ public class BudgetAnalysisEndpointTests
     }
 
     [Fact]
+    public async Task Should_PassTheCallersLocalDateThrough_Unzoned()
+    {
+        DateTime? passed = null;
+        _manager.Setup(m => m.GetAnalysisAsync(5, From, To, 3, It.IsAny<DateTime?>()))
+            .Callback<int, DateTime, DateTime, int, DateTime?>((_, _, _, _, today) => passed = today)
+            .ReturnsAsync(Result<BudgetAnalysis>.Success(new BudgetAnalysis(null, [], [])));
+
+        await BudgetAnalysisEndpoints.GetAsync(
+            From, To, _manager.Object, _currentUser.Object, null, today: new DateTime(2026, 11, 15, 0, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal((new DateTime(2026, 11, 15), DateTimeKind.Unspecified), (passed!.Value, passed.Value.Kind));
+    }
+
+    [Fact]
     public async Task Should_Return400WithError_When_TheManagerRejectsTrendMonths()
     {
-        _manager.Setup(m => m.GetAnalysisAsync(5, From, To, 25))
+        _manager.Setup(m => m.GetAnalysisAsync(5, From, To, 25, null))
             .ReturnsAsync(Result<BudgetAnalysis>.Failure("trendMonths must be between 1 and 24"));
 
         var result = await BudgetAnalysisEndpoints.GetAsync(From, To, _manager.Object, _currentUser.Object, 25);

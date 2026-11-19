@@ -7,5 +7,5 @@ namespace BudgetTracker.Domain.Interfaces.Managers;
 public interface IMoneyMapManager
 {
     /// <summary>The money map over the last <paramref name="months"/> months; a failure when that is outside 1–24.</summary>
-    Task<Result<MoneyMap>> GetAsync(int userId, int months);
+    Task<Result<MoneyMap>> GetAsync(int userId, int months, DateTime? clientToday);
 }

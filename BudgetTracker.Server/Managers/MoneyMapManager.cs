@@ -14,9 +14,9 @@ public class MoneyMapManager(
     ICategoryAccessor categoryAccessor) : IMoneyMapManager
 {
     /// <inheritdoc />
-    public async Task<Result<MoneyMap>> GetAsync(int userId, int months)
+    public async Task<Result<MoneyMap>> GetAsync(int userId, int months, DateTime? clientToday)
     {
-        var today = DateTime.UtcNow.Date;
+        var today = LocalToday.Resolve(clientToday, DateTime.UtcNow);
 
         // Sequential awaits: these accessors share the scoped DbContext, which cannot run two queries at once.
         var plans = await budgetPlanAccessor.GetByUserIdAsync(userId);
