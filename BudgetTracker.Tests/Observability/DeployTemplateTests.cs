@@ -89,6 +89,77 @@ public class DeployTemplateTests
         Assert.Contains($"\"{BudgetTracker.Server.Utilities.Observability.RequestLogScope.CorrelationIdKey}\":",
             SavedQueries()["BudgetTracker/Find a request by correlation ID"]);
 
+    // ── Email alerts ────────────────────────────────────────────────────────
+
+    /// <summary>The indented block of one top-level resource, from its logical ID to the next resource.</summary>
+    private static string Resource(string logicalId)
+    {
+        var match = Regex.Match(Template, $@"^  {logicalId}:\n(?<body>(?:    .*\n|\s*\n)+)", RegexOptions.Multiline);
+        Assert.True(match.Success, $"Resource {logicalId} is missing from deploy/template.yaml.");
+        return match.Groups["body"].Value;
+    }
+
+    [Fact]
+    public void Should_TakeTheAlertEmailAsAParameter_NotFromTheRepo()
+    {
+        Assert.Matches(new Regex(@"^  AlertEmail:\n    Type: String\n    Default: ''", RegexOptions.Multiline), Template);
+        // No address is committed: it is supplied at deploy time.
+        Assert.DoesNotMatch(new Regex(@"[\w.+-]+@[\w-]+\.[\w.]+"), Template);
+    }
+
+    [Fact]
+    public void Should_EmailTheTopicOnlyWhenAnAddressIsGiven()
+    {
+        Assert.Contains("Type: AWS::SNS::Topic", Resource("AlertTopic"));
+        var subscription = Resource("AlertEmailSubscription");
+        Assert.Contains("Type: AWS::SNS::Subscription", subscription);
+        Assert.Contains("Condition: HasAlertEmail", subscription);
+        Assert.Contains("Protocol: email", subscription);
+        Assert.Contains("Endpoint: !Ref AlertEmail", subscription);
+        Assert.Matches(new Regex(@"HasAlertEmail: !Not \[!Equals \[!Ref AlertEmail, ''\]\]"), Template);
+    }
+
+    [Fact]
+    public void Should_AlarmOnLambdaErrors_ToTheAlertTopic()
+    {
+        var alarm = Resource("FunctionErrorsAlarm");
+        Assert.Contains("Type: AWS::CloudWatch::Alarm", alarm);
+        Assert.Contains("Namespace: AWS/Lambda", alarm);
+        Assert.Contains("MetricName: Errors", alarm);
+        Assert.Matches(new Regex(@"Name: FunctionName\n\s+Value: !Ref BudgetTrackerFunction"), alarm);
+        Assert.Contains("- !Ref AlertTopic", alarm);
+        Assert.Contains("TreatMissingData: notBreaching", alarm);
+    }
+
+    [Fact]
+    public void Should_CountServerErrors_FromTheUnhandledExceptionEvent()
+    {
+        var filter = Resource("ServerErrorsMetricFilter");
+        Assert.Contains("Type: AWS::Logs::MetricFilter", filter);
+        Assert.Contains("LogGroupName: !Ref BudgetTrackerLogGroup", filter);
+        var eventId = int.Parse(Regex.Match(filter, @"\$\.EventId = (\d+)").Groups[1].Value);
+        // The event the exception handler writes for every 500 response.
+        var unhandled = Assert.Single(LogCatalogue.All(), m => m.Method.Name == "UnhandledException");
+        Assert.Equal(unhandled.Message.EventId, eventId);
+
+        var metric = Regex.Match(filter, @"MetricName: (\S+)").Groups[1].Value;
+        var alarm = Resource("ServerErrorsAlarm");
+        Assert.Contains($"MetricName: {metric}", alarm);
+        Assert.Contains("- !Ref AlertTopic", alarm);
+        Assert.Contains("TreatMissingData: notBreaching", alarm);
+    }
+
+    [Fact]
+    public void Should_MakeTheCostBudgetOptIn()
+    {
+        Assert.Matches(new Regex(@"^  MonthlyBudgetUsd:\n    Type: Number\n    Default: 0", RegexOptions.Multiline), Template);
+        var budget = Resource("MonthlyCostBudget");
+        Assert.Contains("Type: AWS::Budgets::Budget", budget);
+        Assert.Contains("Condition: HasBudgetAndEmail", budget);
+        Assert.Contains("Amount: !Ref MonthlyBudgetUsd", budget);
+        Assert.Contains("Address: !Ref AlertEmail", budget);
+    }
+
     private static string FindTemplate()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)

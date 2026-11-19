@@ -18,6 +18,22 @@ Parameters:
     Default: Production
     AllowedValues: [Production, Staging]
     Description: Never Development here - it would expose the sandbox seed route and OpenAPI document.
+  AlertEmail:
+    Type: String
+    Default: ''
+    Description: >
+      Address that gets the alarm and budget emails. Empty sends none (the alarms still show in CloudWatch).
+      AWS emails a confirmation link after the deploy; nothing arrives until it is clicked.
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: Monthly AWS cost (USD) that triggers a budget email at 80% and 100%. 0 creates no budget.
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+  HasBudget: !Not [!Equals [!Ref MonthlyBudgetUsd, 0]]
+  HasBudgetAndEmail: !And [!Condition HasAlertEmail, !Condition HasBudget]
 
 Resources:
   BudgetTrackerFunction:
@@ -146,6 +162,106 @@ Resources:
         filter EventId in [3005, 3006]
         | stats count() as runs, avg(State.DurationMs) as avgMs, max(State.DurationMs) as maxMs by EventId, State.Outcome
         | sort runs desc
+
+  # Email alerts (project-docs/observability.md). Single user, so one email per incident is the right volume:
+  # each alarm fires on the first occurrence in a 5-minute window and emails again only after recovering.
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: budgettracker-alerts
+      DisplayName: BudgetTracker alerts
+
+  AlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  # Invocations that crashed or timed out (also the scheduled Webull close snapshot). A handled 500 still
+  # completes the invocation, so it is counted by ServerErrorsAlarm instead.
+  FunctionErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: budgettracker-function-errors
+      AlarmDescription: The Lambda crashed or timed out. Find the request with the "Warnings and errors" saved query.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BudgetTrackerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+
+  # Every 500 response logs event 1004 (ObservabilityLog.UnhandledException), so this counts server errors from
+  # the app's own logs rather than from Function URL metrics.
+  ServerErrorsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref BudgetTrackerLogGroup
+      FilterPattern: '{ $.EventId = 1004 }'
+      MetricTransformations:
+        - MetricNamespace: BudgetTracker
+          MetricName: UnhandledExceptions
+          MetricValue: '1'
+          DefaultValue: 0
+
+  ServerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: budgettracker-server-errors
+      AlarmDescription: A request failed with an unhandled exception (HTTP 500). See the "Unhandled exceptions" saved query.
+      Namespace: BudgetTracker
+      MetricName: UnhandledExceptions
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+
+  # Catches runaway cost from a bug or from abuse of the public Function URL. Account-wide, not just this stack.
+  MonthlyCostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudgetAndEmail
+    Properties:
+      Budget:
+        BudgetName: budgettracker-monthly-cost
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
 
 Outputs:
   FunctionUrl:
