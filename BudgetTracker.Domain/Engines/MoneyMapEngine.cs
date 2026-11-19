@@ -37,7 +37,7 @@ public class MoneyMapEngine : IMoneyMapEngine
 
         today = today.Date;
         var from = WindowStart(today, months);
-        var plan = NewestActivePlan(plans);
+        var plan = EffectivePlan(plans, today);
         var names = categories.ToDictionary(c => c.Id, c => c.Name);
         var window = transactions.Where(t => t.OccurredAt.Date >= from && t.OccurredAt.Date <= today).ToList();
 
@@ -67,7 +67,7 @@ public class MoneyMapEngine : IMoneyMapEngine
         today = today.Date;
         var windowStart = WindowStart(today, months);
         var billLookback = BillLookbackStart(today);
-        var payCategories = NewestActivePlan(plans)?.Entries
+        var payCategories = EffectivePlan(plans, today)?.Entries
             .Where(e => e.LineType == Income && e.CategoryId is not null)
             .Select(e => e.CategoryId!.Value)
             .ToHashSet() ?? [];
@@ -91,8 +91,13 @@ public class MoneyMapEngine : IMoneyMapEngine
     /// <summary>The bill projection reads payments dated after this day; fetching from it is inclusive and harmless.</summary>
     private static DateTime BillLookbackStart(DateTime today) => today.AddMonths(-12);
 
-    private static BudgetPlan? NewestActivePlan(IEnumerable<BudgetPlan> plans) =>
-        plans.Where(p => p.IsActive).OrderByDescending(p => p.PlanMonth).FirstOrDefault();
+    /// <summary>
+    /// The newest active plan dated on or before <paramref name="today"/>: the same rule as
+    /// <see cref="BudgetPlanEngine.SelectEffectivePlan"/>, so a plan made ahead for next month doesn't take over this
+    /// month's map while the Dashboard still shows the current one.
+    /// </summary>
+    private static BudgetPlan? EffectivePlan(IEnumerable<BudgetPlan> plans, DateTime today) =>
+        plans.Where(p => p.IsActive && p.PlanMonth <= today).OrderByDescending(p => p.PlanMonth).FirstOrDefault();
 
     /// <summary>Plan lines in plan order, then unplanned spend largest first. A category in several plan lines is one line.</summary>
     private static List<MoneyMapLine> BuildLines(BudgetPlan? plan, List<Transaction> spend, Dictionary<int, string> names, int months)

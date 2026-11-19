@@ -47,7 +47,8 @@ public class MoneyMapEngineTests
     private static BudgetPlan Plan(params BudgetPlanEntry[] entries) => new()
     {
         Name = "Recommended Budget",
-        PlanMonth = new DateTime(2026, 11, 1),
+        // In effect on Today (2026-10-30): a plan only governs from its own month on.
+        PlanMonth = new DateTime(2026, 10, 1),
         IsActive = true,
         NetIncomeMonthly = 6526m,
         Entries = entries
@@ -225,6 +226,57 @@ public class MoneyMapEngineTests
 
         Assert.Equal([1, 7], history.PayCategoryIds.Order());
         Assert.Equal(6, history.RecentPaychecks);
+    }
+
+    [Fact]
+    public void Build_IgnoresAnActivePlanDatedAfterToday_LikeTheDashboard()
+    {
+        // A plan made ahead for next month must not take over this month's map (BudgetPlanEngine.SelectEffectivePlan).
+        var current = Plan();
+        var nextMonth = Plan(Line(2, 999m));
+        nextMonth.Name = "December";
+        nextMonth.PlanMonth = new DateTime(Today.Year, Today.Month, 1).AddMonths(1);
+        nextMonth.NetIncomeMonthly = 1m;
+
+        var map = _sut.Build([current, nextMonth], [], Categories, Today, 3).Value!;
+
+        Assert.Equal("Recommended Budget", map.PlanName);
+        Assert.Equal(6526m, map.PlannedIncomeMonthly);
+    }
+
+    [Fact]
+    public void Build_UsesAPlanDatedThisMonth_EvenOnTheFirst()
+    {
+        var thisMonth = Plan();
+        thisMonth.PlanMonth = new DateTime(Today.Year, Today.Month, 1);
+
+        var map = _sut.Build([thisMonth], [], Categories, new DateTime(Today.Year, Today.Month, 1), 3).Value!;
+
+        Assert.Equal("Recommended Budget", map.PlanName);
+    }
+
+    [Fact]
+    public void Build_WithOnlyAFuturePlan_HasNoPlan()
+    {
+        var future = Plan();
+        future.PlanMonth = new DateTime(Today.Year, Today.Month, 1).AddMonths(2);
+
+        var map = _sut.Build([future], [], Categories, Today, 3).Value!;
+
+        Assert.Null(map.PlanName);
+        Assert.Empty(map.Upcoming);
+    }
+
+    [Fact]
+    public void DescribeHistory_IgnoresAnActivePlanDatedAfterToday()
+    {
+        var current = Plan(Line(1, 6526m, lineType: "Income"));
+        var nextMonth = Plan(Line(8, 100m, lineType: "Income"));
+        nextMonth.PlanMonth = new DateTime(Today.Year, Today.Month, 1).AddMonths(1);
+
+        var history = _sut.DescribeHistory([current, nextMonth], Today, 12).Value!;
+
+        Assert.Equal([1], history.PayCategoryIds);
     }
 
     [Fact]
