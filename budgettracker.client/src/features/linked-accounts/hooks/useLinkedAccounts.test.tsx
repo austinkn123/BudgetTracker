@@ -177,13 +177,15 @@ describe('useLinkedAccounts', () => {
 
       let disconnectDone!: Promise<void>;
       act(() => {
-        disconnectDone = result.current.disconnect(ALLY.plaidItemId);
+        disconnectDone = result.current.disconnect(ALLY.plaidItemId, false);
       });
 
       await waitFor(() => expect(result.current.disconnectingItemId).toBe(ALLY.plaidItemId));
       expect(result.current.disconnectingItemId).not.toBe(CHASE.plaidItemId);
       expect(apiMock.delete).toHaveBeenCalledTimes(1);
-      expect(apiMock.delete).toHaveBeenCalledWith(`/plaid/connections/${ALLY.plaidItemId}`);
+      expect(apiMock.delete).toHaveBeenCalledWith(`/plaid/connections/${ALLY.plaidItemId}`, {
+        params: { deleteTransactions: false },
+      });
 
       await act(async () => {
         pendingDelete.resolve({ data: undefined });
@@ -194,13 +196,40 @@ describe('useLinkedAccounts', () => {
       expect(result.current.errorMessage).toBeNull();
     });
 
+    it('asks the server to delete the imported transactions when chosen', async () => {
+      apiMock.delete.mockResolvedValue({ data: undefined });
+
+      const { result } = renderLinkedAccounts(queryClient);
+      await waitFor(() => expect(result.current.connections).toHaveLength(2));
+
+      await act(() => result.current.disconnect(CHASE.plaidItemId, true));
+
+      expect(apiMock.delete).toHaveBeenCalledWith(`/plaid/connections/${CHASE.plaidItemId}`, {
+        params: { deleteTransactions: true },
+      });
+    });
+
+    it('refetches the ledger after deleting imported transactions, so they leave the screen at once', async () => {
+      apiMock.delete.mockResolvedValue({ data: undefined });
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const { result } = renderLinkedAccounts(queryClient);
+      await waitFor(() => expect(result.current.connections).toHaveLength(2));
+
+      await act(() => result.current.disconnect(CHASE.plaidItemId, true));
+
+      await waitFor(() =>
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: ['transactions'] }),
+      );
+    });
+
     it('clears disconnectingItemId and reports an error when the delete fails', async () => {
       apiMock.delete.mockRejectedValue(new Error('Network Error'));
 
       const { result } = renderLinkedAccounts(queryClient);
       await waitFor(() => expect(result.current.connections).toHaveLength(2));
 
-      await act(() => result.current.disconnect(CHASE.plaidItemId));
+      await act(() => result.current.disconnect(CHASE.plaidItemId, false));
 
       expect(result.current.disconnectingItemId).toBeNull();
       expect(result.current.errorMessage).toBe("Couldn't disconnect your bank. Please try again.");

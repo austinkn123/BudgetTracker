@@ -64,8 +64,17 @@ export const plaidService = {
     return response.data;
   },
 
-  /** Revoke one institution server-side (Plaid /item/remove) and soft-delete its PlaidItem row. */
-  disconnect: async (plaidItemId: number): Promise<void> => {
-    await api.delete(`/plaid/connections/${plaidItemId}`);
+  /**
+   * Revoke one institution at Plaid and wipe its stored credential (BUD-10). With `deleteTransactions`, every
+   * transaction imported from it is deleted too; manual ones stay.
+   */
+  disconnect: async ({
+    plaidItemId,
+    deleteTransactions,
+  }: {
+    plaidItemId: number;
+    deleteTransactions: boolean;
+  }): Promise<void> => {
+    await api.delete(`/plaid/connections/${plaidItemId}`, { params: { deleteTransactions } });
   },
 };

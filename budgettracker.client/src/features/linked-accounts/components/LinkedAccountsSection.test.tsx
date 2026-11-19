@@ -139,6 +139,65 @@ describe('LinkedAccountsSection', () => {
     expect(apiMock.delete).not.toHaveBeenCalled();
   });
 
+  it('asks what to do with imported transactions, defaulting to keeping them (BUD-10)', async () => {
+    const user = userEvent.setup();
+    apiMock.get.mockResolvedValue({ data: [CHASE, ALLY] });
+    apiMock.delete.mockResolvedValue({ data: undefined });
+
+    renderSection();
+    await user.click(await screen.findByRole('button', { name: 'Disconnect Ally Bank' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Disconnect Ally Bank?' });
+
+    const keep = within(dialog).getByRole('radio', { name: /Keep imported transactions/ });
+    const remove = within(dialog).getByRole('radio', { name: /Delete all imported transactions/ });
+    expect(keep).toBeChecked();
+    expect(remove).not.toBeChecked();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Disconnect' }));
+
+    await waitFor(() =>
+      expect(apiMock.delete).toHaveBeenCalledWith(`/plaid/connections/${ALLY.plaidItemId}`, {
+        params: { deleteTransactions: false },
+      }),
+    );
+  });
+
+  it('deletes the imported transactions when that is chosen, with a confirm label that says so', async () => {
+    const user = userEvent.setup();
+    apiMock.get.mockResolvedValue({ data: [CHASE, ALLY] });
+    apiMock.delete.mockResolvedValue({ data: undefined });
+
+    renderSection();
+    await user.click(await screen.findByRole('button', { name: 'Disconnect Ally Bank' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Disconnect Ally Bank?' });
+
+    await user.click(within(dialog).getByRole('radio', { name: /Delete all imported transactions/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Disconnect and delete' }));
+
+    await waitFor(() =>
+      expect(apiMock.delete).toHaveBeenCalledWith(`/plaid/connections/${ALLY.plaidItemId}`, {
+        params: { deleteTransactions: true },
+      }),
+    );
+  });
+
+  it('resets the choice to keep when the dialog is opened again', async () => {
+    const user = userEvent.setup();
+    apiMock.get.mockResolvedValue({ data: [CHASE, ALLY] });
+
+    renderSection();
+    await user.click(await screen.findByRole('button', { name: 'Disconnect Ally Bank' }));
+    let dialog = await screen.findByRole('dialog', { name: 'Disconnect Ally Bank?' });
+    await user.click(within(dialog).getByRole('radio', { name: /Delete all imported transactions/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Disconnect Chase' }));
+    dialog = await screen.findByRole('dialog', { name: 'Disconnect Chase?' });
+
+    expect(within(dialog).getByRole('radio', { name: /Keep imported transactions/ })).toBeChecked();
+  });
+
   it('shows the server message when re-linking an already-linked bank, and it can be dismissed', async () => {
     const user = userEvent.setup();
     apiMock.get.mockResolvedValue({ data: [CHASE] });

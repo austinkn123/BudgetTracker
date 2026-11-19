@@ -1,7 +1,8 @@
 import { useState } from 'react';
 
-import { Alert, Button, Card, ConfirmModal, Spinner } from '../../../shared/components/ui';
+import { Alert, Button, Card, Modal, ModalActions, Spinner } from '../../../shared/components/ui';
 import type { PlaidConnectionView } from '../../../shared/types/api';
+import { cn } from '../../../shared/utils/cn';
 import { useLinkedAccounts } from '../hooks/useLinkedAccounts';
 import LinkedAccountCard from './LinkedAccountCard';
 import PlaidLinkLauncher from './PlaidLinkLauncher';
@@ -9,7 +10,8 @@ import PlaidLinkLauncher from './PlaidLinkLauncher';
 /**
  * Settings-page section that owns bank-link UX across every institution:
  * - "Add institution" is always available; linking never replaces an existing connection
- * - One LinkedAccountCard per institution, each with its own confirmed Disconnect
+ * - One LinkedAccountCard per institution, each with its own confirmed Disconnect that asks whether to keep or
+ *   delete the transactions it imported (BUD-10)
  * - "Refresh all" re-pulls transactions from every institution
  */
 const LinkedAccountsSection = () => {
@@ -34,6 +36,13 @@ const LinkedAccountsSection = () => {
   } = useLinkedAccounts();
 
   const [pendingDisconnect, setPendingDisconnect] = useState<PlaidConnectionView | null>(null);
+  // Keep is the default: it is the reversible choice, since a bank can be linked again.
+  const [deleteTransactions, setDeleteTransactions] = useState(false);
+
+  const openDisconnect = (connection: PlaidConnectionView) => {
+    setDeleteTransactions(false);
+    setPendingDisconnect(connection);
+  };
 
   const isLinking =
     isPreparingLink || isExchanging || linkToken !== null || reconnectingItemId !== null;
@@ -41,7 +50,7 @@ const LinkedAccountsSection = () => {
 
   const handleConfirmDisconnect = async () => {
     if (!pendingDisconnect) return;
-    await disconnect(pendingDisconnect.plaidItemId);
+    await disconnect(pendingDisconnect.plaidItemId, deleteTransactions);
     // Close on failure too: the error Alert below the list explains what happened.
     setPendingDisconnect(null);
   };
@@ -91,7 +100,7 @@ const LinkedAccountsSection = () => {
                 isDisconnecting={disconnectingItemId === connection.plaidItemId}
                 disabled={isBusy}
                 onReconnect={prepareReconnect}
-                onDisconnect={setPendingDisconnect}
+                onDisconnect={openDisconnect}
               />
             </li>
           ))}
@@ -122,24 +131,77 @@ const LinkedAccountsSection = () => {
         />
       )}
 
-      <ConfirmModal
+      <Modal
         open={pendingDisconnect !== null}
+        onClose={() => setPendingDisconnect(null)}
         title={`Disconnect ${pendingDisconnect?.institutionName ?? 'this bank'}?`}
-        message={
+        description={
           <>
-            Imported transactions stay in your history, but no new transactions will sync from{' '}
-            <strong>{pendingDisconnect?.institutionName ?? 'it'}</strong> afterwards. Your other
-            linked banks aren't affected.
+            BudgetTracker's access to <strong>{pendingDisconnect?.institutionName ?? 'it'}</strong> is
+            removed at Plaid and your stored bank credentials are deleted. Your other linked banks
+            aren't affected.
           </>
         }
-        confirmLabel="Disconnect"
-        destructive
-        isPending={disconnectingItemId !== null}
-        onCancel={() => setPendingDisconnect(null)}
-        onConfirm={handleConfirmDisconnect}
-      />
+        maxWidth="xs"
+        disableBackdropClose={disconnectingItemId !== null}
+        actions={
+          <ModalActions
+            onCancel={() => setPendingDisconnect(null)}
+            onConfirm={handleConfirmDisconnect}
+            confirmLabel={deleteTransactions ? 'Disconnect and delete' : 'Disconnect'}
+            confirmVariant="destructive"
+            isPending={disconnectingItemId !== null}
+          />
+        }
+      >
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-sm font-medium text-ink">Transactions it imported</legend>
+          <DisconnectChoice
+            checked={!deleteTransactions}
+            onSelect={() => setDeleteTransactions(false)}
+            label="Keep imported transactions"
+            hint="They stay in your history; nothing new syncs."
+          />
+          <DisconnectChoice
+            checked={deleteTransactions}
+            onSelect={() => setDeleteTransactions(true)}
+            label={`Delete all imported transactions from ${pendingDisconnect?.institutionName ?? 'this bank'}`}
+            hint="Manual transactions are kept. This can't be undone."
+          />
+        </fieldset>
+      </Modal>
     </Card>
   );
 };
+
+type DisconnectChoiceProps = {
+  checked: boolean;
+  onSelect: () => void;
+  label: string;
+  hint: string;
+};
+
+/** One option of the disconnect dialog's keep / delete choice. */
+const DisconnectChoice = ({ checked, onSelect, label, hint }: DisconnectChoiceProps) => (
+  <label
+    className={cn(
+      'flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition-colors duration-120',
+      checked ? 'border-primary bg-primary-subtle' : 'border-border hover:border-border-strong',
+    )}
+  >
+    {/* Native <input>: radio option; there is no shared radio primitive, and a native group keeps arrow-key navigation. */}
+    <input
+      type="radio"
+      name="disconnect-transactions"
+      checked={checked}
+      onChange={onSelect}
+      className="focus-ring mt-0.5 accent-primary"
+    />
+    <span className="flex flex-col">
+      <span className="text-sm font-medium text-ink">{label}</span>
+      <span className="text-xs text-ink-muted">{hint}</span>
+    </span>
+  </label>
+);
 
 export default LinkedAccountsSection;
