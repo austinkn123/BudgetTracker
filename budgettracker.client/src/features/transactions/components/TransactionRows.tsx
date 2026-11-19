@@ -213,6 +213,16 @@ const TransactionRow = ({
             </span>
           )}
 
+          {/* After an override, the original suggestion stays visible (BUD-9); after accepting it, it would only repeat. */}
+          {transaction.categoryId != null &&
+            transaction.plaidCategoryPrimary &&
+            suggestion?.id !== transaction.categoryId && (
+              <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                <Sparkles size={11} />
+                Plaid suggested {suggestion?.name ?? formatPlaidCategory(transaction.plaidCategoryPrimary)}
+              </span>
+            )}
+
           {editingNote ? (
             // Native <input>: inline-edit note cell (Enter commits, Escape reverts); Input is react-hook-form-bound.
             <input
