@@ -35,13 +35,6 @@ public class CategoryAccessor(BudgetTrackerDbContext context) : ICategoryAccesso
         }
     }
 
-    public async Task<Category?> GetByIdAsync(int id)
-    {
-        return await context.Categories
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == id);
-    }
-
     public async Task<Category?> GetByIdForUserAsync(int id, int userId)
     {
         return await context.Categories

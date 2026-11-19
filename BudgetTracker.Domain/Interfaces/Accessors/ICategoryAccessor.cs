@@ -5,7 +5,6 @@ namespace BudgetTracker.Domain.Interfaces.Accessors;
 
 public interface ICategoryAccessor
 {
-    Task<Category?> GetByIdAsync(int id);
     Task<Category?> GetByIdForUserAsync(int id, int userId);
     Task<IEnumerable<Category>> GetByUserIdAsync(int userId);
 
