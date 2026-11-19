@@ -142,7 +142,7 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 
 // Scheduled Lambda invocation (EventBridge Scheduler): run the Webull market-close snapshot instead of serving HTTP.
-if (isLambda && Environment.GetEnvironmentVariable("BUDGETTRACKER_ENTRY") == "webull-close-snapshot")
+if (isLambda && Environment.GetEnvironmentVariable("BUDGETTRACKER_ENTRY") == WebullCloseSnapshotService.LambdaEntry)
 {
     await LambdaBootstrapBuilder.Create(async () =>
     {

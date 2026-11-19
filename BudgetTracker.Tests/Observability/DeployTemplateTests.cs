@@ -160,6 +160,62 @@ public class DeployTemplateTests
         Assert.Contains("Address: !Ref AlertEmail", budget);
     }
 
+    // ── Scheduled Webull close snapshot ─────────────────────────────────────
+
+    [Fact]
+    public void Should_DefineTheScheduledSnapshotFunction_WithTheEntryProgramChecks()
+    {
+        var function = Resource("WebullCloseSnapshotFunction");
+        Assert.Contains("Type: AWS::Serverless::Function", function);
+        Assert.Contains($"BUDGETTRACKER_ENTRY: {BudgetTracker.Server.Services.WebullCloseSnapshotService.LambdaEntry}", function);
+    }
+
+    [Fact]
+    public void Should_RunTheSnapshotFromTheSamePackageAndRuntimeAsTheApp()
+    {
+        string Value(string body, string key) => Regex.Match(body, $@"^      {key}: (.+)$", RegexOptions.Multiline).Groups[1].Value.Trim();
+        var app = Resource("BudgetTrackerFunction");
+        var snapshot = Resource("WebullCloseSnapshotFunction");
+
+        foreach (var key in new[] { "CodeUri", "Handler", "Runtime", "Architectures" })
+            Assert.Equal(Value(app, key), Value(snapshot, key));
+        Assert.Contains("ASPNETCORE_ENVIRONMENT: !Ref AspNetCoreEnvironment", snapshot);
+        Assert.Contains("SsmParameterPath: !Ref SsmParameterPath", snapshot);
+        Assert.Contains("ssm:GetParametersByPath", snapshot);
+    }
+
+    [Fact]
+    public void Should_ScheduleTheSnapshotOnWeekdaysAfterTheNewYorkClose()
+    {
+        var function = Resource("WebullCloseSnapshotFunction");
+        Assert.Contains("Type: ScheduleV2", function);
+        Assert.Contains("ScheduleExpressionTimezone: America/New_York", function);
+        var cron = Regex.Match(function, @"ScheduleExpression: cron\((?<min>\d+) (?<hours>[\d,-]+) \? \* (?<days>\S+) \*\)");
+        Assert.True(cron.Success, "Expected a cron(...) ScheduleExpression.");
+        Assert.Equal("MON-FRI", cron.Groups["days"].Value);
+        // The engine treats 4:30 pm Eastern as the close; the first run must come after it.
+        var firstHour = int.Parse(cron.Groups["hours"].Value.Split('-', ',')[0]);
+        var firstMinute = int.Parse(cron.Groups["min"].Value);
+        Assert.True(firstHour * 60 + firstMinute > 16 * 60 + 30, "The first run is at or before the 4:30 pm close.");
+    }
+
+    [Fact]
+    public void Should_GiveTheSnapshotNoPublicUrl() =>
+        Assert.DoesNotContain("FunctionUrlConfig", Resource("WebullCloseSnapshotFunction"));
+
+    [Fact]
+    public void Should_KeepTheSnapshotsLogsFor14Days_AndAlarmOnItsErrors()
+    {
+        var logGroup = Resource("WebullCloseSnapshotLogGroup");
+        Assert.Contains("LogGroupName: !Sub /aws/lambda/${WebullCloseSnapshotFunction}", logGroup);
+        Assert.Contains("RetentionInDays: 14", logGroup);
+
+        var alarm = Resource("WebullCloseSnapshotErrorsAlarm");
+        Assert.Contains("MetricName: Errors", alarm);
+        Assert.Matches(new Regex(@"Name: FunctionName\n\s+Value: !Ref WebullCloseSnapshotFunction"), alarm);
+        Assert.Contains("- !Ref AlertTopic", alarm);
+    }
+
     private static string FindTemplate()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)

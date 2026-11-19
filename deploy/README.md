@@ -188,6 +188,13 @@ sandbox Item for testing; the next sync flags it.
 
 The deploying identity needs `logs:PutQueryDefinition` for the saved queries.
 
+### Scheduled Webull snapshot
+
+A second function, `budgettracker-webull-close-snapshot`, runs from the same package on an EventBridge Scheduler
+schedule: weekdays at 4:45, 5:45 and 6:45 pm New York time. It saves each Webull-connected user's daily portfolio value
+once a day, after the 4:30 pm close; the later runs only act if an earlier one failed. It has no URL and its own
+`budgettracker-webull-close-snapshot-errors` alarm.
+
 ### Email alerts
 
 Two alarms email you: when the Lambda crashes or times out, and when a request fails with an unhandled exception

@@ -13,6 +13,12 @@ public class WebullCloseSnapshotService(
     IServiceScopeFactory scopeFactory,
     ILogger<WebullCloseSnapshotService> logger) : BackgroundService
 {
+    /// <summary>
+    /// The <c>BUDGETTRACKER_ENTRY</c> value that makes a Lambda invocation run the snapshot instead of serving HTTP.
+    /// deploy/template.yaml sets it on the scheduled function.
+    /// </summary>
+    public const string LambdaEntry = "webull-close-snapshot";
+
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(10);
 
     /// <inheritdoc />

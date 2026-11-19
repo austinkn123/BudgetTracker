@@ -77,6 +77,51 @@ Resources:
       LogGroupName: !Sub /aws/lambda/${BudgetTrackerFunction}
       RetentionInDays: 14
 
+  # The Webull market-close snapshot. Same package as the app; BUDGETTRACKER_ENTRY makes Program.cs run the
+  # snapshot and exit instead of serving HTTP. RunCloseSnapshotsAsync only fetches when a snapshot is due (after the
+  # 4:30 pm Eastern close, once per day), so the later two runs are cheap retries if the first one fails.
+  WebullCloseSnapshotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: budgettracker-webull-close-snapshot
+      Description: BudgetTracker Webull market-close portfolio snapshot (scheduled)
+      CodeUri: artifacts/budgettracker.zip
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 60
+      Tracing: Active
+      Environment:
+        Variables:
+          ASPNETCORE_ENVIRONMENT: !Ref AspNetCoreEnvironment
+          SsmParameterPath: !Ref SsmParameterPath
+          BUDGETTRACKER_ENTRY: webull-close-snapshot
+      Events:
+        AfterMarketClose:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(45 16-18 ? * MON-FRI *)
+            ScheduleExpressionTimezone: America/New_York
+            Description: Webull close snapshot, after the 4:30 pm Eastern close
+      Policies:
+        - Statement:
+            - Sid: ReadBudgetTrackerParameters
+              Effect: Allow
+              Action:
+                - ssm:GetParametersByPath
+                - ssm:GetParameters
+                - ssm:GetParameter
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmParameterPath}
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmParameterPath}/*
+
+  WebullCloseSnapshotLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${WebullCloseSnapshotFunction}
+      RetentionInDays: 14
+
   # Saved CloudWatch Logs Insights queries (Logs Insights > Saved queries > BudgetTracker). They read the JSON log
   # lines the app writes: top-level EventId / LogLevel / Category / Message, the message's fields under State.*, and
   # the request scope (CorrelationId, UserId, XRayTraceId). Event IDs are catalogued in
@@ -179,8 +224,8 @@ Resources:
       Protocol: email
       Endpoint: !Ref AlertEmail
 
-  # Invocations that crashed or timed out (also the scheduled Webull close snapshot). A handled 500 still
-  # completes the invocation, so it is counted by ServerErrorsAlarm instead.
+  # App invocations that crashed or timed out. A handled 500 still completes the invocation, so it is counted by
+  # ServerErrorsAlarm instead. The scheduled snapshot has its own alarm below.
   FunctionErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -191,6 +236,27 @@ Resources:
       Dimensions:
         - Name: FunctionName
           Value: !Ref BudgetTrackerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+
+  WebullCloseSnapshotErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: budgettracker-webull-close-snapshot-errors
+      AlarmDescription: The scheduled Webull close snapshot crashed or timed out.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WebullCloseSnapshotFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
