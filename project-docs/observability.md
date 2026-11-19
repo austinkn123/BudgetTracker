@@ -27,9 +27,10 @@ for 14 days. See [`deploy/README.md`](../deploy/README.md) for the hosting setup
   event ID. They live in four catalogues: `ObservabilityLog` (1000s), `PlaidLog` (2000s), and
   `WebullLog` (3000s) in `BudgetTracker.Server/Utilities/Observability/`, and `DataLog` (4000s) in
   `BudgetTracker.Domain/Common/`. IDs are never reused or renumbered.
-- **Where `ILogger` is used:** only in Managers and background services — `PlaidManager` (which
-  also covers sandbox seeding), `WebullManager`, `WebullTradesManager`, `PlaidSyncSweepService`,
-  and `WebullCloseSnapshotService`. Endpoints, Engines, and Accessors don't log.
+- **Where `ILogger` is used:** in Managers and background services — `PlaidManager` (which also
+  covers sandbox seeding), `WebullManager`, `WebullTradesManager`, `PlaidSyncSweepService`, and
+  `WebullCloseSnapshotService` — plus one Accessor, `DataVersionAccessor` (see §5). Endpoints and
+  Engines don't log.
 - **Errors:** `UseExceptionHandler` plus ProblemDetails responses that carry `correlationId` and
   no stack trace.
 - **Correlation IDs:** middleware reads `X-Correlation-ID` and keeps it if it is 1–64 characters
@@ -124,7 +125,11 @@ Observability is a cross-cutting concern, so it follows the Utility rules in
   `AddBudgetTrackerObservability()` extension method.
 - **Endpoints** don't log. Middleware covers them.
 - **Managers** log workflow steps and failures, once each.
-- **Accessors** throw typed exceptions rather than logging.
+- **Accessors** throw typed exceptions rather than logging, with one deliberate exception:
+  `DataVersionAccessor.BumpAsync`. The bump runs after the caller's own writes have committed, and
+  a failed bump must never fail them: clients just refresh on the next change. So it swallows the
+  failure, logs it where it happens (event 4001), and returns `false`. Moving the log up would
+  mean each of the four Managers that bump repeating the same check.
 - **Engines do not take `ILogger`.** This is a project choice: IDesign allows Engines to call
   Utilities. Engines return outcomes, and the calling Manager logs them.
 - *Proposed — pending approval:* an optional `Code` on `Result`, so that free-text error messages
