@@ -71,6 +71,19 @@ public interface IPlaidItemAccessor
     Task<bool> DeactivateAsync(int userId, int plaidItemId);
 
     /// <summary>
+    /// Ends one of the user's active connections for good (BUD-10): IsActive = false, and the stored access token and
+    /// sync cursor are wiped, so the credential is gone. Unlike <see cref="DeactivateAsync"/>, which the sandbox seed
+    /// can undo, this cannot be reversed; linking the bank again creates a new item.
+    /// </summary>
+    /// <param name="userId">The owning user.</param>
+    /// <param name="plaidItemId">The PlaidItem row id.</param>
+    /// <returns>
+    /// The item's Plaid account ids (for deleting what it imported), or <c>null</c> when the item does not exist,
+    /// belongs to another user, or is already inactive.
+    /// </returns>
+    Task<IReadOnlyList<string>?> DisconnectAsync(int userId, int plaidItemId);
+
+    /// <summary>
     /// Undoes <see cref="DeactivateAsync"/> for one of the user's inactive PlaidItems (IsActive = true). Returns false when
     /// the item does not exist, belongs to another user, or is already active.
     /// </summary>

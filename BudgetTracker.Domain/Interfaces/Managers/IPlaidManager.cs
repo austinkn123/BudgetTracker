@@ -100,10 +100,11 @@ public interface IPlaidManager
     Task<IReadOnlyList<PlaidConnectionView>> GetConnectionsAsync(int userId);
 
     /// <summary>
-    /// Revoke one Plaid item server-side (best-effort) and soft-delete it. Fails with "Bank connection not found"
-    /// when the item does not exist, belongs to another user, or is already inactive.
+    /// Revoke one Plaid item server-side (best-effort), deactivate it, and wipe its stored access token (BUD-10). With
+    /// <paramref name="deleteTransactions"/>, also delete every transaction it imported; manual ones stay. Fails with
+    /// "Bank connection not found" when the item does not exist, belongs to another user, or is already inactive.
     /// </summary>
-    Task<Result> DisconnectAsync(int userId, int plaidItemId);
+    Task<Result> DisconnectAsync(int userId, int plaidItemId, bool deleteTransactions);
 
     /// <summary>
     /// Clear the reconnect flag on one of the user's active connections after update-mode Link succeeds. A successful

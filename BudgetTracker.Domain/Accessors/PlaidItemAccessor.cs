@@ -201,10 +201,29 @@ public class PlaidItemAccessor : IPlaidItemAccessor
     }
 
     /// <inheritdoc />
-    public async Task<bool> ReactivateAsync(int userId, int plaidItemId)
+    public async Task<IReadOnlyList<string>?> DisconnectAsync(int userId, int plaidItemId)
     {
         var item = await _context.PlaidItems
-            .FirstOrDefaultAsync(p => p.Id == plaidItemId && p.UserId == userId && !p.IsActive);
+            .Include(p => p.Accounts)
+            .FirstOrDefaultAsync(p => p.Id == plaidItemId && p.UserId == userId && p.IsActive);
+
+        if (item is null)
+            return null;
+
+        item.IsActive = false;
+        // The credential is gone for good: an empty token can never decrypt, so nothing can sync this item again.
+        item.AccessTokenEncrypted = string.Empty;
+        item.SyncCursor = null;
+        await _context.SaveChangesAsync();
+        return item.Accounts.Select(a => a.PlaidAccountId).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ReactivateAsync(int userId, int plaidItemId)
+    {
+        // A disconnected item has no credential left; bringing it back would look linked but could never sync.
+        var item = await _context.PlaidItems
+            .FirstOrDefaultAsync(p => p.Id == plaidItemId && p.UserId == userId && !p.IsActive && p.AccessTokenEncrypted != string.Empty);
 
         if (item is null)
             return false;

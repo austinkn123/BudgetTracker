@@ -207,4 +207,79 @@ public class PlaidItemAccessorTests : IDisposable
         Assert.Null(balances["card"]);
         Assert.Equal(2, balances.Count);
     }
+
+    // ── DisconnectAsync (BUD-10) ────────────────────────────────────────────
+
+    private async Task<PlaidItem> SeedItemWithAccountsAsync(bool isActive = true)
+    {
+        var item = await SeedItemAsync(_currentKeyRing, isActive);
+        item.SyncCursor = "cursor-1";
+        _context.PlaidAccounts.AddRange(
+            new PlaidAccount { PlaidItemId = item.Id, PlaidAccountId = "chk", Name = "Checking", AccountType = "depository" },
+            new PlaidAccount { PlaidItemId = item.Id, PlaidAccountId = "card", Name = "Card", AccountType = "credit" });
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+        return item;
+    }
+
+    [Fact]
+    public async Task Disconnect_DeactivatesAndWipesTheStoredCredential()
+    {
+        var item = await SeedItemWithAccountsAsync();
+
+        var accountIds = await BuildSut().DisconnectAsync(UserId, item.Id);
+
+        Assert.NotNull(accountIds);
+        var stored = await _context.PlaidItems.AsNoTracking().SingleAsync(p => p.Id == item.Id);
+        Assert.False(stored.IsActive);
+        Assert.Equal(string.Empty, stored.AccessTokenEncrypted);
+        Assert.Null(stored.SyncCursor);
+    }
+
+    [Fact]
+    public async Task Disconnect_ReturnsTheItemsPlaidAccountIds()
+    {
+        var item = await SeedItemWithAccountsAsync();
+
+        var accountIds = await BuildSut().DisconnectAsync(UserId, item.Id);
+
+        Assert.Equal(["card", "chk"], accountIds!.Order());
+    }
+
+    [Fact]
+    public async Task Disconnect_LeavesNoTokenThatAnyLookupCanReturn()
+    {
+        var item = await SeedItemWithAccountsAsync();
+
+        await BuildSut().DisconnectAsync(UserId, item.Id);
+
+        Assert.Equal(AccessTokenStatus.NotFound, (await BuildSut().GetActiveAccessTokenAsync(UserId, item.Id)).Status);
+        Assert.Null((await BuildSut().GetAccessTokenByPlaidItemIdAsync("plaid-item-1")).AccessToken);
+    }
+
+    [Fact]
+    public async Task Disconnect_SomeoneElsesOrInactiveItem_ReturnsNullAndChangesNothing()
+    {
+        var item = await SeedItemWithAccountsAsync();
+        var inactive = await SeedItemWithAccountsAsync(isActive: false);
+
+        Assert.Null(await BuildSut().DisconnectAsync(userId: 999, item.Id));
+        Assert.Null(await BuildSut().DisconnectAsync(UserId, inactive.Id));
+        Assert.Null(await BuildSut().DisconnectAsync(UserId, plaidItemId: 404));
+
+        var untouched = await _context.PlaidItems.AsNoTracking().SingleAsync(p => p.Id == item.Id);
+        Assert.True(untouched.IsActive);
+        Assert.NotEqual(string.Empty, untouched.AccessTokenEncrypted);
+    }
+
+    [Fact]
+    public async Task Disconnect_CannotBeUndoneByReactivate()
+    {
+        var item = await SeedItemWithAccountsAsync();
+
+        await BuildSut().DisconnectAsync(UserId, item.Id);
+
+        // A reactivated item with no credential would look linked but could never sync.
+        Assert.False(await BuildSut().ReactivateAsync(UserId, item.Id));
+    }
 }

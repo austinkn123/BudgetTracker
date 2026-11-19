@@ -61,21 +61,34 @@ public class PlaidConnectionEndpointTests
 
     // ── DELETE /connections/{plaidItemId} ───────────────────────────────────
 
-    [Fact]
-    public async Task DeleteConnection_Success_Returns204()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeleteConnection_Success_Returns204_AndPassesTheDeleteChoiceThrough(bool deleteTransactions)
     {
-        _manager.Setup(m => m.DisconnectAsync(5, 11)).ReturnsAsync(Result.Success());
+        _manager.Setup(m => m.DisconnectAsync(5, 11, deleteTransactions)).ReturnsAsync(Result.Success());
 
-        var result = await PlaidEndpoints.DeleteConnectionAsync(11, _manager.Object, _currentUser.Object);
+        var result = await PlaidEndpoints.DeleteConnectionAsync(11, _manager.Object, _currentUser.Object, deleteTransactions);
 
         Assert.Equal(StatusCodes.Status204NoContent, StatusOf(result));
-        _manager.Verify(m => m.DisconnectAsync(5, 11), Times.Once);
+        _manager.Verify(m => m.DisconnectAsync(5, 11, deleteTransactions), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteConnection_WithoutTheQueryParameter_KeepsTheTransactions()
+    {
+        _manager.Setup(m => m.DisconnectAsync(5, 11, false)).ReturnsAsync(Result.Success());
+
+        await PlaidEndpoints.DeleteConnectionAsync(11, _manager.Object, _currentUser.Object);
+
+        _manager.Verify(m => m.DisconnectAsync(5, 11, false), Times.Once);
+        _manager.Verify(m => m.DisconnectAsync(It.IsAny<int>(), It.IsAny<int>(), true), Times.Never);
     }
 
     [Fact]
     public async Task DeleteConnection_NotFoundNotOwnedOrInactive_Returns404()
     {
-        _manager.Setup(m => m.DisconnectAsync(5, 99)).ReturnsAsync(Result.Failure("Bank connection not found"));
+        _manager.Setup(m => m.DisconnectAsync(5, 99, false)).ReturnsAsync(Result.Failure("Bank connection not found"));
 
         var result = await PlaidEndpoints.DeleteConnectionAsync(99, _manager.Object, _currentUser.Object);
 

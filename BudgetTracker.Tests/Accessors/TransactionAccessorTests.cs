@@ -515,6 +515,56 @@ public class TransactionAccessorTests : IDisposable
         Assert.Equal(9, (await ReloadAsync(1)).CategoryId);
     }
 
+    // ── DeleteImportedByPlaidAccountIdsAsync (BUD-10) ───────────────────────
+
+    [Fact]
+    public async Task DeleteImported_RemovesOnlyImportedRowsFromThoseAccounts()
+    {
+        await SeedAsync(
+            Imported(Row(1, plaidId: "p1", plaidAccountId: "chk")),
+            Imported(Row(2, plaidId: "p2", plaidAccountId: "card")),
+            Imported(Row(3, plaidId: "p3", plaidAccountId: "other-bank")),
+            Row(4, plaidAccountId: null));                                     // manual, same BudgetTracker account
+
+        var deleted = await BuildSut().DeleteImportedByPlaidAccountIdsAsync(UserId, ["chk", "card"]);
+
+        Assert.Equal(2, deleted);
+        Assert.Equal([3, 4], await _context.Transactions.AsNoTracking().Select(t => t.Id).OrderBy(id => id).ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeleteImported_KeepsAManualRowEvenIfItCarriesThePlaidAccountId()
+    {
+        await SeedAsync(Row(1, plaidAccountId: "chk"));                     // not imported
+
+        Assert.Equal(0, await BuildSut().DeleteImportedByPlaidAccountIdsAsync(UserId, ["chk"]));
+        Assert.Equal(1, await _context.Transactions.CountAsync());
+    }
+
+    [Fact]
+    public async Task DeleteImported_NeverTouchesAnotherUsersRows()
+    {
+        await SeedAsync(Imported(Row(1, accountId: 3, plaidId: "p1", plaidAccountId: "chk")));   // account 3 is someone else's
+
+        Assert.Equal(0, await BuildSut().DeleteImportedByPlaidAccountIdsAsync(UserId, ["chk"]));
+        Assert.Equal(1, await _context.Transactions.CountAsync());
+    }
+
+    [Fact]
+    public async Task DeleteImported_NoAccountIds_DeletesNothing()
+    {
+        await SeedAsync(Imported(Row(1, plaidId: "p1", plaidAccountId: "chk")));
+
+        Assert.Equal(0, await BuildSut().DeleteImportedByPlaidAccountIdsAsync(UserId, []));
+        Assert.Equal(1, await _context.Transactions.CountAsync());
+    }
+
+    private static Transaction Imported(Transaction row)
+    {
+        row.IsImported = true;
+        return row;
+    }
+
     // ── Reads ───────────────────────────────────────────────────────────────
 
     [Fact]

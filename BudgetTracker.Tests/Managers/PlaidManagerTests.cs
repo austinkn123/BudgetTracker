@@ -1014,21 +1014,82 @@ public class PlaidManagerTests
 
     // ── DisconnectAsync (by id) ─────────────────────────────────────────────
 
+    private static readonly IReadOnlyList<string> ChaseAccountIds = ["chk", "card"];
+
     [Fact]
-    public async Task Disconnect_RevokesPlaidItemAndDeactivatesOnlyThatItem()
+    public async Task Disconnect_KeepingTransactions_DeletesNoneOfThem()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync(ChaseAccountIds);
+
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
+
+        Assert.True(result.IsSuccess);
+        _txnAccessor.Verify(a => a.DeleteImportedByPlaidAccountIdsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Disconnect_DeletingTransactions_RevokesThenDisconnectsThenDeletesThatBanksRowsThenRepairsThenBumps()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>()))
+            .Callback(() => _calls.Add("revoke")).Returns(Task.CompletedTask);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).Callback(() => _calls.Add("disconnect")).ReturnsAsync(ChaseAccountIds);
+        _txnAccessor.Setup(a => a.DeleteImportedByPlaidAccountIdsAsync(5, It.Is<IReadOnlyCollection<string>>(ids => ids.Order().SequenceEqual(new[] { "card", "chk" }))))
+            .Callback(() => _calls.Add("delete")).ReturnsAsync(7);
+        _categoryAccessor.Setup(a => a.GetByUserIdAsync(5)).ReturnsAsync([]);
+        _txnAccessor.Setup(a => a.GetTransferCandidatesAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+            .Callback(() => _calls.Add("re-pair")).ReturnsAsync([]);
+
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: true);
+
+        Assert.True(result.IsSuccess);
+        // Credentials go first, so a failure deleting rows never leaves a live connection behind.
+        Assert.Equal(["revoke", "disconnect", "delete", "re-pair", "bump:5"], _calls);
+    }
+
+    [Fact]
+    public async Task Disconnect_DeletingTransactions_ItemNotFound_DeletesNothing()
+    {
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Undecryptable);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync((IReadOnlyList<string>?)null);
+
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: true);
+
+        Assert.False(result.IsSuccess);
+        _txnAccessor.Verify(a => a.DeleteImportedByPlaidAccountIdsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Disconnect_NeverUsesTheReversibleDeactivate()
+    {
+        // DeactivateAsync keeps the stored token so the sandbox seed can restore it; a user disconnect must wipe it.
+        _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync(ChaseAccountIds);
+
+        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
+
+        _itemAccessor.Verify(a => a.DeactivateAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
+
+
+    [Fact]
+    public async Task Disconnect_RevokesPlaidItemAndDisconnectsOnlyThatItem()
     {
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
         _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).ReturnsAsync(true);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync(ChaseAccountIds);
 
-        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
 
         Assert.True(result.IsSuccess);
         // /item/remove is what stops Plaid's per-Item billing.
         _plaidAccessor.Verify(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>()), Times.Once);
-        _itemAccessor.Verify(a => a.DeactivateAsync(5, 11), Times.Once);
-        _itemAccessor.Verify(a => a.DeactivateAsync(It.IsAny<int>(), It.Is<int>(id => id != 11)), Times.Never);
+        _itemAccessor.Verify(a => a.DisconnectAsync(5, 11), Times.Once);
+        _itemAccessor.Verify(a => a.DisconnectAsync(It.IsAny<int>(), It.Is<int>(id => id != 11)), Times.Never);
     }
 
     [Fact]
@@ -1038,12 +1099,12 @@ public class PlaidManagerTests
         // and an already-inactive item all come back as null.
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 99)).ReturnsAsync(AccessTokenLookup.NotFound);
 
-        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 99);
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 99, deleteTransactions: false);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Bank connection not found", result.Error);
         _plaidAccessor.Verify(a => a.RemoveItemAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        _itemAccessor.Verify(a => a.DeactivateAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _itemAccessor.Verify(a => a.DisconnectAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
     }
 
     [Fact]
@@ -1053,24 +1114,24 @@ public class PlaidManagerTests
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
         _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Plaid down"));
-        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).ReturnsAsync(true);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync(ChaseAccountIds);
 
-        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
 
         Assert.True(result.IsSuccess);
-        _itemAccessor.Verify(a => a.DeactivateAsync(5, 11), Times.Once);
+        _itemAccessor.Verify(a => a.DisconnectAsync(5, 11), Times.Once);
     }
 
     [Fact]
     public async Task Should_SkipPlaidRemoveDeactivateAndSucceed_When_TokenIsUndecryptable()
     {
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Undecryptable);
-        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).ReturnsAsync(true);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync(ChaseAccountIds);
 
-        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
 
         Assert.True(result.IsSuccess);
-        _itemAccessor.Verify(a => a.DeactivateAsync(5, 11), Times.Once);
+        _itemAccessor.Verify(a => a.DisconnectAsync(5, 11), Times.Once);
         _plaidAccessor.Verify(a => a.RemoveItemAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -1078,9 +1139,9 @@ public class PlaidManagerTests
     public async Task Should_LogWarning_When_DisconnectingAnItemWithAnUndecryptableToken()
     {
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Undecryptable);
-        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).ReturnsAsync(true);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync(ChaseAccountIds);
 
-        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
 
         VerifyWarningLogged(Times.Once());
     }
@@ -1089,9 +1150,9 @@ public class PlaidManagerTests
     public async Task Should_ReturnNotFound_When_TokenIsUndecryptableAndItemWasDeactivatedConcurrently()
     {
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Undecryptable);
-        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).ReturnsAsync(false);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync((IReadOnlyList<string>?)null);
 
-        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Bank connection not found", result.Error);
@@ -1104,9 +1165,9 @@ public class PlaidManagerTests
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
         _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).ReturnsAsync(false);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync((IReadOnlyList<string>?)null);
 
-        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Bank connection not found", result.Error);
@@ -2165,16 +2226,16 @@ public class PlaidManagerTests
     }
 
     [Fact]
-    public async Task Disconnect_Deactivated_BumpsAfterTheWrite()
+    public async Task Disconnect_Disconnected_BumpsAfterTheWrite()
     {
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
         _plaidAccessor.Setup(a => a.RemoveItemAsync("access-token-xyz", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).Callback(() => _calls.Add("deactivate")).ReturnsAsync(true);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).Callback(() => _calls.Add("disconnect")).ReturnsAsync(ChaseAccountIds);
 
-        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+        var result = await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(["deactivate", "bump:5"], _calls);
+        Assert.Equal(["disconnect", "bump:5"], _calls);
     }
 
     [Fact]
@@ -2182,10 +2243,10 @@ public class PlaidManagerTests
     {
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 99)).ReturnsAsync(AccessTokenLookup.NotFound);
         _itemAccessor.Setup(a => a.GetActiveAccessTokenAsync(5, 11)).ReturnsAsync(AccessTokenLookup.Undecryptable);
-        _itemAccessor.Setup(a => a.DeactivateAsync(5, 11)).ReturnsAsync(false);
+        _itemAccessor.Setup(a => a.DisconnectAsync(5, 11)).ReturnsAsync((IReadOnlyList<string>?)null);
 
-        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 99);
-        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11);
+        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 99, deleteTransactions: false);
+        await BuildSut().DisconnectAsync(userId: 5, plaidItemId: 11, deleteTransactions: false);
 
         VerifyNeverBumped();
     }

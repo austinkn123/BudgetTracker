@@ -113,15 +113,18 @@ public static class PlaidEndpoints
     }
 
     /// <summary>
-    /// <c>DELETE /api/plaid/connections/{plaidItemId}</c> — revokes and soft-deletes one connection. 204 on success;
-    /// 404 when the item is missing, owned by another user, or already inactive.
+    /// <c>DELETE /api/plaid/connections/{plaidItemId}?deleteTransactions=</c> — revokes one connection at Plaid and wipes
+    /// its stored credential. With <c>deleteTransactions=true</c>, also deletes every transaction it imported (manual
+    /// ones stay); without it they are kept. 204 on success; 404 when the item is missing, owned by another user, or
+    /// already inactive.
     /// </summary>
     public static async Task<IResult> DeleteConnectionAsync(
         int plaidItemId,
         IPlaidManager manager,
-        ICurrentUserProvider currentUser)
+        ICurrentUserProvider currentUser,
+        bool deleteTransactions = false)
     {
-        var result = await manager.DisconnectAsync(currentUser.UserId, plaidItemId);
+        var result = await manager.DisconnectAsync(currentUser.UserId, plaidItemId, deleteTransactions);
         return result.IsSuccess ? TypedResults.NoContent() : TypedResults.NotFound();
     }
 

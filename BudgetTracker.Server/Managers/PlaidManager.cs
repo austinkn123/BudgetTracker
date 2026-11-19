@@ -371,7 +371,7 @@ public class PlaidManager(
     }
 
     /// <inheritdoc />
-    public async Task<Result> DisconnectAsync(int userId, int plaidItemId)
+    public async Task<Result> DisconnectAsync(int userId, int plaidItemId, bool deleteTransactions)
     {
         var lookup = await itemAccessor.GetActiveAccessTokenAsync(userId, plaidItemId);
         switch (lookup.Status)
@@ -397,10 +397,24 @@ public class PlaidManager(
                 break;
         }
 
-        if (!await itemAccessor.DeactivateAsync(userId, plaidItemId))
+        // Credentials first, so a failure deleting rows below never leaves a live connection behind.
+        if (await itemAccessor.DisconnectAsync(userId, plaidItemId) is not { } plaidAccountIds)
             return Result.Failure(ConnectionNotFoundMessage);
 
-        await dataVersion.BumpAsync(userId);
+        try
+        {
+            if (deleteTransactions && plaidAccountIds.Count > 0)
+            {
+                await transactionAccessor.DeleteImportedByPlaidAccountIdsAsync(userId, plaidAccountIds);
+                // A deleted leg's partner on another bank is left as half a transfer; re-pairing reverts it.
+                await PairOwnAccountTransfersAsync(userId, (await categoryAccessor.GetByUserIdAsync(userId)).ToList());
+            }
+        }
+        finally
+        {
+            await dataVersion.BumpAsync(userId);
+        }
+
         return Result.Success();
     }
 

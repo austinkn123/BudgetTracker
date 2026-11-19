@@ -118,4 +118,13 @@ public interface ITransactionAccessor
 
     /// <summary>Delete imported transactions by Plaid transaction id (used when Plaid reports removals).</summary>
     Task<int> DeleteByPlaidTransactionIdsAsync(IEnumerable<string> plaidTransactionIds);
+
+    /// <summary>
+    /// Deletes the user's Plaid-imported transactions that came from the given Plaid accounts (disconnect and delete,
+    /// BUD-10). Manual transactions are kept, even in the same account, and so are other users' rows.
+    /// </summary>
+    /// <param name="userId">The owning user.</param>
+    /// <param name="plaidAccountIds">Plaid's account ids for the bank being removed.</param>
+    /// <returns>How many transactions were deleted.</returns>
+    Task<int> DeleteImportedByPlaidAccountIdsAsync(int userId, IReadOnlyCollection<string> plaidAccountIds);
 }
