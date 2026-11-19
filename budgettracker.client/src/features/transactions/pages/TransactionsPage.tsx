@@ -3,8 +3,13 @@ import { PageHeader } from '../../../shared/components/ui';
 import { useTransactionSummary } from '../hooks/useTransactionSummary';
 import StatusBanner from '../../../shared/components/StatusBanner';
 import TransactionsSection from '../TransactionsSection';
+import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
 
 const TransactionsPage = () => {
+  // Pull any bank not synced in the last 6 hours: a direct visit (bookmark, reload) skips the home page that
+  // otherwise does it, and the ledger is where stale data shows most.
+  useSyncOnOpen();
+
   // The section's first paint waits on the ledger summary: small, shared with the section's own
   // backlog count, and the one read every view needs. Each view's rows then load on their own.
   const { isLoading } = useTransactionSummary();
