@@ -20,7 +20,8 @@ public class UserAccessor(BudgetTrackerDbContext context) : IUserAccessor
             // Lost a first-login race: a concurrent request provisioned this sub first, so return that row.
             context.Entry(user).State = EntityState.Detached;
             var existing = await GetByCognitoSubAsync(user.CognitoSub!);
-            return existing?.Id ?? throw ex;
+            if (existing is null) throw; // keep the original stack trace
+            return existing.Id;
         }
     }
 
