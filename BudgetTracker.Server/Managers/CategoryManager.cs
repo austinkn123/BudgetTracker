@@ -11,7 +11,9 @@ public class CategoryManager(
     ICategoryAccessor accessor,
     ITransactionAccessor transactionAccessor,
     IPlaidEngine plaidEngine,
-    IDataVersionAccessor dataVersion) : ICategoryManager
+    IDataVersionAccessor dataVersion,
+    ICategoryRuleAccessor ruleAccessor,
+    ICategoryRuleEngine ruleEngine) : ICategoryManager
 {
     public async Task<Result<Category>> GetByIdAsync(int id, int userId)
     {
@@ -130,6 +132,11 @@ public class CategoryManager(
 
     public async Task<Result<bool>> DeleteAsync(int id, int userId)
     {
+        // Name the rules, which the database's in-use error can't (it stays the backstop for a race).
+        var rulePatterns = await ruleAccessor.GetPatternsForCategoryAsync(id, userId);
+        if (rulePatterns.Count > 0)
+            return Result<bool>.Failure(ruleEngine.CategoryInUseByRulesError(rulePatterns));
+
         bool deleted;
         try
         {

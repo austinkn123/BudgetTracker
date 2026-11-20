@@ -14,17 +14,20 @@ public class CategoryManagerTests
     private readonly CategoryEngine _engine = new();
     private readonly Mock<ITransactionAccessor> _txnAccessor = new(MockBehavior.Strict);
     private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
+    private readonly Mock<ICategoryRuleAccessor> _rules = new(MockBehavior.Strict);
     private readonly List<string> _calls = [];
 
     public CategoryManagerTests()
     {
         _accessor.Setup(a => a.GetOtherNamesAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync([]);
+        _rules.Setup(r => r.GetPatternsForCategoryAsync(It.IsAny<int>(), It.IsAny<int>())).ReturnsAsync([]);
         _dataVersion.Setup(d => d.BumpAsync(It.IsAny<int>()))
             .Callback<int>(userId => _calls.Add($"bump:{userId}"))
             .ReturnsAsync(true);
     }
 
-    private CategoryManager BuildSut() => new(_engine, _accessor.Object, _txnAccessor.Object, new PlaidEngine(), _dataVersion.Object);
+    private CategoryManager BuildSut() =>
+        new(_engine, _accessor.Object, _txnAccessor.Object, new PlaidEngine(), _dataVersion.Object, _rules.Object, new CategoryRuleEngine());
 
     private static Category BuildMappedCategory() => new()
     {
@@ -434,6 +437,18 @@ public class CategoryManagerTests
             .ThrowsAsync(new UniqueNameViolationException("UQ_Categories_User_Name", new Exception("23505")));
         await BuildSut().UpdateAsync(BuildMappedCategory());
 
+        VerifyNeverBumped();
+    }
+
+    [Fact]
+    public async Task Delete_UsedByRules_NamesTheRulesWithoutDeleting()
+    {
+        _rules.Setup(r => r.GetPatternsForCategoryAsync(8, 5)).ReturnsAsync(["uber", "lyft"]);
+
+        var result = await BuildSut().DeleteAsync(8, 5);
+
+        Assert.Equal("This category is used by rules: \"uber\", \"lyft\". Delete or change those rules first.", result.Error);
+        _accessor.Verify(a => a.DeleteAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
         VerifyNeverBumped();
     }
 
