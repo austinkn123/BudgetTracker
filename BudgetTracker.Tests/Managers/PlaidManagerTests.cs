@@ -24,6 +24,7 @@ public class PlaidManagerTests
     private readonly PlaidOptions _options = new();
     private readonly Mock<ILogger<PlaidManager>> _logger = TestLoggers.Enabled<PlaidManager>();
     private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
+    private readonly Mock<ICategoryRuleAccessor> _ruleAccessor = new(MockBehavior.Strict);
     private readonly List<string> _calls = [];
 
     public PlaidManagerTests()
@@ -50,6 +51,7 @@ public class PlaidManagerTests
         _txnAccessor
             .Setup(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
             .ReturnsAsync(new Dictionary<string, int>());
+        _ruleAccessor.Setup(a => a.GetByUserIdAsync(It.IsAny<int>())).ReturnsAsync([]);
     }
 
     private PlaidManager BuildSut() => new(
@@ -64,6 +66,8 @@ public class PlaidManagerTests
         new Mock<IBudgetPlanAccessor>(MockBehavior.Strict).Object,
         new BudgetPlanEngine(),
         new Mock<ISandboxSeedEngine>(MockBehavior.Strict).Object,
+        _ruleAccessor.Object,
+        new CategoryRuleEngine(),
         Options.Create(_options),
         _logger.Object);
 
@@ -1785,6 +1789,55 @@ public class PlaidManagerTests
     }
 
     [Fact]
+    public async Task Sync_NewRow_TakesAMatchingRuleAheadOfTheLearnedPayeePick()
+    {
+        StubSyncWith(
+            new PlaidSyncResult([ZelleIn()], [], [], "next-cursor"),
+            [
+                new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income" },
+                new Category { Id = 12, UserId = 5, Name = "Gifts", CategoryType = "Income" },
+            ]);
+        _txnAccessor.Setup(a => a.GetLatestCategoryByPayeeAsync(5, It.IsAny<IReadOnlyCollection<string>>()))
+            .ReturnsAsync(new Dictionary<string, int> { ["ZELLE FROM SAM"] = 9 });
+        _ruleAccessor.Setup(a => a.GetByUserIdAsync(5))
+            .ReturnsAsync([new CategoryRule { Id = 1, UserId = 5, Pattern = "zelle from", MatchType = CategoryRuleMatchType.Contains, CategoryId = 12 }]);
+        List<Transaction>? captured = null;
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(t => captured = t.ToList())
+            .ReturnsAsync((1, 0));
+
+        await BuildSut().SyncAsync(5);
+
+        var mapped = Assert.Single(captured!);
+        Assert.Equal(12, mapped.CategoryId);
+        Assert.Equal("Income", mapped.TransactionType);
+    }
+
+    [Fact]
+    public async Task Sync_UpsertedRow_KeepsItsCategory_When_ARuleMatches()
+    {
+        // A category already on the row (picked by hand or filed earlier) is never overwritten by a rule (BUD-24 AC-4).
+        StubSyncWith(
+            new PlaidSyncResult([], [ZelleIn()], [], "next-cursor"),
+            [
+                new Category { Id = 9, UserId = 5, Name = "Side gig", CategoryType = "Income" },
+                new Category { Id = 12, UserId = 5, Name = "Gifts", CategoryType = "Income" },
+            ]);
+        _txnAccessor.Setup(a => a.GetByPlaidTransactionIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync([new Transaction { Id = 40, PlaidTransactionId = "plaid-txn-1", CategoryId = 9, TransactionType = "Income" }]);
+        _ruleAccessor.Setup(a => a.GetByUserIdAsync(5))
+            .ReturnsAsync([new CategoryRule { Id = 1, UserId = 5, Pattern = "zelle", MatchType = CategoryRuleMatchType.Contains, CategoryId = 12 }]);
+        List<Transaction>? captured = null;
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(t => captured = t.ToList())
+            .ReturnsAsync((0, 1));
+
+        await BuildSut().SyncAsync(5);
+
+        Assert.Equal(9, Assert.Single(captured!).CategoryId);
+    }
+
+    [Fact]
     public async Task Sync_NewRow_IsClassifiedByItsResolvedCategoryType()
     {
         StubSyncWith(
@@ -2365,6 +2418,8 @@ public class PlaidManagerTests
         new Mock<IBudgetPlanAccessor>(MockBehavior.Strict).Object,
         new BudgetPlanEngine(),
         new Mock<ISandboxSeedEngine>(MockBehavior.Strict).Object,
+        _ruleAccessor.Object,
+        new CategoryRuleEngine(),
         Options.Create(_options),
         NullLogger<PlaidManager>.Instance);
 

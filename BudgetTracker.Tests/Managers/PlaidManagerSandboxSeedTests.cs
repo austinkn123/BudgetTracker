@@ -84,6 +84,8 @@ public class PlaidManagerSandboxSeedTests
         _budgetPlanAccessor.Object,
         new BudgetPlanEngine(),
         _seedEngine.Object,
+        Mock.Of<ICategoryRuleAccessor>(a => a.GetByUserIdAsync(It.IsAny<int>()) == Task.FromResult<IReadOnlyList<CategoryRule>>(Array.Empty<CategoryRule>())),
+        new CategoryRuleEngine(),
         Options.Create(_options),
         logger ?? NullLogger<PlaidManager>.Instance);
 

@@ -69,6 +69,21 @@ public class ProgramWiringTests
     }
 
     [Fact]
+    public async Task Should_ResolveThePayeeRuleChain_When_ProgramIsHosted()
+    {
+        await using var factory = CreateFactory(new Mock<ICurrentUserProvider>().Object);
+        using var scope = factory.Services.CreateScope();
+
+        // BUD-24 added CategoryRule{Engine,Accessor,Manager} and new dependencies on the category and Plaid managers.
+        Assert.IsType<BudgetTracker.Server.Managers.CategoryRuleManager>(
+            scope.ServiceProvider.GetRequiredService<BudgetTracker.Domain.Interfaces.Managers.ICategoryRuleManager>());
+        Assert.IsType<BudgetTracker.Server.Managers.CategoryManager>(
+            scope.ServiceProvider.GetRequiredService<BudgetTracker.Domain.Interfaces.Managers.ICategoryManager>());
+        Assert.IsType<BudgetTracker.Server.Managers.PlaidManager>(
+            scope.ServiceProvider.GetRequiredService<BudgetTracker.Domain.Interfaces.Managers.IPlaidManager>());
+    }
+
+    [Fact]
     public async Task Should_AttachTheSlowQueryInterceptorToTheDbContext_When_ProgramIsHosted()
     {
         await using var factory = CreateFactory(new Mock<ICurrentUserProvider>().Object);

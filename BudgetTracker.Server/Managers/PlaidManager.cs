@@ -29,6 +29,8 @@ public class PlaidManager(
     IBudgetPlanAccessor budgetPlanAccessor,
     IBudgetPlanEngine budgetPlanEngine,
     ISandboxSeedEngine seedEngine,
+    ICategoryRuleAccessor ruleAccessor,
+    ICategoryRuleEngine ruleEngine,
     IOptions<PlaidOptions> options,
     ILogger<PlaidManager> logger) : IPlaidManager
 {
@@ -756,6 +758,9 @@ public class PlaidManager(
             : await transactionAccessor.GetLatestCategoryByPayeeAsync(
                 userId, changes.Select(engine.ResolvePayee).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
 
+        // The user's explicit payee rules come first for a row that is still uncategorized (BUD-24).
+        IReadOnlyList<CategoryRule> rules = changes.Count == 0 ? [] : await ruleAccessor.GetByUserIdAsync(userId);
+
         foreach (var plaidTxn in changes)
         {
             var matchingSnapshot = plaidAccountSnapshots.FirstOrDefault(a => a.PlaidAccountId == plaidTxn.AccountId);
@@ -774,6 +779,7 @@ public class PlaidManager(
                 continue; // Defensive — exchange flow ensures one exists; skip orphans rather than crash.
 
             var categoryId = existingByPlaidId.GetValueOrDefault(plaidTxn.TransactionId)?.CategoryId
+                             ?? ruleEngine.FindMatch(engine.ResolvePayee(plaidTxn), rules)?.CategoryId
                              ?? engine.ResolveCategoryId(plaidTxn, userCategories, categoryByPayee);
             var categoryType = userCategories.FirstOrDefault(c => c.Id == categoryId)?.CategoryType;
             mapped.Add(engine.MapToBudgetTrackerTransaction(plaidTxn, resolvedAccountId.Value, categoryId, categoryType));
