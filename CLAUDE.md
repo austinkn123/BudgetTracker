@@ -51,6 +51,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - Local database: **PostgreSQL**. Local dev reads `ConnectionStrings:BudgetTrackerConnection` from `BudgetTracker.Server/appsettings.Development.json` (points at Postgres on `localhost`); the gitignored `appsettings.Local.json` can override it. Production uses Neon, with the connection string in SSM (see `deploy/README.md`). Use the `postgres` MCP server (`.mcp.json`, Postgres MCP Pro via `uvx`, **read-only** `--access-mode=restricted`) to inspect schema, run read queries, and verify migrations. It connects to `BUDGETTRACKER_DATABASE_URI` if set (use a read-only role for Neon), otherwise to the local dev database.
 
 ## How to Work
+- Keep responses brief: lead with the result, then only what the user must know or decide. No recaps, no restating the request, short bullets over paragraphs.
 - Do the work in the main thread. Don't spawn subagents unless the user asks, or for a broad read-only search where only the conclusion matters.
 - Before backend, test, database, frontend or Jira work, read the matching section of `project-docs/engineering-standards.md` (once per session, not per step).
 - `/review` runs the read-only `reviewer` agent (Sonnet) only for large diffs; small diffs are reviewed inline.
