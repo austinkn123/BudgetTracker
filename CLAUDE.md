@@ -54,7 +54,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - Keep responses brief: lead with the result, then only what the user must know or decide. No recaps, no restating the request, short bullets over paragraphs.
 - Do the work in the main thread. Don't spawn subagents unless the user asks, or for a broad read-only search where only the conclusion matters.
 - Before backend, test, database, frontend or Jira work, read the matching section of `project-docs/engineering-standards.md` (once per session, not per step).
-- `/review` runs the read-only `reviewer` agent (Sonnet) only for large diffs; small diffs are reviewed inline.
+- `/review` runs the read-only `reviewer` agent only for large diffs; small diffs are reviewed inline.
 
 ## Guardrails
 

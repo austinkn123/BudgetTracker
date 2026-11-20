@@ -1,7 +1,6 @@
 ---
 name: reviewer
 description: Read-only pre-commit review of a large diff (IDesign layering, correctness, test gaps). Use only from /review or when the user asks for a review.
-model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
 
