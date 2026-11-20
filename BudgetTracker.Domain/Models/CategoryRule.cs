@@ -30,3 +30,6 @@ public static class CategoryRuleMatchType
 
     public static readonly IReadOnlyList<string> All = [Contains, Exact];
 }
+
+/// <summary>How many of a user's transactions share a payee and category (null = uncategorized).</summary>
+public record PayeeCategoryCount(string Payee, int? CategoryId, int Count);
