@@ -5,6 +5,7 @@ import { createQueryWrapper, createTestQueryClient } from '../../test/renderWith
 import { useBudgetPlans } from '../../features/budget-plans/hooks/useBudgetPlans';
 import { useCashFlow } from '../../features/cash-flow/hooks/useCashFlow';
 import { useCategories } from '../../features/categories/hooks/useCategories';
+import { useCategoryRules } from '../../features/categories/hooks/useCategoryRules';
 import { useCategoryUsage } from '../../features/categories/hooks/useCategoryUsage';
 import { useBudgetAnalysis } from '../../features/dashboard/hooks/useBudgetAnalysis';
 import { usePlaidConnections } from '../../features/linked-accounts/hooks/usePlaidConnections';
@@ -46,6 +47,7 @@ const SINGLE_KEY_LIVE_HOOKS: [string, () => unknown][] = [
   ['useCashFlow', () => useCashFlow({ to: '2026-11-30', groupBy: 'Month' })],
   ['useMoneyMap', () => useMoneyMap(3)],
   ['useCategories', useCategories],
+  ['useCategoryRules', useCategoryRules],
   ['useBudgetPlans', useBudgetPlans],
   ['usePlaidConnections', usePlaidConnections],
 ];
@@ -99,6 +101,7 @@ describe('isLiveDataQuery against the keys the hooks build', () => {
       'useBudgetPlans.ts',
       'useCashFlow.ts',
       'useCategories.ts',
+      'useCategoryRules.ts',
       'useCategoryUsage.ts',
       'useMoneyMap.ts',
       'usePlaidConnections.ts',

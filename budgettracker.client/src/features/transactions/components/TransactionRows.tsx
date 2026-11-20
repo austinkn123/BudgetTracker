@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Sparkles, StickyNote } from 'lucide-react';
+import { Sparkles, StickyNote, Wand2 } from 'lucide-react';
 import { Badge, InlineCheckbox, InlineSelect } from '../../../shared/components/ui';
 import type { Category, Transaction } from '../../../shared/types/api';
 import { formatPlaidCategory } from '../../../shared/constants/plaidCategories';
 import { signedAmount } from '../../../shared/utils/format';
 import { isInflowTransaction } from '../utils/transactionGroups';
 import { cn } from '../../../shared/utils/cn';
+import CategoryRuleDialog from '../../categories/components/CategoryRuleDialog';
 
 type TransactionRowsProps = {
   transactions: Transaction[];
@@ -67,6 +68,7 @@ const TransactionRows = ({
           <TransactionRow
             key={transaction.id}
             transaction={transaction}
+            categories={categories}
             categoryOptions={categoryOptions}
             suggestion={suggestion}
             mask={
@@ -88,6 +90,7 @@ const TransactionRows = ({
 
 type TransactionRowProps = {
   transaction: Transaction;
+  categories: Category[];
   categoryOptions: { value: number; label: string }[];
   suggestion: Category | undefined;
   mask: string | null | undefined;
@@ -100,6 +103,7 @@ type TransactionRowProps = {
 
 const TransactionRow = ({
   transaction,
+  categories,
   categoryOptions,
   suggestion,
   mask,
@@ -111,6 +115,20 @@ const TransactionRow = ({
 }: TransactionRowProps) => {
   const [editingNote, setEditingNote] = useState(false);
   const [noteDraft, setNoteDraft] = useState(transaction.notes ?? '');
+  const [ruleOpen, setRuleOpen] = useState(false);
+  const [ruleStatus, setRuleStatus] = useState<string | null>(null);
+  // Stable while the dialog is open: a new object would make it reset the form on every parent render.
+  const ruleInitialValues = useMemo(
+    () => ({
+      pattern: transaction.payee ?? '',
+      matchType: 'Contains' as const,
+      categoryId: transaction.categoryId ?? suggestion?.id ?? 0,
+      applyToExisting: false,
+    }),
+    // Captured when the dialog opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ruleOpen],
+  );
 
   // A re-sync can change the stored note underneath an open editor; follow it when not editing.
   useEffect(() => {
@@ -254,8 +272,37 @@ const TransactionRow = ({
               {transaction.notes ? transaction.notes : 'Add note'}
             </button>
           )}
+
+          {transaction.payee && (
+            // Native <button>: same quiet chip as the note trigger beside it (BUD-24).
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => {
+                setRuleStatus(null);
+                setRuleOpen(true);
+              }}
+              aria-label={`Always categorize ${transaction.payee}`}
+              className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted transition-colors duration-120 hover:bg-surface hover:text-ink disabled:opacity-50"
+            >
+              <Wand2 size={11} />
+              Always categorize…
+            </button>
+          )}
+
+          {ruleStatus && <span className="text-xs text-success-dark">{ruleStatus}</span>}
         </div>
       </div>
+
+      {ruleOpen && (
+        <CategoryRuleDialog
+          open
+          initialValues={ruleInitialValues}
+          categories={categories}
+          onClose={() => setRuleOpen(false)}
+          onSaved={setRuleStatus}
+        />
+      )}
     </li>
   );
 };

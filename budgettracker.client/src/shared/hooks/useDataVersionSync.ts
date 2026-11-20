@@ -14,6 +14,8 @@ const LIVE_PREFIXES = new Set([
   'cash-flow',
   'money-map',
   'categories',
+  // Payee rules (BUD-24): their filed counts move with the ledger.
+  'category-rules',
   'budgetPlans',
   'plaid',
 ]);

@@ -412,3 +412,30 @@ export interface CashFlowQuery {
   categoryId?: number;
   search?: string;
 }
+
+/** How a payee rule's pattern matches (BUD-24): anywhere in the payee, or the whole payee. Both ignore case. */
+export type CategoryRuleMatchType = 'Contains' | 'Exact';
+
+/** "Always categorize this payee as" (BUD-24), with how many rows in its category it has filed. */
+export interface CategoryRule {
+  id: number;
+  pattern: string;
+  matchType: CategoryRuleMatchType;
+  categoryId: number;
+  categoryName: string;
+  matchedCount: number;
+}
+
+/** Body of a rule create, update or preview. `applyToExisting` is read by create only. */
+export interface CategoryRuleRequest {
+  pattern: string;
+  matchType: CategoryRuleMatchType;
+  categoryId: number;
+  applyToExisting?: boolean;
+}
+
+/** The new rule's id and how many existing uncategorized rows it filed. */
+export interface CategoryRuleCreated {
+  id: number;
+  appliedCount: number;
+}
