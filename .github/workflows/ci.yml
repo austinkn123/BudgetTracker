@@ -1,0 +1,109 @@
+# Runs every check on every push and pull request (BUD-23). Work lands straight on main, so this
+# reports a break after it lands; requiring it in branch protection is what would block one.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server (.NET + Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      # The client .esproj is a project reference of the server; its npm install belongs to the client job.
+      BUILD_PROPS: -p:ShouldRunNpmInstall=false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # setup-dotnet's own cache needs packages.lock.json files, which this repo doesn't use.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore BudgetTracker.Tests $BUILD_PROPS
+
+      - name: Build (warnings are errors)
+        run: dotnet build BudgetTracker.Tests --no-restore -warnaserror $BUILD_PROPS
+
+      - name: Test (Postgres tests must run, not skip)
+        env:
+          BUDGETTRACKER_REQUIRE_POSTGRES: '1'
+          BUDGETTRACKER_TEST_POSTGRES: Host=localhost;Username=postgres;Password=postgres
+        run: dotnet test BudgetTracker.Tests --no-build
+
+      - name: Vulnerable NuGet packages
+        run: |
+          set -o pipefail
+          for project in BudgetTracker.Server BudgetTracker.Tests; do
+            dotnet list "$project" package --vulnerable --include-transitive | tee "$RUNNER_TEMP/vulnerable.txt"
+            # Pass only on the SDK's explicit all-clear, so an unexpected output format fails loudly.
+            if ! grep -q "has no vulnerable packages" "$RUNNER_TEMP/vulnerable.txt"; then
+              echo "::error::$project has vulnerable NuGet packages"
+              exit 1
+            fi
+          done
+
+  client:
+    name: Client (lint, types, tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: budgettracker.client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: budgettracker.client/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc -b --noEmit
+
+      - name: Test
+        run: npx vitest run
+
+      - name: Build
+        run: npx vite build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

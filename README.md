@@ -136,6 +136,7 @@ Authentication is not documented as active in the current setup. Treat the app a
 - Keep accessors focused on database interaction
 - For frontend forms, use React Hook Form with Zod schemas and `@hookform/resolvers`
 - Keep reusable form schemas in `budgettracker.client/src/shared/validation/`
+- CI (`.github/workflows/ci.yml`) runs on every push and pull request: the backend build with warnings as errors, every test including the Postgres ones against a `postgres:16` service, client lint, type-check, tests and build, and both dependency audits. It reports; nothing in branch protection requires it yet.
 
 ## Related Files
 
