@@ -167,6 +167,7 @@ const LinkedAccountsSection = () => {
             onSelect={() => setDeleteTransactions(true)}
             label={`Delete all imported transactions from ${pendingDisconnect?.institutionName ?? 'this bank'}`}
             hint="Manual transactions are kept. This can't be undone."
+            tone="danger"
           />
         </fieldset>
       </Modal>
@@ -179,14 +180,18 @@ type DisconnectChoiceProps = {
   onSelect: () => void;
   label: string;
   hint: string;
+  /** `danger` marks a destructive option: red rather than brand purple when selected. */
+  tone?: 'danger';
 };
 
 /** One option of the disconnect dialog's keep / delete choice. */
-const DisconnectChoice = ({ checked, onSelect, label, hint }: DisconnectChoiceProps) => (
+const DisconnectChoice = ({ checked, onSelect, label, hint, tone }: DisconnectChoiceProps) => (
   <label
     className={cn(
       'flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition-colors duration-120',
-      checked ? 'border-primary bg-primary-subtle' : 'border-border hover:border-border-strong',
+      // A destructive choice reads red when picked, matching the red confirm button.
+      !checked && 'border-border hover:border-border-strong',
+      checked && (tone === 'danger' ? 'border-error bg-error-subtle' : 'border-primary bg-primary-subtle'),
     )}
   >
     {/* Native <input>: radio option; there is no shared radio primitive, and a native group keeps arrow-key navigation. */}
@@ -195,7 +200,7 @@ const DisconnectChoice = ({ checked, onSelect, label, hint }: DisconnectChoicePr
       name="disconnect-transactions"
       checked={checked}
       onChange={onSelect}
-      className="focus-ring mt-0.5 accent-primary"
+      className={cn('focus-ring mt-0.5', tone === 'danger' ? 'accent-error' : 'accent-primary')}
     />
     <span className="flex flex-col">
       <span className="text-sm font-medium text-ink">{label}</span>

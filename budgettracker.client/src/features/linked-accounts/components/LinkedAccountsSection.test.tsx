@@ -181,6 +181,25 @@ describe('LinkedAccountsSection', () => {
     );
   });
 
+  it('marks the selected delete option red, the keep option purple', async () => {
+    const user = userEvent.setup();
+    apiMock.get.mockResolvedValue({ data: [CHASE, ALLY] });
+
+    renderSection();
+    await user.click(await screen.findByRole('button', { name: 'Disconnect Ally Bank' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Disconnect Ally Bank?' });
+    const keep = within(dialog).getByRole('radio', { name: /Keep imported transactions/ });
+    const remove = within(dialog).getByRole('radio', { name: /Delete all imported transactions/ });
+
+    expect(keep.closest('label')).toHaveClass('border-primary');
+
+    await user.click(remove);
+
+    expect(remove.closest('label')).toHaveClass('border-error', 'bg-error-subtle');
+    expect(remove.closest('label')).not.toHaveClass('border-primary');
+    expect(remove).toHaveClass('accent-error');
+  });
+
   it('resets the choice to keep when the dialog is opened again', async () => {
     const user = userEvent.setup();
     apiMock.get.mockResolvedValue({ data: [CHASE, ALLY] });
