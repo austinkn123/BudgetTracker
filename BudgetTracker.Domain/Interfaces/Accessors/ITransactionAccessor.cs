@@ -90,6 +90,15 @@ public interface ITransactionAccessor
     Task<IReadOnlyList<Transaction>> GetByPlaidTransactionIdsAsync(IEnumerable<string> plaidTransactionIds);
 
     /// <summary>
+    /// The user's rows grouped by exact payee and category, for payee rules (BUD-24). Rows without a payee are left out,
+    /// and a null-category group holds only rows that need a category (not Transfers).
+    /// </summary>
+    Task<IReadOnlyList<PayeeCategoryCount>> GetPayeeCategoryCountsAsync(int userId);
+
+    /// <summary>The user's rows that need a category whose payee is exactly one of <paramref name="payees"/>.</summary>
+    Task<IReadOnlyList<Transaction>> GetUncategorizedByPayeesAsync(int userId, IReadOnlyCollection<string> payees);
+
+    /// <summary>
     /// Set (or clear, when <paramref name="categoryId"/> is null) the category on many rows at once, writing each row's
     /// re-derived type from <paramref name="transactionTypes"/> (keyed by row id) in the same save.
     /// Only rows owned by <paramref name="userId"/> are touched. Returns how many changed.

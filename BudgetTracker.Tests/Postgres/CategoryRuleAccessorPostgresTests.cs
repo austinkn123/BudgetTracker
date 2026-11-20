@@ -134,3 +134,59 @@ public sealed class CategoryRuleAccessorPostgresTests(PostgresFixture fixture)
         Assert.True(await check.Categories.AnyAsync(c => c.Id == coffee.Id));
     }
 }
+
+/// <summary>The TransactionAccessor queries payee rules lean on (BUD-24), against real Postgres.</summary>
+[Collection(PostgresCollection.Name)]
+[Trait("Category", "Postgres")]
+public sealed class PayeeRuleTransactionQueriesPostgresTests(PostgresFixture fixture)
+{
+    private static readonly DateTime Day = new(2026, 11, 3);
+
+    [PostgresFact]
+    public async Task Should_GroupRowsByPayeeAndCategory_LeavingOutTransfersThatNeedNoCategoryAndBlankPayees()
+    {
+        var user = await fixture.UserAsync();
+        var other = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var savings = await fixture.AccountAsync(user.Id, "Savings");
+        var otherAccount = await fixture.AccountAsync(other.Id);
+        var coffee = await fixture.CategoryAsync(user.Id, "Coffee");
+        await fixture.TransactionsAsync(
+            PostgresSeed.Row(account.Id, Day, payee: "UBER TRIP"),
+            PostgresSeed.Row(account.Id, Day, payee: "UBER TRIP"),
+            PostgresSeed.Row(account.Id, Day, payee: "UBER TRIP", categoryId: coffee.Id),
+            PostgresSeed.Row(account.Id, Day, payee: "Transfer to savings", type: "Transfer", transferAccountId: savings.Id),
+            PostgresSeed.Row(account.Id, Day, payee: null),
+            PostgresSeed.Row(otherAccount.Id, Day, payee: "UBER TRIP"));
+
+        await using var context = fixture.CreateContext();
+        var counts = await new TransactionAccessor(context).GetPayeeCategoryCountsAsync(user.Id);
+
+        Assert.Equal(
+            [new PayeeCategoryCount("UBER TRIP", null, 2), new PayeeCategoryCount("UBER TRIP", coffee.Id, 1)],
+            counts.OrderBy(c => c.CategoryId ?? 0).ToList());
+    }
+
+    [PostgresFact]
+    public async Task Should_ReturnOnlyTheUsersUncategorizedRowsForThosePayees()
+    {
+        var user = await fixture.UserAsync();
+        var other = await fixture.UserAsync();
+        var account = await fixture.AccountAsync(user.Id);
+        var savings = await fixture.AccountAsync(user.Id, "Savings");
+        var otherAccount = await fixture.AccountAsync(other.Id);
+        var coffee = await fixture.CategoryAsync(user.Id, "Coffee");
+        var wanted = PostgresSeed.Row(account.Id, Day, payee: "UBER TRIP");
+        await fixture.TransactionsAsync(
+            wanted,
+            PostgresSeed.Row(account.Id, Day, payee: "UBER TRIP", categoryId: coffee.Id),
+            PostgresSeed.Row(account.Id, Day, payee: "uber trip"),   // payees match exactly, as stored
+            PostgresSeed.Row(account.Id, Day, payee: "UBER TRIP", type: "Transfer", transferAccountId: savings.Id),
+            PostgresSeed.Row(otherAccount.Id, Day, payee: "UBER TRIP"));
+
+        await using var context = fixture.CreateContext();
+        var rows = await new TransactionAccessor(context).GetUncategorizedByPayeesAsync(user.Id, ["UBER TRIP"]);
+
+        Assert.Equal([wanted.Id], rows.Select(r => r.Id));
+    }
+}

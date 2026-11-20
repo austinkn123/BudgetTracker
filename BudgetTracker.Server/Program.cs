@@ -185,6 +185,10 @@ var categoryGroup = apiGroup.MapGroup("/categories")
     .WithTags("Categories");
 categoryGroup.MapCategoryEndpoints();
 
+var categoryRuleGroup = apiGroup.MapGroup("/category-rules")
+    .WithTags("Category Rules");
+categoryRuleGroup.MapCategoryRuleEndpoints();
+
 var budgetPlanGroup = apiGroup.MapGroup("/budget-plans")
     .WithTags("Budget Plans");
 budgetPlanGroup.MapBudgetPlanEndpoints();

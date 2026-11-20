@@ -221,6 +221,33 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<PayeeCategoryCount>> GetPayeeCategoryCountsAsync(int userId)
+    {
+        var groups = await context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId && t.Payee != null && t.Payee != "")
+            .Where(t => t.CategoryId != null || t.TransactionType != TransferType)
+            .GroupBy(t => new { t.Payee, t.CategoryId })
+            .Select(g => new { g.Key.Payee, g.Key.CategoryId, Count = g.Count() })
+            .ToListAsync();
+
+        return groups.Select(g => new PayeeCategoryCount(g.Payee!, g.CategoryId, g.Count)).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Transaction>> GetUncategorizedByPayeesAsync(int userId, IReadOnlyCollection<string> payees)
+    {
+        if (payees.Count == 0)
+            return [];
+
+        return await context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId && t.Payee != null && payees.Contains(t.Payee))
+            .Where(NeedsCategory)
+            .ToListAsync();
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Transaction>> GetByPlaidTransactionIdsAsync(IEnumerable<string> plaidTransactionIds)
     {
         var ids = plaidTransactionIds.Distinct().ToList();
