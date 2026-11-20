@@ -13,6 +13,7 @@ public class BudgetTrackerDbContext(DbContextOptions<BudgetTrackerDbContext> opt
     public DbSet<User> Users => Set<User>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<CategoryRule> CategoryRules => Set<CategoryRule>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<BudgetPlan> BudgetPlans => Set<BudgetPlan>();
     public DbSet<BudgetPlanEntry> BudgetPlanEntries => Set<BudgetPlanEntry>();

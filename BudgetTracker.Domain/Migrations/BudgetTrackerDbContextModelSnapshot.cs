@@ -17,7 +17,7 @@ namespace BudgetTracker.Domain.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.6")
+                .HasAnnotation("ProductVersion", "9.0.22")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -224,6 +224,51 @@ namespace BudgetTracker.Domain.Migrations
                     b.ToTable("Categories", null, t =>
                         {
                             t.HasCheckConstraint("CK_Categories_CategoryType", "\"CategoryType\" IN ('Expense', 'Income', 'Both', 'Transfer')");
+                        });
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.CategoryRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
+
+                    b.Property<string>("MatchType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Pattern")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("IX_CategoryRules_CategoryId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_CategoryRules_UserId");
+
+                    b.ToTable("CategoryRules", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CategoryRules_MatchType", "\"MatchType\" IN ('Contains', 'Exact')");
+
+                            t.HasCheckConstraint("CK_CategoryRules_Pattern", "btrim(\"Pattern\") <> ''");
                         });
                 });
 
@@ -805,6 +850,25 @@ namespace BudgetTracker.Domain.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.CategoryRule", b =>
+                {
+                    b.HasOne("BudgetTracker.Domain.Models.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("BudgetTracker.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Category");
 
                     b.Navigation("User");
                 });

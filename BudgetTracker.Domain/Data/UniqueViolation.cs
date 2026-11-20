@@ -11,6 +11,9 @@ internal static class UniqueViolation
     /// <summary>Name of the case-insensitive (UserId, lower(Name)) index on Categories.</summary>
     public const string CategoryName = "UQ_Categories_User_Name";
 
+    /// <summary>One rule per pattern (ignoring case) and match type per user (BUD-24).</summary>
+    public const string CategoryRulePattern = "UQ_CategoryRules_User_Pattern";
+
     /// <summary>Name of the case-insensitive (UserId, PlanMonth, lower(Name)) index on BudgetPlans.</summary>
     public const string BudgetPlanName = "UQ_BudgetPlans_User_Month_Name";
 
