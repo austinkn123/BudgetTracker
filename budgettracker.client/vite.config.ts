@@ -82,6 +82,7 @@ export default defineConfig(({ command }) => ({
             }
         },
         port: parseInt(env.DEV_SERVER_PORT || '53608'),
-        https: command === 'serve' ? devCertificate() : undefined,
+        // E2E runs serve plain HTTP, so they need neither the certificate nor the .NET SDK (BUD-29).
+        https: command === 'serve' && !env.E2E ? devCertificate() : undefined,
     }
 }));
