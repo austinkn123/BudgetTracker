@@ -30,7 +30,7 @@ const CategoryRulesSection = () => {
   );
 
   return (
-    <Card title="Rules" subtitle="Payees that always land in the same category. New imports follow them.">
+    <Card title="Rules" subtitle="Payees filed automatically on import">
       <div className="space-y-3">
         {status && <Alert severity="success" message={status} onClose={() => setStatus(null)} />}
         {remove.error && (
@@ -48,7 +48,7 @@ const CategoryRulesSection = () => {
             {rules.data.map((rule) => (
               <li key={rule.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-ink">
+                  <p className="break-words text-sm text-ink">
                     {describeMatch(rule)} → <span className="font-medium">{rule.categoryName}</span>
                   </p>
                   <p className="text-xs text-ink-muted">{matchedLabel(rule.matchedCount)}</p>
