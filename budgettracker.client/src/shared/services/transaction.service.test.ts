@@ -1,5 +1,5 @@
-import type { InternalAxiosRequestConfig } from "axios";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { InternalAxiosRequestConfig } from 'axios';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Capture the fully resolved request URL (base + path + query string) without touching the network.
 const captured = vi.hoisted(() => ({
@@ -7,9 +7,9 @@ const captured = vi.hoisted(() => ({
   headers: {} as Record<string, string>,
 }));
 
-vi.mock("../api", async () => {
-  const { default: axios } = await import("axios");
-  const instance = axios.create({ baseURL: "/api" });
+vi.mock('../api', async () => {
+  const { default: axios } = await import('axios');
+  const instance = axios.create({ baseURL: '/api' });
   instance.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
     captured.urls.push(instance.getUri(config));
     if (captured.failWith) {
@@ -20,7 +20,7 @@ vi.mock("../api", async () => {
     return {
       data: { items: [], nextCursor: null },
       status: 200,
-      statusText: "OK",
+      statusText: 'OK',
       headers: captured.headers,
       config,
     };
@@ -28,68 +28,59 @@ vi.mock("../api", async () => {
   return { default: instance };
 });
 
-import { categoryService } from "./category.service";
-import { transactionService } from "./transaction.service";
+import { categoryService } from './category.service';
+import { transactionService } from './transaction.service';
 import { errorMessage } from '../utils/errorMessage';
 
-describe("transaction reads", () => {
+describe('transaction reads', () => {
   beforeEach(() => {
     captured.urls.length = 0;
   });
 
-  it("pages with the filters, cursor and limit, dropping anything unset", async () => {
-    await transactionService.getPage(
-      { uncategorized: true, search: "" },
-      { cursor: "abc", limit: 50 },
-    );
+  it('pages with the filters, cursor and limit, dropping anything unset', async () => {
+    await transactionService.getPage({ uncategorized: true, search: '' }, { cursor: 'abc', limit: 50 });
 
-    expect(captured.urls).toEqual([
-      "/api/transactions/page?uncategorized=true&cursor=abc&limit=50",
-    ]);
+    expect(captured.urls).toEqual(['/api/transactions/page?uncategorized=true&cursor=abc&limit=50']);
   });
 
-  it("asks for the first page with no cursor at all", async () => {
+  it('asks for the first page with no cursor at all', async () => {
     await transactionService.getPage({}, { limit: 50 });
 
-    expect(captured.urls).toEqual(["/api/transactions/page?limit=50"]);
+    expect(captured.urls).toEqual(['/api/transactions/page?limit=50']);
   });
 
-  it("reads the summary", async () => {
+  it('reads the summary', async () => {
     await transactionService.getSummary();
 
-    expect(captured.urls).toEqual(["/api/transactions/summary"]);
+    expect(captured.urls).toEqual(['/api/transactions/summary']);
   });
 
-  it("reads category usage since a date", async () => {
-    await categoryService.getUsage("2025-11-06");
+  it('reads category usage since a date', async () => {
+    await categoryService.getUsage('2025-11-06');
 
-    expect(captured.urls).toEqual(["/api/categories/usage?since=2025-11-06"]);
+    expect(captured.urls).toEqual(['/api/categories/usage?since=2025-11-06']);
   });
 
-  it("refuses a filtered read with no filter, before it reaches the server", async () => {
-    await expect(
-      transactionService.getFiltered({ search: "" }),
-    ).rejects.toThrow(/at least one filter/);
+  it('refuses a filtered read with no filter, before it reaches the server', async () => {
+    await expect(transactionService.getFiltered({ search: '' })).rejects.toThrow(/at least one filter/);
     expect(captured.urls).toEqual([]);
   });
 
-  it("sends a bounded read with its filters", async () => {
+  it('sends a bounded read with its filters', async () => {
     await transactionService.getFiltered({
-      from: "2026-04-01",
-      to: "2026-04-30",
+      from: '2026-04-01',
+      to: '2026-04-30',
     });
 
-    expect(captured.urls).toEqual([
-      "/api/transactions?from=2026-04-01&to=2026-04-30",
-    ]);
+    expect(captured.urls).toEqual(['/api/transactions?from=2026-04-01&to=2026-04-30']);
   });
 
-  it("has no unfiltered ledger read left to call", () => {
-    expect(transactionService).not.toHaveProperty("getCurrentUserTransactions");
+  it('has no unfiltered ledger read left to call', () => {
+    expect(transactionService).not.toHaveProperty('getCurrentUserTransactions');
   });
 });
 
-describe("transaction export (BUD-25)", () => {
+describe('transaction export (BUD-25)', () => {
   beforeEach(() => {
     captured.urls.length = 0;
     captured.headers = {};
@@ -105,7 +96,10 @@ describe("transaction export (BUD-25)", () => {
   });
 
   it("surfaces the server's error message from a blob error body", async () => {
-    captured.failWith = { status: 400, data: new Blob([JSON.stringify({ error: 'Too many rows' })], { type: 'application/json' }) };
+    captured.failWith = {
+      status: 400,
+      data: new Blob([JSON.stringify({ error: 'Too many rows' })], { type: 'application/json' }),
+    };
 
     const failure = await transactionService.exportCsv({}).catch((err: unknown) => err);
 
@@ -114,25 +108,23 @@ describe("transaction export (BUD-25)", () => {
 
   it("sends the feed's filters and names the file as the server says", async () => {
     captured.headers = {
-      "content-disposition":
+      'content-disposition':
         "attachment; filename=budgettracker-transactions-all.csv; filename*=UTF-8''budgettracker-transactions-all.csv",
     };
 
     const { fileName } = await transactionService.exportCsv({
       isPending: false,
-      search: "uber",
-      plaidAccountId: "acct-1",
+      search: 'uber',
+      plaidAccountId: 'acct-1',
     });
 
-    expect(captured.urls).toEqual([
-      "/api/transactions/export?isPending=false&search=uber&plaidAccountId=acct-1",
-    ]);
-    expect(fileName).toBe("budgettracker-transactions-all.csv");
+    expect(captured.urls).toEqual(['/api/transactions/export?isPending=false&search=uber&plaidAccountId=acct-1']);
+    expect(fileName).toBe('budgettracker-transactions-all.csv');
   });
 
-  it("falls back to a generic name when the server sends none", async () => {
+  it('falls back to a generic name when the server sends none', async () => {
     const { fileName } = await transactionService.exportCsv({});
 
-    expect(fileName).toBe("budgettracker-transactions.csv");
+    expect(fileName).toBe('budgettracker-transactions.csv');
   });
 });

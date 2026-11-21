@@ -1,9 +1,5 @@
-import api from "../api";
-import type {
-  Transaction,
-  TransactionPage,
-  TransactionSummary,
-} from "../types/api";
+import api from '../api';
+import type { Transaction, TransactionPage, TransactionSummary } from '../types/api';
 
 /** Mirrors the server's TransactionFilter. Omitted fields mean "no constraint". */
 export type TransactionQuery = {
@@ -23,12 +19,10 @@ export type TransactionPageParams = {
   limit?: number;
 };
 
-const toParams = (
-  query: TransactionQuery & TransactionPageParams,
-): Record<string, string> => {
+const toParams = (query: TransactionQuery & TransactionPageParams): Record<string, string> => {
   const params: Record<string, string> = {};
   for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== "") params[key] = String(value);
+    if (value !== undefined && value !== '') params[key] = String(value);
   }
   return params;
 };
@@ -50,20 +44,15 @@ export const transactionService = {
   getFiltered: async (query: TransactionQuery): Promise<Transaction[]> => {
     const params = toParams(query);
     if (Object.keys(params).length === 0) {
-      throw new Error(
-        "getFiltered needs at least one filter; page the full ledger with getPage.",
-      );
+      throw new Error('getFiltered needs at least one filter; page the full ledger with getPage.');
     }
-    const response = await api.get<Transaction[]>("/transactions", { params });
+    const response = await api.get<Transaction[]>('/transactions', { params });
     return response.data;
   },
 
   /** One page of the ledger, newest first. Pass the previous page's `nextCursor` to continue. */
-  getPage: async (
-    query: TransactionQuery,
-    page: TransactionPageParams = {},
-  ): Promise<TransactionPage> => {
-    const response = await api.get<TransactionPage>("/transactions/page", {
+  getPage: async (query: TransactionQuery, page: TransactionPageParams = {}): Promise<TransactionPage> => {
+    const response = await api.get<TransactionPage>('/transactions/page', {
       params: toParams({ ...query, ...page }),
     });
     return response.data;
@@ -96,24 +85,18 @@ export const transactionService = {
 
   /** Ledger-wide counts and pending sums, without fetching the ledger. */
   getSummary: async (): Promise<TransactionSummary> => {
-    const response = await api.get<TransactionSummary>("/transactions/summary");
+    const response = await api.get<TransactionSummary>('/transactions/summary');
     return response.data;
   },
 
   /** Set (or clear, with a null categoryId) the category on many rows in one request. */
-  setCategoryBulk: async (
-    ids: number[],
-    categoryId: number | null,
-  ): Promise<number> => {
-    const response = await api.patch<{ updated: number }>(
-      "/transactions/category",
-      { ids, categoryId },
-    );
+  setCategoryBulk: async (ids: number[], categoryId: number | null): Promise<number> => {
+    const response = await api.patch<{ updated: number }>('/transactions/category', { ids, categoryId });
     return response.data.updated;
   },
 
   /** Set or clear the note on one transaction. */
   setNotes: async (id: number, notes: string | null): Promise<void> => {
-    await api.patch("/transactions/notes", { id, notes });
+    await api.patch('/transactions/notes', { id, notes });
   },
 };
