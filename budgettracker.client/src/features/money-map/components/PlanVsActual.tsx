@@ -33,7 +33,7 @@ const Bar = ({ label, split, income }: { label: string; split: Split; income: nu
         return (
           <div key={s.key} className={cn('flex min-w-0 items-center px-3 text-xs font-semibold text-white', s.bar)} style={{ flexGrow: value, flexBasis: 0 }}>
             {share >= AMOUNT_SHARE && (
-              <span className="numeric truncate">
+              <span className="numeric truncate" title={`${s.label} ${currency.format(value)}`}>
                 {share >= LABEL_SHARE ? `${s.label} ${currency.format(value)}` : currency.format(value)}
               </span>
             )}

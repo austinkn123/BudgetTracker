@@ -61,7 +61,7 @@ const RecentActivityFeed = ({ items, categories }: RecentActivityFeedProps) => {
                 </span>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-ink">{t.payee || name}</p>
+                  <p className="truncate text-[13px] font-medium text-ink" title={t.payee || name}>{t.payee || name}</p>
                   <span className="text-2xs text-ink-muted">
                     {name} · {formatDistanceToNow(parseISO(t.occurredAt), { addSuffix: true })}
                   </span>

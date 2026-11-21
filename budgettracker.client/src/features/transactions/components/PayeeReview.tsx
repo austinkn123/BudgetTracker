@@ -36,7 +36,7 @@ const PayeeReview = ({ transactions, categoryOptions, onCategorize, isBusy }: Pa
           {groups.map((group) => (
             <li key={group.payee} className="flex items-center gap-3 px-4 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink">{group.payee}</p>
+                <p className="truncate text-sm font-medium text-ink" title={group.payee}>{group.payee}</p>
                 <p className="text-xs text-ink-muted">
                   {group.ids.length} {group.ids.length === 1 ? 'transaction' : 'transactions'}
                   {group.plaidCategoryPrimary && (

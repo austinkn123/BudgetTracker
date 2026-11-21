@@ -55,7 +55,7 @@ const CategoryDrillTransactions = ({ card, rangeFilter, limit }: CategoryDrillTr
     <ul className="flex flex-col gap-1.5">
       {transactions.map((t) => (
         <li key={t.id} className="flex items-center justify-between gap-4">
-          <span className="truncate text-[13px] text-ink">
+          <span className="truncate text-[13px] text-ink" title={t.payee || card.name}>
             {t.payee || card.name}
             <span className="ml-2 text-2xs text-ink-muted">
               {format(parseISO(t.occurredAt), 'MMM d')}
@@ -205,7 +205,7 @@ const CategoryDrillGrid = ({ cards, rangeFilter, transactionLimit }: CategoryDri
                         event.stopPropagation();
                         setExpandedKey((prev) => (prev === data.key ? null : data.key));
                       }}
-                      className="focus-ring rounded p-0.5"
+                      className="focus-ring touch-target rounded p-0.5"
                     >
                       <ChevronRight
                         size={15}

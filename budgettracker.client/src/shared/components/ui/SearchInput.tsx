@@ -22,14 +22,14 @@ const SearchInput = ({ value, onChange, placeholder, ariaLabel, className }: Sea
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
       aria-label={ariaLabel}
-      className="focus-ring h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[16px] text-ink sm:text-[14px] shadow-xs transition-colors duration-120 hover:border-border-strong placeholder:text-ink-muted/60"
+      className="focus-ring h-10 [@media(pointer:coarse)]:h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-[16px] text-ink sm:text-[14px] shadow-xs transition-colors duration-120 hover:border-border-strong placeholder:text-ink-muted/60"
     />
     {value && (
       <button
         type="button"
         onClick={() => onChange('')}
         aria-label="Clear search"
-        className="focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink"
+        className="focus-ring touch-target absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-muted hover:text-ink"
       >
         <X size={14} />
       </button>

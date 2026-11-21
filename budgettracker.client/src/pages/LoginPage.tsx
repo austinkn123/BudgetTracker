@@ -149,7 +149,7 @@ const LoginPage = () => {
 
       <div className="flex flex-col gap-3">
         <p className="text-center text-sm text-ink-muted">
-          <Link to="/forgot" className="font-semibold text-primary hover:text-primary-dark">
+          <Link to="/forgot" className="touch-target font-semibold text-primary hover:text-primary-dark">
             Forgot password?
           </Link>
         </p>

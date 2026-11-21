@@ -29,6 +29,7 @@ const InlineCheckbox = ({
     disabled={disabled}
     aria-label={ariaLabel}
     className={cn(
+      'touch-target',
       'focus-ring flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border-strong bg-surface transition-colors duration-120',
       'data-[state=checked]:border-primary data-[state=checked]:bg-primary',
       'data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary',

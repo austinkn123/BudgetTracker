@@ -1,4 +1,5 @@
 import * as RadixToggleGroup from '@radix-ui/react-toggle-group';
+import { useScrollEdges } from '../../hooks/useScrollEdges';
 import { useSlidingIndicator } from '../../hooks/useSlidingIndicator';
 import { cn } from '../../utils/cn';
 
@@ -28,6 +29,8 @@ const ToggleGroup = <TValue extends string = string>({
   className,
 }: ToggleGroupProps<TValue>) => {
   const { containerRef, rect } = useSlidingIndicator<HTMLDivElement>('[data-state="on"]', value);
+  // Options past the visible edge fade out, so a row cut off on a phone reads as scrollable.
+  const edges = useScrollEdges(containerRef);
 
   return (
     <RadixToggleGroup.Root
@@ -42,6 +45,7 @@ const ToggleGroup = <TValue extends string = string>({
       className={cn(
         // Scrolls in place when the options outgrow a phone, instead of widening the page.
         'relative isolate inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-md border border-border bg-background p-0.5 shadow-xs [scrollbar-width:none]',
+        edges.start && edges.end ? 'fade-x-both' : edges.end ? 'fade-x-end' : edges.start ? 'fade-x-start' : null,
         className,
       )}
     >
@@ -62,6 +66,7 @@ const ToggleGroup = <TValue extends string = string>({
           key={option.value}
           value={option.value}
           className={cn(
+            'touch-target',
             'focus-ring flex-1 whitespace-nowrap rounded px-3 py-1.5 text-xs font-semibold text-ink-muted transition-colors duration-120',
             'data-[state=on]:text-ink',
             'hover:text-ink',

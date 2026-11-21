@@ -30,16 +30,16 @@ const classNames = {
   caption_label: 'text-sm font-semibold text-ink',
   nav: 'absolute inset-x-0 top-0 z-10 flex h-9 items-center justify-between',
   button_previous:
-    'focus-ring inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition-colors duration-120 hover:bg-border-subtle hover:text-ink',
+    'focus-ring touch-target inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition-colors duration-120 hover:bg-border-subtle hover:text-ink',
   button_next:
-    'focus-ring inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition-colors duration-120 hover:bg-border-subtle hover:text-ink',
+    'focus-ring touch-target inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition-colors duration-120 hover:bg-border-subtle hover:text-ink',
   month_grid: 'mt-3 w-full border-separate border-spacing-1',
   weekdays: '',
   weekday: 'pb-1 text-center text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted',
   week: '',
   day: 'rounded p-0 text-center',
   day_button:
-    'focus-ring mx-auto flex h-9 w-full min-w-9 cursor-pointer items-center justify-center rounded text-sm text-ink transition-colors duration-120 hover:bg-border-subtle',
+    'focus-ring touch-target mx-auto flex h-9 w-full min-w-9 cursor-pointer items-center justify-center rounded text-sm text-ink transition-colors duration-120 hover:bg-border-subtle',
   selected: 'bg-primary text-white [&_button]:text-white [&_button:hover]:bg-transparent',
   // Days between the two ends of a range also carry `selected`; this has to win over it.
   range_middle: '!bg-primary-subtle [&_button]:!text-primary-dark',

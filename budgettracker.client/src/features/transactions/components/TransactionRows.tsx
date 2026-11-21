@@ -177,7 +177,7 @@ const TransactionRow = ({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <span className="truncate text-sm font-medium text-ink">
+          <span className="truncate text-sm font-medium text-ink" title={transaction.payee || undefined}>
             {transaction.payee || 'Untitled transaction'}
           </span>
           <span
@@ -217,7 +217,7 @@ const TransactionRow = ({
               type="button"
               disabled={isBusy}
               onClick={() => onCategoryChange(transaction.id, suggestion.id)}
-              className="focus-ring inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary-subtle px-2 py-1 text-xs font-medium text-primary-dark transition-colors duration-120 hover:border-primary disabled:opacity-50"
+              className="focus-ring touch-target inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary-subtle px-2 py-1 text-xs font-medium text-primary-dark transition-colors duration-120 hover:border-primary disabled:opacity-50"
             >
               <Sparkles size={11} />
               Use {suggestion.name}
@@ -266,7 +266,7 @@ const TransactionRow = ({
               type="button"
               disabled={isBusy}
               onClick={() => setEditingNote(true)}
-              className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted transition-colors duration-120 hover:bg-surface hover:text-ink disabled:opacity-50"
+              className="focus-ring touch-target inline-flex items-center gap-1 rounded-md px-2 py-1 text-left text-xs text-ink-muted transition-colors duration-120 hover:bg-surface hover:text-ink disabled:opacity-50"
             >
               <StickyNote size={11} />
               {transaction.notes ? transaction.notes : 'Add note'}
@@ -283,7 +283,7 @@ const TransactionRow = ({
                 setRuleOpen(true);
               }}
               aria-label={`Always categorize ${transaction.payee}`}
-              className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted transition-colors duration-120 hover:bg-surface hover:text-ink disabled:opacity-50"
+              className="focus-ring touch-target inline-flex items-center gap-1 rounded-md px-2 py-1 text-left text-xs text-ink-muted transition-colors duration-120 hover:bg-surface hover:text-ink disabled:opacity-50"
             >
               <Wand2 size={11} />
               Always categorize…

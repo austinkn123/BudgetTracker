@@ -30,7 +30,7 @@ const UncategorizedNudge = ({ count }: UncategorizedNudgeProps) => {
         </div>
         <Link
           to="/transactions"
-          className="focus-ring shrink-0 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-xs transition-colors duration-120 hover:border-border-strong"
+          className="focus-ring touch-target shrink-0 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-xs transition-colors duration-120 hover:border-border-strong"
         >
           Review them
         </Link>

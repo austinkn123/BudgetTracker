@@ -71,6 +71,7 @@ const Button = ({
   return (
     <Comp
       className={cn(
+        'touch-target',
         'focus-ring inline-flex select-none items-center justify-center whitespace-nowrap rounded-lg font-semibold tracking-[-0.005em] transition-all duration-120 ease-out-soft',
         'disabled:pointer-events-none disabled:opacity-50',
         VARIANT_CLASSES[variant],

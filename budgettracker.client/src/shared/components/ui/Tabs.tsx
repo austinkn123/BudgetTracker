@@ -73,6 +73,7 @@ const Tabs = <TValue extends string = string>({
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(option.value)}
               className={cn(
+                'touch-target',
                 'focus-ring rounded-sm pb-2.5 pt-1 text-sm font-semibold transition-colors duration-120',
                 selected ? 'text-ink' : 'text-ink-muted hover:text-ink',
               )}

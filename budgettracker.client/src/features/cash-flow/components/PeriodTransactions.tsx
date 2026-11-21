@@ -100,7 +100,7 @@ const PeriodTransactions = ({
                 className="flex items-center justify-between gap-4 border-b border-border-subtle py-2.5 last:border-b-0"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink">{t.payee || name}</p>
+                  <p className="truncate text-sm font-medium text-ink" title={t.payee || name}>{t.payee || name}</p>
                   <p className="text-xs text-ink-muted">
                     <span className="numeric">{format(parseISO(t.occurredAt), 'MMM d')}</span> · {name}
                   </p>

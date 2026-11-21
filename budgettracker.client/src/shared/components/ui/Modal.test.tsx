@@ -57,9 +57,9 @@ describe('Modal', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('applies the maxWidth class', () => {
+  it('applies the maxWidth class, capped at the screen width less a gutter', () => {
     renderModal({ maxWidth: 'xs' });
 
-    expect(screen.getByRole('dialog')).toHaveClass('max-w-[444px]');
+    expect(screen.getByRole('dialog')).toHaveClass('max-w-[min(444px,calc(100vw_-_2rem))]');
   });
 });

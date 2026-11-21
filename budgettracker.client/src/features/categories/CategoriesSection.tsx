@@ -224,7 +224,7 @@ const CategoriesSection = ({
                     className="focus-ring -mx-2 grid min-w-0 flex-1 grid-cols-[minmax(0,13rem)_1fr_5.5rem_2.5rem] items-center gap-4 rounded-md px-2 py-2.5 text-left transition-colors duration-120 hover:bg-background"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-ink">{row.category.name}</span>
+                      <span className="block truncate text-sm font-medium text-ink" title={row.category.name}>{row.category.name}</span>
                       <span className="block text-xs text-ink-muted">
                         {plural(row.transactions, 'transaction')}
                         {row.inActivePlan && ' · in plan'}

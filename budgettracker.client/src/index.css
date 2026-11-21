@@ -118,3 +118,39 @@
     @apply bg-ink/90;
   }
 }
+
+@layer utilities {
+  /* Touch hit area (BUD-29). On a touch screen every control gets at least a 44×44 hit area,
+     centred on it, without changing how it looks. Pointer devices are untouched. Text inputs
+     can't host ::after, so they grow to 44px tall instead (Input, SearchInput). */
+  @media (pointer: coarse) {
+    .touch-target:not(.absolute):not(.fixed):not(.sticky) {
+      position: relative;
+    }
+    .touch-target::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+@layer utilities {
+  /* Edge fades for a horizontally scrolling row (BUD-29): the faded side has more options past it. */
+  .fade-x-end {
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 2rem), transparent);
+    mask-image: linear-gradient(to right, black calc(100% - 2rem), transparent);
+  }
+  .fade-x-start {
+    -webkit-mask-image: linear-gradient(to left, black calc(100% - 2rem), transparent);
+    mask-image: linear-gradient(to left, black calc(100% - 2rem), transparent);
+  }
+  .fade-x-both {
+    -webkit-mask-image: linear-gradient(to right, transparent, black 2rem, black calc(100% - 2rem), transparent);
+    mask-image: linear-gradient(to right, transparent, black 2rem, black calc(100% - 2rem), transparent);
+  }
+}

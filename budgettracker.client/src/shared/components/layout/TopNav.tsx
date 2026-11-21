@@ -111,7 +111,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
         {/* Brand */}
         <NavLink
           to="/"
-          className="focus-ring flex shrink-0 items-center gap-2 rounded-full px-2 py-1.5"
+          className="focus-ring touch-target flex shrink-0 items-center gap-2 rounded-full px-2 py-1.5"
           aria-label="BudgetTracker home"
         >
           <span className="flex text-primary-light">
@@ -205,7 +205,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
               onClick={handleThemeToggle}
               aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               className={cn(
-                'focus-ring inline-flex items-center justify-center rounded-full text-white/45 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white/90 motion-reduce:transition-none',
+                'focus-ring touch-target inline-flex items-center justify-center rounded-full text-white/45 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white/90 motion-reduce:transition-none',
                 compact ? 'h-8 w-8' : 'h-9 w-9',
               )}
             >
@@ -223,7 +223,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
                 aria-label="Settings"
                 className={({ isActive }) =>
                   cn(
-                    'focus-ring inline-flex items-center justify-center rounded-full transition-all duration-240 ease-out-soft motion-reduce:transition-none',
+                    'focus-ring touch-target inline-flex items-center justify-center rounded-full transition-all duration-240 ease-out-soft motion-reduce:transition-none',
                     isActive
                       ? 'bg-white/[0.12] text-primary-light'
                       : 'text-white/45 hover:bg-white/[0.06] hover:text-white/90',
@@ -258,7 +258,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
               disabled={isSigningOut}
               aria-label="Sign out"
               className={cn(
-                'focus-ring inline-flex items-center justify-center rounded-full text-white/45 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white/90 disabled:opacity-50 motion-reduce:transition-none',
+                'focus-ring touch-target inline-flex items-center justify-center rounded-full text-white/45 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white/90 disabled:opacity-50 motion-reduce:transition-none',
                 compact ? 'h-8 w-8' : 'h-9 w-9',
               )}
             >
@@ -272,7 +272,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
             onClick={onOpenMobileNav}
             aria-label="Open navigation menu"
             className={cn(
-              'focus-ring inline-flex items-center justify-center rounded-full text-white/70 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white motion-reduce:transition-none lg:hidden',
+              'focus-ring touch-target inline-flex items-center justify-center rounded-full text-white/70 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white motion-reduce:transition-none lg:hidden',
               compact ? 'h-8 w-8' : 'h-9 w-9',
             )}
           >

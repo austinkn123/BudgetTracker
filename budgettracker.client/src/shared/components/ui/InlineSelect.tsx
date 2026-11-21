@@ -71,6 +71,7 @@ const InlineSelect = <TValue extends string | number = string>({
     <RadixSelect.Trigger
       aria-label={ariaLabel}
       className={cn(
+        'touch-target',
         'focus-ring flex h-8 w-full items-center justify-between gap-1.5 rounded-md px-2 text-[13px] text-ink transition-colors duration-120 disabled:cursor-not-allowed disabled:text-ink-muted',
         'data-[placeholder]:text-ink-muted/60',
         subtle

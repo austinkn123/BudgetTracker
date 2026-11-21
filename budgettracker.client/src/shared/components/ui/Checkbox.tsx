@@ -41,6 +41,7 @@ const Checkbox = <TFieldValues extends FieldValues>({
             onBlur={field.onBlur}
             disabled={disabled}
             className={cn(
+              'touch-target',
               'focus-ring flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-sm border border-border-strong bg-surface shadow-xs transition-colors duration-120',
               'data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white',
               'disabled:cursor-not-allowed disabled:opacity-50',

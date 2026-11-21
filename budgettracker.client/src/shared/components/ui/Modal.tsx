@@ -4,12 +4,12 @@ import { cn } from '../../utils/cn';
 
 export type ModalMaxWidth = 'xs' | 'sm' | 'md' | 'lg';
 
-/** MUI Dialog maxWidth equivalents. */
+/** MUI Dialog maxWidth equivalents, never wider than the screen less a 1rem gutter each side (BUD-29). */
 const MAX_WIDTH_CLASSES: Record<ModalMaxWidth, string> = {
-  xs: 'max-w-[444px]',
-  sm: 'max-w-[600px]',
-  md: 'max-w-[900px]',
-  lg: 'max-w-[1200px]',
+  xs: 'max-w-[min(444px,calc(100vw_-_2rem))]',
+  sm: 'max-w-[min(600px,calc(100vw_-_2rem))]',
+  md: 'max-w-[min(900px,calc(100vw_-_2rem))]',
+  lg: 'max-w-[min(1200px,calc(100vw_-_2rem))]',
 };
 
 export interface ModalProps {
@@ -65,7 +65,7 @@ const Modal = ({
         </div>
 
         {actions && (
-          <div className="flex items-center gap-2 border-t border-border-subtle bg-background/60 px-6 py-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border-subtle bg-background/60 px-6 py-4">
             {actions}
           </div>
         )}

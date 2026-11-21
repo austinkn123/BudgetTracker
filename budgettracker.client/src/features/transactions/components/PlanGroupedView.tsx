@@ -160,7 +160,7 @@ const CategoryRow = ({ category, ...rowProps }: CategoryRowProps) => {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <span className="truncate text-sm font-medium text-ink">{category.name}</span>
+            <span className="truncate text-sm font-medium text-ink" title={category.name}>{category.name}</span>
             <span className="numeric shrink-0 text-sm text-ink-muted">
               <span className="font-semibold text-ink">{currency.format(category.actual)}</span>
               {category.planned > 0 ? (
