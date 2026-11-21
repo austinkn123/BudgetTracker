@@ -17,6 +17,7 @@ public static class TransactionEndpoints
     {
         transactionGroup.MapGet("/", GetAsync);
         transactionGroup.MapGet("/page", GetPageAsync);
+        transactionGroup.MapGet("/export", Export);
         transactionGroup.MapGet("/summary", GetSummaryAsync);
 
         transactionGroup.MapPatch("/category", async (
@@ -75,6 +76,41 @@ public static class TransactionEndpoints
             new TransactionFilter(WallClock.Unzoned(from), WallClock.Unzoned(to), uncategorized, isImported, isPending, search, plaidAccountId, categoryId));
 
         return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// <c>GET /api/transactions/export</c> — every row the feed shows for the same filters, newest first, as a CSV download
+    /// (BUD-25): UTF-8 with a BOM so Excel reads non-ASCII payees, CRLF line endings per RFC 4180, streamed row by row.
+    /// </summary>
+    /// <returns>The HTTP result.</returns>
+    public static IResult Export(
+        ITransactionExportManager manager,
+        ICurrentUserProvider currentUser,
+        DateTime? from,
+        DateTime? to,
+        bool? uncategorized,
+        bool? isImported,
+        bool? isPending,
+        string? search,
+        string? plaidAccountId,
+        int? categoryId)
+    {
+        var export = manager.ExportCsv(
+            currentUser.UserId,
+            new TransactionFilter(WallClock.Unzoned(from), WallClock.Unzoned(to), uncategorized, isImported, isPending, search, plaidAccountId, categoryId));
+
+        return Results.Stream(
+            async body =>
+            {
+                await using var writer = new StreamWriter(body, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+                await foreach (var line in export.Lines)
+                {
+                    await writer.WriteAsync(line);
+                    await writer.WriteAsync("\r\n");
+                }
+            },
+            contentType: "text/csv; charset=utf-8",
+            fileDownloadName: export.FileName);
     }
 
     /// <summary>

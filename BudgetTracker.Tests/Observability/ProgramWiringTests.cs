@@ -81,6 +81,8 @@ public class ProgramWiringTests
             scope.ServiceProvider.GetRequiredService<BudgetTracker.Domain.Interfaces.Managers.ICategoryManager>());
         Assert.IsType<BudgetTracker.Server.Managers.PlaidManager>(
             scope.ServiceProvider.GetRequiredService<BudgetTracker.Domain.Interfaces.Managers.IPlaidManager>());
+        Assert.IsType<BudgetTracker.Server.Managers.TransactionExportManager>(
+            scope.ServiceProvider.GetRequiredService<BudgetTracker.Domain.Interfaces.Managers.ITransactionExportManager>());
     }
 
     [Fact]

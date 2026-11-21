@@ -20,6 +20,12 @@ public interface ITransactionAccessor
     Task<IReadOnlyList<Transaction>> GetPageAsync(int userId, TransactionFilter filter, TransactionCursor? after, int take);
 
     /// <summary>
+    /// Every row the feed would show for <paramref name="filter"/>, newest first, streamed rather than loaded at once, for
+    /// the CSV export (BUD-25).
+    /// </summary>
+    IAsyncEnumerable<TransactionExportRow> StreamForExportAsync(int userId, TransactionFilter filter);
+
+    /// <summary>
     /// Ledger-wide counters, aggregated in the database: uncategorized non-Transfer rows, and pending amount per Plaid
     /// account.
     /// </summary>

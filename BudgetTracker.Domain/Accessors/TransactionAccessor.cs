@@ -49,6 +49,16 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
     }
 
     /// <inheritdoc />
+    public IAsyncEnumerable<TransactionExportRow> StreamForExportAsync(int userId, TransactionFilter filter) =>
+        Filtered(userId, filter)
+            .OrderByDescending(t => t.OccurredAt)
+            .ThenByDescending(t => t.Id)
+            .Select(t => new TransactionExportRow(
+                t.OccurredAt, t.Payee, t.Amount, t.TransactionType, t.Category != null ? t.Category.Name : null,
+                t.Account.Name, t.IsPending, t.Notes, t.PlaidCategoryPrimary))
+            .AsAsyncEnumerable();
+
+    /// <inheritdoc />
     public async Task<TransactionSummary> GetSummaryAsync(int userId)
     {
         var owned = context.Transactions.AsNoTracking().Where(t => t.Account.UserId == userId);
