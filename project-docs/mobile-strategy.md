@@ -129,11 +129,21 @@ A completely separate mobile app sharing only the .NET API backend. Requires rew
 
 - **Rejected**: Too much effort for a project this size. Would require maintaining two frontends.
 
-## Responsive UI improvements (pending)
+## Phone layout (BUD-29, done)
 
-These frontend changes would improve the experience on both mobile web and Capacitor:
+Audited and fixed at 375×667 (iPhone SE 3rd gen) and 390×844 (iPhone 14), in light and dark mode.
 
-1. **Responsive expenses table** — Convert the 6-column table to cards below `md:` breakpoint, or hide ID/Category ID/Notes columns with `hidden md:table-cell`
-2. **Responsive typography** — Scale header from `text-xl` to `text-3xl` across breakpoints
-3. **Touch-friendly spacing** — Ensure all interactive elements are at least 44px tall
-4. **Tighter mobile padding** — Use `px-4 sm:px-6` on card interiors
+**Kept honest by `budgettracker.client/e2e/`** (Playwright, every `/api` call mocked from typed fixtures, no backend):
+
+- `mobile-layout.spec.ts`: every page (plus the Transactions List and Calendar views and Money Map's Plan tab) has no horizontal scroll, and every visible control has at least a 44×44 tap area.
+- `mobile-interactions.spec.ts`: the rule, disconnect and budget-plan dialogs fit with their main action reachable, and a transaction row's category picker, suggestion chip and note editor work by touch.
+- Run with `npx playwright test` in `budgettracker.client`. CI runs them on every push. `E2E_AUDIT_DIR=<dir>` also writes each page's screenshot and small-tap-target list there.
+
+**What changed:**
+
+- **Tap targets.** The `touch-target` utility (`src/index.css`) gives a control a 44×44 hit area on touch screens (`pointer: coarse`) without changing how it looks. It's on the shared primitives (Button, ToggleGroup, Tabs, Checkbox, Select, InlineSelect, InlineCheckbox, the calendar's days and arrows) and on the custom controls (top nav, transaction-row chips, dashboard disclosure). Text inputs grow to 44px tall on touch screens instead, because inputs can't host `::after`.
+- **Truncated names.** Payees and category names that truncate carry the full text in `title`. Amounts don't truncate.
+- **Scrolling option rows.** A ToggleGroup that doesn't fit (e.g. Cash Flow's date range) scrolls sideways and fades the edge with more options past it (`useScrollEdges`).
+- **Dialogs.** Never wider than the screen less 1rem each side; the action row wraps.
+
+**Known limits:** 320px-wide phones (1st-gen iPhone SE) aren't covered; Money Map's Plan tab overflows there. Tablet layouts aren't covered.
