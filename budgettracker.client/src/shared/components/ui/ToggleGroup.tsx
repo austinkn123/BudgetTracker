@@ -66,7 +66,9 @@ const ToggleGroup = <TValue extends string = string>({
           key={option.value}
           value={option.value}
           className={cn(
-            'touch-target',
+            // Really 44px on touch screens: an invisible ::after hit area would overflow this scrolling row
+            // vertically and get clipped (BUD-29 review).
+            '[@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11',
             'focus-ring flex-1 whitespace-nowrap rounded px-3 py-1.5 text-xs font-semibold text-ink-muted transition-colors duration-120',
             'data-[state=on]:text-ink',
             'hover:text-ink',

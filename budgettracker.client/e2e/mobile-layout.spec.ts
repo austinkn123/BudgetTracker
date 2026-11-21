@@ -13,6 +13,14 @@ const PAGES = [
   { path: '/settings', name: 'Settings', ready: 'Rules' },
 ] as const;
 
+/** Option rows that scroll sideways must not also scroll vertically (an overhanging hit area once made them wobble). */
+const verticallyScrollingRows = (page: Page) =>
+  page.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('[role="radiogroup"], [role="group"], [role="tablist"]'))
+      .filter((el) => ['auto', 'scroll'].includes(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight)
+      .map((el) => `${el.getAttribute('aria-label') ?? el.getAttribute('role')} ${el.scrollHeight}>${el.clientHeight}`),
+  );
+
 const horizontalOverflow = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 
@@ -59,9 +67,11 @@ for (const target of PAGES) {
     await expect(page.getByRole('status', { name: 'Loading page' })).toHaveCount(0);
 
     const overflow = await horizontalOverflow(page);
+    const wobbling = await verticallyScrollingRows(page);
     const small = await record(page, testInfo, target.name);
 
     expect(overflow).toBeLessThanOrEqual(0);
+    expect(wobbling).toEqual([]);
     expect(small).toEqual([]);
   });
 }
