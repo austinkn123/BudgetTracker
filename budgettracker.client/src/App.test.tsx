@@ -18,13 +18,21 @@ vi.mock('./features/webull/pages/InvestmentsPage', () => ({
 }));
 
 describe('App routes', () => {
-  it('renders the Investments page at /investments', () => {
+  it('loads every page on demand rather than in the main bundle (BUD-28)', async () => {
+    const source = (await import('./App.tsx?raw')).default;
+
+    expect(source).not.toMatch(/^import \w+ from '\.\/(features|pages)\//m);
+  });
+
+
+  it('renders the Investments page at /investments', async () => {
     render(
       <MemoryRouter initialEntries={['/investments']}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Investments page')).toBeInTheDocument();
+    // Pages load on demand (BUD-28), so the route renders once its chunk resolves.
+    expect(await screen.findByText('Investments page')).toBeInTheDocument();
   });
 });

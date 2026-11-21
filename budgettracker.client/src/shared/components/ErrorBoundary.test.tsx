@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -106,5 +107,21 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('offers a reload when a lazily loaded page fails to download (BUD-28)', async () => {
+    // What a stale tab sees after a deploy: the old chunk's URL now 404s.
+    const MissingPage = lazy(() => Promise.reject(new TypeError('Failed to fetch dynamically imported module')));
+
+    render(
+      <ErrorBoundary>
+        <Suspense fallback={<p>Loading…</p>}>
+          <MissingPage />
+        </Suspense>
+      </ErrorBoundary>,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+    expect(screen.getByRole('button', { name: 'Reload page' })).toBeInTheDocument();
   });
 });
