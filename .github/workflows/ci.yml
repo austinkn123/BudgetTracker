@@ -37,7 +37,7 @@ jobs:
       # The client .esproj is a project reference of the server; its npm install belongs to the client job.
       BUILD_PROPS: -p:ShouldRunNpmInstall=false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -82,7 +82,7 @@ jobs:
       run:
         working-directory: budgettracker.client
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -116,7 +116,7 @@ jobs:
       run:
         working-directory: budgettracker.client
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
