@@ -1,9 +1,11 @@
-# Runs every check on every push and pull request (BUD-23). Work lands straight on main, so this
-# reports a break after it lands; requiring it in branch protection is what would block one.
+# Runs every check on pushes to main and on pull requests (BUD-23). Work branches are fast-forwarded
+# onto main, so running on their pushes too would test every commit twice. Work lands straight on
+# main, so this reports a break after it lands; requiring it in branch protection would block one.
 name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
