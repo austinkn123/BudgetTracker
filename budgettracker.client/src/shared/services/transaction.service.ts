@@ -33,6 +33,15 @@ const toParams = (
   return params;
 };
 
+/** A header's file name, percent-decoded when it can be; a malformed escape keeps the raw text. */
+const decodeFileName = (raw: string) => {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+};
+
 export const transactionService = {
   /**
    * Bounded, server-side filtered read (a month, the uncategorized backlog). The server refuses
@@ -64,21 +73,25 @@ export const transactionService = {
    * Every row the feed shows for `query`, as a CSV file (BUD-25). Fetched through the API client
    * so the request carries the sign-in token; the file name comes from the server.
    */
-  exportCsv: async (
-    query: TransactionQuery,
-  ): Promise<{ blob: Blob; fileName: string }> => {
-    const response = await api.get<Blob>("/transactions/export", {
-      params: toParams(query),
-      responseType: "blob",
-    });
-    const disposition = String(response.headers?.["content-disposition"] ?? "");
+  exportCsv: async (query: TransactionQuery): Promise<{ blob: Blob; fileName: string }> => {
+    let response;
+    try {
+      response = await api.get<Blob>('/transactions/export', { params: toParams(query), responseType: 'blob' });
+    } catch (err) {
+      // A blob response carries the server's { error } as a Blob; read it so the caller can show the message.
+      const data = (err as { response?: { data?: unknown } })?.response?.data;
+      if (data instanceof Blob) {
+        try {
+          (err as { response: { data: unknown } }).response.data = JSON.parse(await data.text());
+        } catch {
+          // Not JSON: leave the blob, and the caller falls back to its generic message.
+        }
+      }
+      throw err;
+    }
+    const disposition = String(response.headers?.['content-disposition'] ?? '');
     const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
-    return {
-      blob: response.data,
-      fileName: match
-        ? decodeURIComponent(match[1])
-        : "budgettracker-transactions.csv",
-    };
+    return { blob: response.data, fileName: match ? decodeFileName(match[1]) : 'budgettracker-transactions.csv' };
   },
 
   /** Ledger-wide counts and pending sums, without fetching the ledger. */

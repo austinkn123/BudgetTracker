@@ -12,6 +12,11 @@ vi.mock("../api", async () => {
   const instance = axios.create({ baseURL: "/api" });
   instance.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
     captured.urls.push(instance.getUri(config));
+    if (captured.failWith) {
+      const { AxiosError } = await import('axios');
+      const response = { ...captured.failWith, statusText: 'Bad Request', headers: {}, config };
+      throw new AxiosError('Request failed', 'ERR_BAD_REQUEST', config, null, response as never);
+    }
     return {
       data: { items: [], nextCursor: null },
       status: 200,
@@ -25,6 +30,7 @@ vi.mock("../api", async () => {
 
 import { categoryService } from "./category.service";
 import { transactionService } from "./transaction.service";
+import { errorMessage } from '../utils/errorMessage';
 
 describe("transaction reads", () => {
   beforeEach(() => {
@@ -87,6 +93,23 @@ describe("transaction export (BUD-25)", () => {
   beforeEach(() => {
     captured.urls.length = 0;
     captured.headers = {};
+    captured.failWith = null;
+  });
+
+  it('keeps the raw file name when its percent-escapes are malformed', async () => {
+    captured.headers = { 'content-disposition': "attachment; filename*=UTF-8''bad%E0%A4%A.csv" };
+
+    const { fileName } = await transactionService.exportCsv({});
+
+    expect(fileName).toBe('bad%E0%A4%A.csv');
+  });
+
+  it("surfaces the server's error message from a blob error body", async () => {
+    captured.failWith = { status: 400, data: new Blob([JSON.stringify({ error: 'Too many rows' })], { type: 'application/json' }) };
+
+    const failure = await transactionService.exportCsv({}).catch((err: unknown) => err);
+
+    expect(errorMessage(failure, 'fallback')).toBe('Too many rows');
   });
 
   it("sends the feed's filters and names the file as the server says", async () => {
