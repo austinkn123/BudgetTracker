@@ -50,6 +50,21 @@ const target = env.VITE_API_PROXY_TARGET ??
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
     plugins: [plugin()],
+    build: {
+        rollupOptions: {
+            output: {
+                // Framework code every page needs at boot, in chunks that only change when a dependency does,
+                // so a deploy of app code leaves them cached (BUD-28). Pages are split by React.lazy in App.tsx.
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) return undefined;
+                    if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return 'vendor-react';
+                    if (/node_modules\/(@aws-amplify|aws-amplify|@aws-sdk|@smithy|@aws-crypto)\//.test(id)) return 'vendor-amplify';
+                    if (/node_modules\/(@tanstack|axios)\//.test(id)) return 'vendor-data';
+                    return undefined;
+                },
+            },
+        },
+    },
     resolve: {
         alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url))
