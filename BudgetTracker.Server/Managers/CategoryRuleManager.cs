@@ -16,6 +16,7 @@ public class CategoryRuleManager(
     IDataVersionAccessor dataVersion) : ICategoryRuleManager
 {
     private const string NotFound = "Rule not found";
+    private const string CategoryNotFound = "Category not found";
 
     /// <inheritdoc />
     public async Task<Result<IReadOnlyList<CategoryRuleView>>> GetAllAsync(int userId)
@@ -58,6 +59,10 @@ public class CategoryRuleManager(
         {
             return Result<CategoryRuleCreated>.Failure(engine.DuplicateRuleError(rule.Pattern));
         }
+        catch (MissingReferenceException)
+        {
+            return Result<CategoryRuleCreated>.Failure(CategoryNotFound);
+        }
 
         var applied = 0;
         try
@@ -89,6 +94,10 @@ public class CategoryRuleManager(
         {
             return Result<bool>.Failure(engine.DuplicateRuleError(rule.Pattern));
         }
+        catch (MissingReferenceException)
+        {
+            return Result<bool>.Failure(CategoryNotFound);
+        }
 
         if (!updated)
             return Result<bool>.Failure(NotFound);
@@ -115,7 +124,7 @@ public class CategoryRuleManager(
             return error;
 
         // The category id arrives straight from the request body.
-        return await categoryAccessor.GetByIdForUserAsync(rule.CategoryId, rule.UserId) is null ? "Category not found" : null;
+        return await categoryAccessor.GetByIdForUserAsync(rule.CategoryId, rule.UserId) is null ? CategoryNotFound : null;
     }
 
     /// <summary>Files the uncategorized rows whose payee the saved rule wins, re-typing each as a hand-picked category would.</summary>

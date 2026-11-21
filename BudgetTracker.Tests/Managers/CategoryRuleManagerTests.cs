@@ -147,6 +147,29 @@ public class CategoryRuleManagerTests
         _transactions.Verify(t => t.SetCategoryAsync(It.IsAny<IReadOnlyDictionary<int, string>>(), It.IsAny<int?>(), It.IsAny<int>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Should_ReportCategoryNotFound_When_TheCategoryIsDeletedMidSave()
+    {
+        _rules.Setup(r => r.CreateAsync(It.IsAny<CategoryRule>()))
+            .ThrowsAsync(new MissingReferenceException("FK_CategoryRules_Categories_CategoryId", new Exception()));
+
+        var result = await BuildSut().CreateAsync(Rule("uber"), applyToExisting: false);
+
+        Assert.Equal("Category not found", result.Error);
+        Assert.Empty(_calls);
+    }
+
+    [Fact]
+    public async Task Should_ReportCategoryNotFound_When_TheCategoryIsDeletedMidUpdate()
+    {
+        _rules.Setup(r => r.UpdateAsync(It.IsAny<CategoryRule>()))
+            .ThrowsAsync(new MissingReferenceException("FK_CategoryRules_Categories_CategoryId", new Exception()));
+
+        var result = await BuildSut().UpdateAsync(Rule("uber", id: 3));
+
+        Assert.Equal("Category not found", result.Error);
+    }
+
     // --- Preview ---
 
     [Fact]

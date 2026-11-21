@@ -70,5 +70,10 @@ public class CategoryRuleAccessor(BudgetTrackerDbContext context) : ICategoryRul
         {
             throw new UniqueNameViolationException(UniqueViolation.CategoryRulePattern, ex);
         }
+        catch (DbUpdateException ex) when (ex.IsForeignKeyViolationOf(ForeignKeyViolation.CategoryRuleCategory))
+        {
+            // The category was deleted after the manager checked it was the user's.
+            throw new MissingReferenceException(ForeignKeyViolation.CategoryRuleCategory, ex);
+        }
     }
 }

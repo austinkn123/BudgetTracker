@@ -61,6 +61,17 @@ public sealed class CategoryRuleAccessorPostgresTests(PostgresFixture fixture)
     }
 
     [PostgresFact]
+    public async Task Should_ThrowMissingReference_When_TheCategoryIsGone()
+    {
+        // The category can be deleted between the manager's ownership check and this save.
+        var user = await fixture.UserAsync();
+
+        var missing = await Assert.ThrowsAsync<MissingReferenceException>(() => CreateRuleAsync(user.Id, categoryId: int.MaxValue, "uber"));
+
+        Assert.Equal("FK_CategoryRules_Categories_CategoryId", missing.ConstraintName);
+    }
+
+    [PostgresFact]
     public async Task Should_KeepACategoryInUse_When_ARuleFilesIntoIt()
     {
         var user = await fixture.UserAsync();
