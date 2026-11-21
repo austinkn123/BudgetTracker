@@ -28,7 +28,7 @@ const LoginPage = () => {
   // Set once the password is accepted and Cognito wants an authenticator code.
   const [mfaStep, setMfaStep] = useState<Exclude<SignInResult, { step: 'done' }> | null>(null);
 
-  const { control, handleSubmit } = useForm<LoginFormData>({
+  const { control, handleSubmit, resetField } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: '',
@@ -70,6 +70,14 @@ const LoginPage = () => {
     }
   });
 
+  // A wrong or expired code would otherwise leave reloading as the only way out. Keeps the email, drops the password.
+  const backToSignIn = () => {
+    setMfaStep(null);
+    setError(null);
+    codeForm.reset();
+    resetField('password');
+  };
+
   if (mfaStep) {
     const isSetup = mfaStep.step === 'totpSetup';
     return (
@@ -110,6 +118,9 @@ const LoginPage = () => {
 
             <Button type="submit" fullWidth size="lg" loading={isSubmitting}>
               {isSubmitting ? 'Verifying…' : 'Verify'}
+            </Button>
+            <Button variant="ghost" fullWidth onClick={backToSignIn} disabled={isSubmitting}>
+              Back to sign in
             </Button>
           </div>
         </form>

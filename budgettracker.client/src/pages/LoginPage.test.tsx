@@ -95,4 +95,32 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Invalid code received for user')).toBeInTheDocument();
     expect(screen.getByLabelText('6-digit code')).toBeInTheDocument();
   });
+
+  it('goes back to the password step from the code step, clearing the error', async () => {
+    // A wrong or expired code would otherwise leave reloading the page as the only way out.
+    const user = userEvent.setup();
+    signIn.mockResolvedValue({ step: 'totp' });
+    confirmMfa.mockRejectedValue(new Error('Invalid code'));
+    renderLogin();
+
+    await submitPassword(user);
+    await user.type(await screen.findByLabelText('6-digit code'), '123456');
+    await user.click(screen.getByRole('button', { name: 'Verify' }));
+    expect(await screen.findByText('Invalid code')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Back to sign in' }));
+
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
+    expect(screen.queryByLabelText('6-digit code')).not.toBeInTheDocument();
+    expect(screen.queryByText('Invalid code')).not.toBeInTheDocument();
+
+    expect(screen.getByLabelText('Email')).toHaveValue('me@example.com');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
+
+    signIn.mockResolvedValue({ step: 'done' });
+    await user.type(screen.getByLabelText('Password'), 'hunter22');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await waitFor(() => expect(signIn).toHaveBeenLastCalledWith('me@example.com', 'hunter22'));
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
+  });
 });
