@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const captured = vi.hoisted(() => ({
   urls: [] as string[],
   headers: {} as Record<string, string>,
+  failWith: null as null | { status: number; data: unknown },
 }));
 
 vi.mock('../api', async () => {
