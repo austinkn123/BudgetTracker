@@ -15,6 +15,7 @@ import PayeeReview from './components/PayeeReview';
 import PlanGroupedView from './components/PlanGroupedView';
 import TransactionFeed from './components/TransactionFeed';
 import TransactionTable from './components/TransactionTable';
+import ExportCsvButton from './components/ExportCsvButton';
 import TransactionFilters from './components/TransactionFilters';
 import {
   accountOptionsFrom,
@@ -317,6 +318,9 @@ const TransactionsSection = ({
               onAccountChange={setSelectedAccount}
               accountOptions={accountOptions}
             />
+            <div className="flex justify-end">
+              <ExportCsvButton query={feedQuery} />
+            </div>
             <TransactionFeed
               transactions={feed.transactions}
               isLoading={feed.isLoading}
