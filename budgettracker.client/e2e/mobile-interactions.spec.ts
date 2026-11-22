@@ -40,8 +40,7 @@ test.describe('dialogs fit a phone', () => {
   test('budget plan dialog', async ({ page }) => {
     await signIn(page);
     await mockApi(page);
-    await page.goto('/');
-    await page.getByRole('tab', { name: 'Plan' }).or(page.getByRole('radio', { name: 'Plan' })).first().tap();
+    await page.goto('/budget');
     await page.getByRole('button', { name: 'Edit', exact: true }).first().tap();
     const dialog = page.getByRole('dialog', { name: 'Edit budget plan' });
     await expectFitsWithReachableAction(page, dialog, dialog.getByRole('button', { name: 'Save changes' }));

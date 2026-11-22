@@ -28,7 +28,7 @@ describe('useNavItems', () => {
     const { result } = renderNav();
 
     expect(result.current).not.toContain('Investments');
-    expect(result.current).toContain('Dashboard');
+    expect(result.current).toContain('Home');
   });
 
   it('keeps Investments hidden when Webull is not set up', async () => {
@@ -37,7 +37,7 @@ describe('useNavItems', () => {
     const { result } = renderNav();
 
     await waitFor(() => expect(getMock).toHaveBeenCalled());
-    await waitFor(() => expect(result.current).toHaveLength(5));
+    await waitFor(() => expect(result.current).toHaveLength(3));
     expect(result.current).not.toContain('Investments');
   });
 
@@ -56,6 +56,6 @@ describe('useNavItems', () => {
     const { result } = renderNav();
 
     await waitFor(() => expect(result.current).toContain('Investments'));
-    expect(result.current).toEqual(['Money Map', 'Budget', 'Dashboard', 'Cash Flow', 'Transactions', 'Investments']);
+    expect(result.current).toEqual(['Home', 'Budget', 'Transactions', 'Investments']);
   });
 });
