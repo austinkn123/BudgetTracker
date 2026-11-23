@@ -16,6 +16,9 @@ export interface Split {
 /** A line runs over when its average beats the plan by more than this share. */
 const OVER_TOLERANCE = 0.05;
 
+/** A "normal month" is the average of this many months, on Home and the Budget page alike (one shared query). */
+export const AVERAGE_MONTHS = 12;
+
 const sum = (lines: MoneyMapLine[], pick: (l: MoneyMapLine) => number) =>
   lines.reduce((total, line) => total + pick(line), 0);
 

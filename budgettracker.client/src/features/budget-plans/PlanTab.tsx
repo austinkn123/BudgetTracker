@@ -8,7 +8,7 @@ import StatusBanner from '../../shared/components/StatusBanner';
 import BudgetPlansSection from './BudgetPlansSection';
 import CategoriesSection from '../categories/CategoriesSection';
 
-/** Money Map's Plan tab: what you intend to spend each month, and the categories it is measured in. */
+/** The Budget page's editing half: what you intend to spend each month, and the categories it is measured in. */
 const PlanTab = () => {
   const { data: plans = [], isLoading: loadingPlans } = useBudgetPlans();
   const { isLoading: loadingCategories } = useCategories();
@@ -31,7 +31,7 @@ const PlanTab = () => {
               Four short questions, with amounts filled in from your bank.
             </p>
           </div>
-          <Button component={Link} to="/budget" startIcon={<ListChecks size={16} />}>
+          <Button component={Link} to="/budget/guide" startIcon={<ListChecks size={16} />}>
             {plans.length > 0 ? 'Change my budget' : 'Make my budget'}
           </Button>
         </div>

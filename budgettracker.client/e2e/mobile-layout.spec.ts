@@ -4,10 +4,9 @@ import { mockApi, signIn } from './support/session';
 
 /** Every signed-in page (BUD-29). `ready` is text that only shows once the page has its data. */
 const PAGES = [
-  { path: '/', name: 'Money Map', ready: 'Household plan' },
-  { path: '/budget', name: 'Budget Builder', ready: 'Change your monthly budget' },
-  { path: '/dashboard', name: 'Dashboard', ready: 'Groceries' },
-  { path: '/cash-flow', name: 'Cash Flow', ready: 'ACME CORP PAYROLL DIRECT DEP' },
+  { path: '/', name: 'Home', ready: 'Household plan' },
+  { path: '/budget', name: 'Budget', ready: 'Household plan' },
+  { path: '/budget/guide', name: 'Budget guide', ready: 'Change your monthly budget' },
   { path: '/transactions', name: 'Transactions', ready: 'Groceries' },
   { path: '/investments', name: 'Investments', ready: 'Holdings' },
   { path: '/settings', name: 'Settings', ready: 'Rules' },
@@ -75,19 +74,6 @@ for (const target of PAGES) {
     expect(small).toEqual([]);
   });
 }
-
-test('Money Map Plan tab fits the screen', async ({ page }, testInfo) => {
-  await signIn(page);
-  await mockApi(page);
-  await page.goto('/');
-  await page.getByRole('tab', { name: 'Plan' }).or(page.getByRole('radio', { name: 'Plan' })).first().click();
-  await expect(page.getByRole('button', { name: 'Edit', exact: true }).first()).toBeVisible();
-
-  const overflow = await horizontalOverflow(page);
-  const small = await record(page, testInfo, 'Money-Map-Plan');
-  expect(overflow).toBeLessThanOrEqual(0);
-  expect(small).toEqual([]);
-});
 
 for (const view of ['List', 'Calendar'] as const) {
   test(`Transactions ${view} view fits the screen`, async ({ page }, testInfo) => {

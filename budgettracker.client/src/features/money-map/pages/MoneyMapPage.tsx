@@ -1,36 +1,35 @@
 import { useMemo, useState } from 'react';
-import { Alert, Card, PageHeader, Skeleton, Tabs, ToggleGroup } from '../../../shared/components/ui';
-import { useTabParam } from '../../../shared/hooks/useTabParam';
-import type { MoneyMap } from '../../../shared/types/api';
-import { currency } from '../../../shared/utils/format';
+import type { ReactNode } from 'react';
+import { endOfMonth, startOfDay, startOfMonth } from 'date-fns';
+import { Alert, Card, Skeleton } from '../../../shared/components/ui';
+import type { CashFlowQuery, MoneyMap, PlanPerformance } from '../../../shared/types/api';
+import { currency, percent } from '../../../shared/utils/format';
 import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
 import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
 import ReconnectAlert from '../../linked-accounts/components/ReconnectAlert';
+import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactionSummary } from '../../transactions/hooks/useTransactionSummary';
 import { useWebull, useWebullRefreshOnOpen } from '../../webull/hooks/useWebull';
 import { summarizeNetWorth } from '../../dashboard/utils/netWorth';
+import { getStatusHeadline } from '../../dashboard/utils/planCopy';
+import { useBudgetAnalysis } from '../../dashboard/hooks/useBudgetAnalysis';
 import NetWorthCard from '../../dashboard/components/NetWorthCard';
+import StatStrip from '../../dashboard/components/StatStrip';
+import type { Stat } from '../../dashboard/components/StatStrip';
 import UncategorizedNudge from '../../dashboard/components/UncategorizedNudge';
+import { useCashFlow } from '../../cash-flow/hooks/useCashFlow';
+import { periodBounds, rangeWindow, savingsRate, toDateKey } from '../../cash-flow/utils/cashFlow';
+import CashFlowChart from '../../cash-flow/components/CashFlowChart';
+import BalanceChart from '../../cash-flow/components/BalanceChart';
+import PeriodTransactions from '../../cash-flow/components/PeriodTransactions';
 import { useMoneyMap } from '../hooks/useMoneyMap';
-import { biggestOverrun, billsSetAside, normalIncome, splitMonth } from '../utils/moneyMap';
+import { AVERAGE_MONTHS, biggestOverrun, billsSetAside, normalIncome, splitMonth } from '../utils/moneyMap';
 import PlanVsActual from '../components/PlanVsActual';
 import MoneyFlow from '../components/MoneyFlow';
-import BudgetTable from '../components/BudgetTable';
 import BillsAhead from '../components/BillsAhead';
-import PlanTab from '../../budget-plans/PlanTab';
 
-// Every window ends with the current month, so "1" is this month to date.
-const RANGE_OPTIONS = [
-  { value: '1', label: 'This month' },
-  { value: '3', label: '3 months' },
-  { value: '6', label: '6 months' },
-  { value: '12', label: '12 months' },
-] as const;
-
-const TABS = [
-  { value: 'map', label: 'Map' },
-  { value: 'plan', label: 'Plan' },
-] as const;
+/** The analysis endpoint's trend length; Home doesn't show the trend, so the smallest the Dashboard used. */
+const TREND_MONTHS = 3;
 
 /** How many months of must-pay bills a cash cushion should cover. */
 const CUSHION_MONTHS = 3;
@@ -94,19 +93,99 @@ const Insights = ({ map, cash }: { map: MoneyMap; cash: number | null }) => {
   );
 };
 
+const Section = ({ title, detail, children }: { title: string; detail?: ReactNode; children: ReactNode }) => (
+  <section className="space-y-4">
+    <div>
+      <h2 className="text-xl font-semibold tracking-[-0.015em] text-ink">{title}</h2>
+      {detail && <p className="mt-1 text-sm text-ink-muted">{detail}</p>}
+    </div>
+    {children}
+  </section>
+);
+
+/** This month against the plan: the trail headline and four figures. Nothing without an active plan. */
+const ThisMonth = ({ planMonth }: { planMonth: PlanPerformance }) => {
+  const { pacing, analyzedMonth, income } = planMonth;
+  const daysLeft = Math.max(0, pacing.daysInMonth - pacing.daysElapsed);
+  const stats: Stat[] = [
+    { label: 'Came in', value: income, format: currency.format, tone: 'positive', detail: 'so far this month' },
+    { label: 'Spent', value: pacing.actualExpenses, format: currency.format, detail: `of ${currency.format(pacing.plannedExpenses)} planned` },
+    pacing.remaining >= 0
+      ? { label: 'Left to spend', value: pacing.remaining, format: currency.format, detail: 'before you go over plan' }
+      : { label: 'Over plan', value: -pacing.remaining, format: currency.format, tone: 'negative', detail: 'more than you planned' },
+    { label: 'Days left', value: daysLeft, format: (n) => String(Math.round(n)), detail: `of ${pacing.daysInMonth}` },
+  ];
+
+  return (
+    <Section title={getStatusHeadline(pacing.pacingDelta, pacing.daysPct, analyzedMonth)} detail={`Measured against ${planMonth.plan.name}.`}>
+      <StatStrip stats={stats} />
+    </Section>
+  );
+};
+
+/** Money in and out for each of the last 12 months, plus the bank balance under it. A month opens its transactions. */
+const MonthByMonth = () => {
+  const { data: categories = [] } = useCategories();
+  const [selectedStart, setSelectedStart] = useState<string | null>(null);
+  // Same window as Cash flow's "12 months" range, so a month's bucket bounds match.
+  const bounds = useMemo(() => {
+    const today = startOfDay(new Date());
+    return rangeWindow('12m', today, { from: today, to: today });
+  }, []);
+  const query = useMemo<CashFlowQuery>(
+    () => ({ from: bounds.from ? toDateKey(bounds.from) : undefined, to: toDateKey(bounds.to), groupBy: 'Month' }),
+    [bounds],
+  );
+  const { data: report, isPending, error } = useCashFlow(query);
+
+  if (error && !report) {
+    return <Alert severity="error" title="Couldn't load month by month" message="Check that the server and database are running." />;
+  }
+  if (isPending || !report) return <Skeleton height={380} className="rounded-xl" />;
+
+  const { net, moneyIn } = report.totals;
+  const rate = savingsRate(report.totals);
+  const kept =
+    net >= 0
+      ? `You kept ${currency.format(net)}${rate !== null ? `, ${percent(rate)} of what came in` : ''}.`
+      : `You spent ${currency.format(-net)} more than came in (${currency.format(moneyIn)}).`;
+  const selected = report.periods.find((p) => p.start === selectedStart) ?? null;
+
+  return (
+    <Section title="The last 12 months" detail={`${kept} Pick a month to see its transactions.`}>
+      <CashFlowChart periods={report.periods} grouping="Month" selected={selected?.start ?? null} onSelect={setSelectedStart} />
+      {selected && (
+        <PeriodTransactions
+          key={selected.start}
+          period={selected}
+          grouping="Month"
+          bounds={periodBounds(selected.start, 'Month', bounds)}
+          plaidAccountId={null}
+          categoryId={null}
+          search=""
+          categories={categories}
+          onClear={() => setSelectedStart(null)}
+        />
+      )}
+      {report.currentBalance !== null && (
+        <BalanceChart periods={report.periods} grouping="Month" currentBalance={report.currentBalance} />
+      )}
+    </Section>
+  );
+};
+
 /**
- * The whole picture on one page: a normal month's pay against the plan, where it flows, every line against
- * its average, and the lump-sum bills ahead. The Plan tab edits the plan and categories behind it.
+ * Home: how this month is going, where a normal month's pay goes, the last 12 months, and what you have.
+ * Replaces the old Money map, Dashboard and Cash flow pages. The plan itself lives on the Budget page.
  */
 const MoneyMapPage = () => {
   // The home page, so it pulls fresh bank and Webull data on open; both are silent and refresh the queries below.
   useSyncOnOpen();
   useWebullRefreshOnOpen();
 
-  // Map is the bare /; the plan behind it is /?tab=plan.
-  const [tab, selectTab] = useTabParam(['map', 'plan']);
-  const [months, setMonths] = useState<(typeof RANGE_OPTIONS)[number]['value']>('12');
-  const { data: map, isPending, error } = useMoneyMap(Number(months));
+  const { data: map, isPending, error } = useMoneyMap(AVERAGE_MONTHS);
+  const now = new Date();
+  const { data: analysis } = useBudgetAnalysis(startOfMonth(now), endOfMonth(now), TREND_MONTHS);
   const { data: connections = [] } = usePlaidConnections();
   const { data: webull } = useWebull();
   const { data: summary } = useTransactionSummary();
@@ -119,55 +198,41 @@ const MoneyMapPage = () => {
   const uncategorizedCount = summary?.uncategorizedCount ?? 0;
 
   return (
-    <div className="stagger-in space-y-6">
-      <PageHeader
-        title="Money map"
-        description={
-          tab === 'plan' ? (
-            'The plan every figure on the map is measured against, and the categories it uses.'
-          ) : map?.planName ? (
-            <>
-              Where a normal month’s pay goes, against <span className="font-semibold text-ink">{map.planName}</span>
-            </>
-          ) : (
-            'Where a normal month’s pay goes.'
-          )
-        }
-        actions={
-          tab === 'map' && <ToggleGroup value={months} onChange={setMonths} options={RANGE_OPTIONS} ariaLabel="Average over" />
-        }
-      />
+    // Flex gap, not space-y: the sr-only heading and an empty alerts block must not leave a gap at the top.
+    <div className="stagger-in flex flex-col gap-10">
+      {/* No visible header: the sections name themselves. Screen readers still get a page heading. */}
+      <h1 className="sr-only">Home</h1>
 
-      <ReconnectAlert />
+      <div className="space-y-4 empty:hidden">
+        <ReconnectAlert />
+        <UncategorizedNudge count={uncategorizedCount} />
+      </div>
 
-      <Tabs value={tab} onChange={selectTab} options={TABS} ariaLabel="Money map">
-        {tab === 'plan' ? (
-          <PlanTab />
+      {analysis?.planMonth && <ThisMonth planMonth={analysis.planMonth} />}
+
+      <Section title="A normal month" detail="Your plan next to what a month really cost, on average, over the last 12 months.">
+        {error && !map ? (
+          <Alert severity="error" title="Couldn't load your money map" message="Check that the server and database are running." />
+        ) : isPending || !map || !split ? (
+          <div className="space-y-6" aria-busy>
+            <Skeleton height={220} className="rounded-xl" />
+            <Skeleton height={160} className="rounded-xl" />
+          </div>
         ) : (
-          <div className="stagger-in space-y-6">
-            <NetWorthCard />
-            <UncategorizedNudge count={uncategorizedCount} />
-
-            {error && !map ? (
-              <Alert severity="error" title="Couldn't load your money map" message="Check that the server and database are running." />
-            ) : isPending || !map || !split ? (
-              <div className="space-y-6" aria-busy>
-                <Skeleton height={220} className="rounded-xl" />
-                <Skeleton height={160} className="rounded-xl" />
-                <Skeleton height={520} className="rounded-xl" />
-              </div>
-            ) : (
-              <>
-                <PlanVsActual income={normalIncome(map)} plan={split.plan} actual={split.actual} months={map.months} />
-                <Insights map={map} cash={cash} />
-                <MoneyFlow lines={map.lines} income={normalIncome(map)} />
-                <BudgetTable lines={map.lines} months={map.months} income={normalIncome(map)} plan={split.plan} actual={split.actual} />
-                <BillsAhead upcoming={map.upcoming} setAside={billsSetAside(map.lines)} today={new Date(map.to)} />
-              </>
-            )}
+          <div className="space-y-6">
+            <PlanVsActual income={normalIncome(map)} plan={split.plan} actual={split.actual} months={map.months} />
+            <Insights map={map} cash={cash} />
+            <MoneyFlow lines={map.lines} income={normalIncome(map)} />
+            <BillsAhead upcoming={map.upcoming} setAside={billsSetAside(map.lines)} today={new Date(map.to)} />
           </div>
         )}
-      </Tabs>
+      </Section>
+
+      <MonthByMonth />
+
+      <Section title="What you have">
+        <NetWorthCard />
+      </Section>
     </div>
   );
 };

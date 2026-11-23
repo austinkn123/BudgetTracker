@@ -1,11 +1,4 @@
-import {
-  ArrowLeftRight,
-  ChartCandlestick,
-  ChartNoAxesCombined,
-  LayoutDashboard,
-  ListChecks,
-  Waypoints,
-} from 'lucide-react';
+import { ArrowLeftRight, ChartCandlestick, House, ListChecks } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useWebull } from '../../../features/webull/hooks/useWebull';
 
@@ -28,10 +21,8 @@ const INVESTMENTS_PATH = '/investments';
  * Settings is not here: it sits with the account controls in TopNav and MobileNavPanel.
  */
 const NAV_ITEMS: readonly NavItem[] = [
-  { label: 'Money Map', path: '/', icon: Waypoints, end: true },
+  { label: 'Home', path: '/', icon: House, end: true },
   { label: 'Budget', path: '/budget', icon: ListChecks, end: false },
-  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, end: false },
-  { label: 'Cash Flow', path: '/cash-flow', icon: ChartNoAxesCombined, end: false },
   { label: 'Transactions', path: '/transactions', icon: ArrowLeftRight, end: false },
   { label: 'Investments', path: INVESTMENTS_PATH, icon: ChartCandlestick, end: false },
 ];
