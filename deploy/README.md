@@ -18,6 +18,8 @@ The database is Neon Postgres. Everything runs in **us-east-2**.
 - .NET 9 SDK, `dotnet-ef`, and Amazon.Lambda.Tools: `dotnet tool install -g Amazon.Lambda.Tools`
 - Node/npm. Packaging runs the client's `npm run build` through the `.esproj`, so the client must compile.
 - A Neon project. Use the **direct** (non-pooler) connection string.
+- The client's Cognito settings, which are baked in at build time. See step 3.
+- On Windows, run the commands below in Git Bash or WSL. They're bash; `deploy/*.ps1` are the only PowerShell scripts.
 
 ## 1. Store configuration in SSM
 
@@ -57,7 +59,8 @@ Don't create `/budgettracker/Plaid/WebhookUrl` or `/budgettracker/Plaid/Redirect
 
 ## 2. Create the schema in Neon
 
-Run this from the repo root. It applies `InitialCreate`, which includes the `DataProtectionKeys` table.
+Run this from the repo root. It applies every migration in `BudgetTracker.Domain/Migrations`, including the
+`DataProtectionKeys` table. Run it again before each deploy that adds a migration: the Lambda never migrates on its own.
 
 ```bash
 dotnet ef database update \
@@ -66,6 +69,21 @@ dotnet ef database update \
 ```
 
 ## 3. Build the Lambda package
+
+**First, the client's Cognito settings.** Vite bakes them into the JavaScript at build time, and
+`src/auth/amplifyConfig.ts` throws at startup without them: the deployed site would be a blank page with
+`Missing required Cognito environment variables` in the browser console. Create
+`budgettracker.client/.env.production.local` (Vite reads it for production builds only; `*.local` is gitignored) with
+the values from the `Cognito` section of `BudgetTracker.Server/appsettings.json`:
+
+```bash
+VITE_COGNITO_REGION=<Cognito:Region>
+VITE_COGNITO_USER_POOL_ID=<Cognito:UserPoolId>
+VITE_COGNITO_USER_POOL_CLIENT_ID=<Cognito:ClientId>
+```
+
+These aren't secrets: they end up in the public JavaScript bundle either way. If you change the pool or app client,
+update both this file and `appsettings.json` (or its SSM override), then rebuild.
 
 ```bash
 cd BudgetTracker.Server
