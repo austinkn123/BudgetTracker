@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MoneyMap, MoneyMapLine } from '../../../shared/types/api';
-import { biggestOverrun, billsSetAside, groupLines, lineStatus, splitMonth, timeline } from './moneyMap';
+import { biggestOverrun, billsSetAside, groupLines, lineStatus, planFlow, splitMonth, timeline } from './moneyMap';
 
 const line = (over: Partial<MoneyMapLine>): MoneyMapLine => ({
   categoryId: 1,
@@ -98,5 +98,38 @@ describe('timeline', () => {
     expect(months[0].month).toEqual(new Date(2026, 10, 1));
     expect(months[0].items.map((i) => i.label)).toEqual(['Car registration']);
     expect(months[11].items.map((i) => i.label)).toEqual(['Extra paycheck']);
+  });
+});
+
+describe('planFlow', () => {
+  it('splits pay into must-pay, flexible and saving with each planned line', () => {
+    const groups = planFlow(
+      [
+        line({ name: 'Rent', bucket: 'Core', planMonthly: 2_000 }),
+        line({ name: 'Groceries', bucket: 'Buffer', planMonthly: 1_000 }),
+      ],
+      10_000,
+    );
+    expect(groups).toEqual([
+      { key: 'mustPay', label: 'Must-pay', amount: 2_000, share: 0.2, lines: [{ name: 'Rent', amount: 2_000 }] },
+      { key: 'flexible', label: 'Flexible', amount: 1_000, share: 0.1, lines: [{ name: 'Groceries', amount: 1_000 }] },
+      { key: 'saving', label: 'Saving', amount: 7_000, share: 0.7, lines: [{ name: 'Cushion, then investing', amount: 7_000 }] },
+    ]);
+  });
+
+  it('leaves out unplanned lines and groups with nothing planned', () => {
+    const groups = planFlow(
+      [line({ bucket: 'Core', planMonthly: 500 }), line({ bucket: null, planMonthly: 0 }), line({ bucket: 'Buffer', planMonthly: 0 })],
+      1_000,
+    );
+    expect(groups.map((g) => g.key)).toEqual(['mustPay', 'saving']);
+  });
+
+  it('shows no saving when the plan spends all of pay', () => {
+    expect(planFlow([line({ bucket: 'Core', planMonthly: 1_200 })], 1_000).map((g) => g.key)).toEqual(['mustPay']);
+  });
+
+  it('reports a zero share when there is no income', () => {
+    expect(planFlow([line({ bucket: 'Core', planMonthly: 100 })], 0)[0].share).toBe(0);
   });
 });

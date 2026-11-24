@@ -13,6 +13,14 @@ export const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
+/** Short dollars ($13.5K, $1.2M) — for chart axes, where full figures crowd a phone-width plot. */
+export const compactCurrency = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
 /** Dollars and cents — for individual transaction amounts, where the exact figure matters. */
 export const currencyPrecise = new Intl.NumberFormat('en-US', {
   style: 'currency',

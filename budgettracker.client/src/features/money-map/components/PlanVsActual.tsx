@@ -2,6 +2,7 @@ import { Badge, Card } from '../../../shared/components/ui';
 import type { BadgeColor } from '../../../shared/components/ui';
 import { currency } from '../../../shared/utils/format';
 import { cn } from '../../../shared/utils/cn';
+import { PHONE_QUERY, useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import type { Split } from '../utils/moneyMap';
 
 const SEGMENTS = [
@@ -10,9 +11,11 @@ const SEGMENTS = [
   { key: 'saving', label: 'Saving', bar: 'bg-success', dot: 'bg-success' },
 ] as const;
 
-/** Segments narrower than this share of the bar show only the amount; narrower still, nothing. */
-const LABEL_SHARE = 0.18;
-const AMOUNT_SHARE = 0.06;
+/**
+ * Segments narrower than `label` share of the bar show only the amount; narrower than `amount`, nothing.
+ * A phone's bar is ~250px, so its segments need a bigger share before text fits; the cards below give every figure.
+ */
+const THRESHOLDS = { wide: { label: 0.18, amount: 0.06 }, phone: { label: 0.5, amount: 0.22 } };
 const TOLERANCE = 0.05;
 
 interface PlanVsActualProps {
@@ -22,7 +25,9 @@ interface PlanVsActualProps {
   months: number;
 }
 
-const Bar = ({ label, split, income }: { label: string; split: Split; income: number }) => (
+const Bar = ({ label, split, income }: { label: string; split: Split; income: number }) => {
+  const min = THRESHOLDS[useMediaQuery(PHONE_QUERY) ? 'phone' : 'wide'];
+  return (
   <div className="flex items-center gap-4">
     <span className="w-14 shrink-0 text-xs font-semibold text-ink-muted">{label}</span>
     <div className="flex h-9 flex-1 gap-[3px] overflow-hidden rounded-md" role="img" aria-label={`${label}: ${SEGMENTS.map((s) => `${s.label} ${currency.format(split[s.key])}`).join(', ')}`}>
@@ -32,9 +37,9 @@ const Bar = ({ label, split, income }: { label: string; split: Split; income: nu
         if (value === 0) return null;
         return (
           <div key={s.key} className={cn('flex min-w-0 items-center px-3 text-xs font-semibold text-white', s.bar)} style={{ flexGrow: value, flexBasis: 0 }}>
-            {share >= AMOUNT_SHARE && (
+            {share >= min.amount && (
               <span className="numeric truncate" title={`${s.label} ${currency.format(value)}`}>
-                {share >= LABEL_SHARE ? `${s.label} ${currency.format(value)}` : currency.format(value)}
+                {share >= min.label ? `${s.label} ${currency.format(value)}` : currency.format(value)}
               </span>
             )}
           </div>
@@ -42,7 +47,8 @@ const Bar = ({ label, split, income }: { label: string; split: Split; income: nu
       })}
     </div>
   </div>
-);
+  );
+};
 
 const verdict = (key: (typeof SEGMENTS)[number]['key'], plan: number, actual: number): { color: BadgeColor; label: string } => {
   const gap = actual - plan;

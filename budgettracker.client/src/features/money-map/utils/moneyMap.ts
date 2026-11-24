@@ -97,3 +97,45 @@ export const timeline = (upcoming: UpcomingItem[], today: Date): TimelineMonth[]
   }));
   return months[0].items.length === 0 ? months.slice(1) : months;
 };
+
+export interface FlowGroup {
+  key: 'mustPay' | 'flexible' | 'saving';
+  label: string;
+  /** Dollars per month. */
+  amount: number;
+  /** Share of a normal month's pay. */
+  share: number;
+  lines: { name: string; amount: number }[];
+}
+
+/** A normal month's pay split into must-pay, flexible and saving, each with its planned lines. Empty groups drop out. */
+export const planFlow = (lines: MoneyMapLine[], income: number): FlowGroup[] => {
+  const groups: FlowGroup[] = [];
+  let planned = 0;
+  for (const [bucket, key, label] of [
+    ['Core', 'mustPay', 'Must-pay'],
+    ['Buffer', 'flexible', 'Flexible'],
+  ] as const) {
+    const group = lines.filter((l) => l.bucket === bucket && l.planMonthly > 0);
+    const amount = sum(group, (l) => l.planMonthly);
+    if (amount === 0) continue;
+    planned += amount;
+    groups.push({
+      key,
+      label,
+      amount,
+      share: income > 0 ? amount / income : 0,
+      lines: group.map((l) => ({ name: l.name, amount: l.planMonthly })),
+    });
+  }
+  const saving = income - planned;
+  if (saving > 0)
+    groups.push({
+      key: 'saving',
+      label: 'Saving',
+      amount: saving,
+      share: saving / income,
+      lines: [{ name: 'Cushion, then investing', amount: saving }],
+    });
+  return groups;
+};

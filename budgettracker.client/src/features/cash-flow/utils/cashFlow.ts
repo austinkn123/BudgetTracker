@@ -167,3 +167,28 @@ export const selectTopIncome = (sources: IncomeSource[], limit: number): SpendSl
   if (otherTotal > 0) top.push({ key: 'other', label: 'Other', value: otherTotal });
   return top;
 };
+
+/** The smallest 1, 2, 2.5 or 5 × 10ⁿ at least `raw`, so ticks land on round dollars. */
+const niceStep = (raw: number) => {
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((step) => step >= raw) ?? 10 * magnitude;
+};
+
+/**
+ * Y-axis range and ticks for the balance chart. Recharts' 'auto' hugs the data, so a near-flat balance
+ * spreads a few dollars over the whole height and compact ticks all read the same ($24.3K five times).
+ * Pad by a tenth of the swing, but never less than 5% of the balance (or $100 near zero), then snap to
+ * about four round steps. Null when no period has a balance.
+ */
+export const balanceAxis = (balances: (number | null)[]): { domain: [number, number]; ticks: number[] } | null => {
+  const known = balances.filter((b): b is number => b !== null);
+  if (known.length === 0) return null;
+  const min = Math.min(...known);
+  const max = Math.max(...known);
+  const pad = Math.max((max - min) * 0.1, Math.max(Math.abs(min), Math.abs(max)) * 0.05, 100);
+  const step = niceStep((max - min + 2 * pad) / 4);
+  const low = Math.floor((min - pad) / step) * step;
+  const high = Math.ceil((max + pad) / step) * step;
+  const ticks = Array.from({ length: Math.round((high - low) / step) + 1 }, (_, i) => low + i * step);
+  return { domain: [low, high], ticks };
+};

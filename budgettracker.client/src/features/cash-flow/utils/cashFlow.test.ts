@@ -12,6 +12,7 @@ import {
   type DateSpan,
   type DateWindow,
 } from './cashFlow';
+import { balanceAxis } from './cashFlow';
 
 const d = (iso: string) => new Date(`${iso}T00:00:00`);
 const keys = (span: DateSpan | DateWindow | null) =>
@@ -203,5 +204,27 @@ describe('selectTopIncome', () => {
       ['Gusto', 5000],
       ['Other', 43],
     ]);
+  });
+});
+
+describe('balanceAxis', () => {
+  it('returns nothing when no period has a balance', () => {
+    expect(balanceAxis([null, null])).toBeNull();
+  });
+
+  it('pads a flat balance and ticks it in round thousands', () => {
+    expect(balanceAxis([24_311, 24_311])).toEqual({ domain: [23_000, 26_000], ticks: [23_000, 24_000, 25_000, 26_000] });
+  });
+
+  it('pads a wide swing by a tenth of the swing', () => {
+    expect(balanceAxis([0, 10_000])).toEqual({ domain: [-5_000, 15_000], ticks: [-5_000, 0, 5_000, 10_000, 15_000] });
+  });
+
+  it('pads at least $100 around a balance near zero', () => {
+    expect(balanceAxis([0, null])).toEqual({ domain: [-100, 100], ticks: [-100, -50, 0, 50, 100] });
+  });
+
+  it('pads below a negative balance', () => {
+    expect(balanceAxis([-2_000, -1_000])).toEqual({ domain: [-2_500, -500], ticks: [-2_500, -2_000, -1_500, -1_000, -500] });
   });
 });

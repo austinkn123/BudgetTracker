@@ -18,7 +18,7 @@ import type { NameType, ValueType } from 'recharts/types/component/DefaultToolti
 import { Card } from '../../../shared/components/ui';
 import { withAlpha } from '../../../shared/theme/tokens';
 import type { CashFlowGrouping, CashFlowPeriod } from '../../../shared/types/api';
-import { currency, signedCurrency } from '../../../shared/utils/format';
+import { compactCurrency, currency, signedCurrency } from '../../../shared/utils/format';
 import { semanticColors } from '../../dashboard/utils/chartTheme';
 import { formatPeriod, formatTick } from '../utils/cashFlow';
 
@@ -41,6 +41,8 @@ const LEGEND = [
   { label: 'Net', color: semanticColors.neutral, line: true },
 ] as const;
 
+/** A range of one or two buckets would otherwise draw a bar the width of the chart. */
+const MAX_BAR = 48;
 const AXIS_TICK = { fontSize: 11, fill: semanticColors.expense };
 // Recharts' default list minus 'mousemove'.
 const UNTHROTTLED_MOUSEMOVE = ['touchmove', 'pointermove', 'scroll', 'wheel'] as const;
@@ -158,8 +160,8 @@ const CashFlowChart = ({ periods, grouping, selected, onSelect }: CashFlowChartP
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  width={72}
-                  tickFormatter={(value: number) => currency.format(value)}
+                  width={52}
+                  tickFormatter={(value: number) => compactCurrency.format(value)}
                   tick={AXIS_TICK}
                 />
                 <ReferenceLine y={0} stroke={withAlpha(semanticColors.ink, 0.2)} />
@@ -169,12 +171,12 @@ const CashFlowChart = ({ periods, grouping, selected, onSelect }: CashFlowChartP
                 />
                 {/* Shared stack + sign offset: in and out share one column, growing apart from 0.
                     Radius applies at each bar's value end, so both round on their outer edge. */}
-                <Bar dataKey="moneyIn" name="Money in" stackId="flow" fill={semanticColors.income} radius={[3, 3, 0, 0]}>
+                <Bar dataKey="moneyIn" name="Money in" stackId="flow" maxBarSize={MAX_BAR} fill={semanticColors.income} radius={[3, 3, 0, 0]}>
                   {rows.map((row) => (
                     <Cell key={row.start} fillOpacity={opacityFor(row)} />
                   ))}
                 </Bar>
-                <Bar dataKey="out" name="Money out" stackId="flow" fill={semanticColors.expense} radius={[3, 3, 0, 0]}>
+                <Bar dataKey="out" name="Money out" stackId="flow" maxBarSize={MAX_BAR} fill={semanticColors.expense} radius={[3, 3, 0, 0]}>
                   {rows.map((row) => (
                     <Cell key={row.start} fillOpacity={opacityFor(row)} />
                   ))}

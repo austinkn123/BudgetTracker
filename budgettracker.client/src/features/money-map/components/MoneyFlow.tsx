@@ -3,7 +3,11 @@ import { ResponsiveContainer, Sankey } from 'recharts';
 import type { MoneyMapLine } from '../../../shared/types/api';
 import { Card } from '../../../shared/components/ui';
 import { cssVar } from '../../../shared/theme/tokens';
-import { currency } from '../../../shared/utils/format';
+import { currency, percent } from '../../../shared/utils/format';
+import { cn } from '../../../shared/utils/cn';
+import { PHONE_QUERY, useMediaQuery } from '../../../shared/hooks/useMediaQuery';
+import { planFlow } from '../utils/moneyMap';
+import type { FlowGroup } from '../utils/moneyMap';
 
 interface FlowNode {
   name: string;
@@ -20,36 +24,32 @@ interface FlowLink {
 }
 
 const HEIGHT = 520;
+/** Leaf labels get 230px of right margin; longer names are cut and keep the full text in a tooltip. */
+const MAX_LEAF_CHARS = 28;
+
+const GROUP_STYLE: Record<FlowGroup['key'], { color: string; bar: string }> = {
+  mustPay: { color: cssVar('primary'), bar: 'bg-primary' },
+  flexible: { color: cssVar('secondary'), bar: 'bg-secondary' },
+  saving: { color: cssVar('success'), bar: 'bg-success' },
+};
 
 /** Paychecks → must-pay / flexible / saving → each plan line. Band width is dollars per month. */
-const buildFlow = (lines: MoneyMapLine[], income: number) => {
+const buildSankey = (groups: FlowGroup[], income: number) => {
   const nodes: FlowNode[] = [{ name: 'Paychecks', amount: income, color: cssVar('ink-muted') }];
   const links: FlowLink[] = [];
   const add = (node: FlowNode, from: number) => {
     links.push({ source: from, target: nodes.push(node) - 1, value: node.amount });
     return nodes.length - 1;
   };
-
-  let planned = 0;
-  for (const [bucket, label, color] of [
-    ['Core', 'Must-pay', cssVar('primary')],
-    ['Buffer', 'Flexible', cssVar('secondary')],
-  ] as const) {
-    const group = lines.filter((l) => l.bucket === bucket && l.planMonthly > 0);
-    const total = group.reduce((s, l) => s + l.planMonthly, 0);
-    if (total === 0) continue;
-    planned += total;
-    const groupIndex = add({ name: label, amount: total, color, share: total / income }, 0);
-    for (const line of group) add({ name: line.name, amount: line.planMonthly, color }, groupIndex);
-  }
-
-  const saving = income - planned;
-  if (saving > 0) {
-    const savingIndex = add({ name: 'Saving', amount: saving, color: cssVar('success'), share: saving / income }, 0);
-    add({ name: 'Cushion, then investing', amount: saving, color: cssVar('success') }, savingIndex);
+  for (const group of groups) {
+    const { color } = GROUP_STYLE[group.key];
+    const groupIndex = add({ name: group.label, amount: group.amount, color, share: group.share }, 0);
+    for (const line of group.lines) add({ name: line.name, amount: line.amount, color }, groupIndex);
   }
   return { nodes, links };
 };
+
+const shorten = (name: string) => (name.length > MAX_LEAF_CHARS ? `${name.slice(0, MAX_LEAF_CHARS - 1).trimEnd()}…` : name);
 
 interface NodeShapeProps {
   x: number;
@@ -85,7 +85,8 @@ const NodeShape = ({ x, y, width, height, payload }: NodeShapeProps) => {
     <g>
       <rect x={x} y={y} width={width} height={Math.max(height, 2)} rx={2} fill={payload.color} />
       <text x={x + width + 10} y={mid} dominantBaseline="middle" fontSize={12} fill={ink}>
-        <tspan fontWeight={500}>{payload.name}</tspan>
+        <title>{payload.name}</title>
+        <tspan fontWeight={500}>{shorten(payload.name)}</tspan>
         <tspan fill={muted}>{`  ${currency.format(payload.amount)}`}</tspan>
       </text>
     </g>
@@ -113,32 +114,78 @@ const LinkShape = ({ sourceX, targetX, sourceY, targetY, sourceControlX, targetC
   />
 );
 
+/** Phone layout: the Sankey's side labels need ~360px of margin, so each group becomes a bar and a list. */
+const FlowList = ({ groups }: { groups: FlowGroup[] }) => (
+  <ul className="flex flex-col gap-5">
+    {groups.map((group) => (
+      <li key={group.key}>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span className={cn('h-2.5 w-2.5 rounded-full', GROUP_STYLE[group.key].bar)} aria-hidden />
+            {group.label}
+          </span>
+          <span className="numeric shrink-0 text-sm text-ink-muted">
+            <span className="font-semibold text-ink">{currency.format(group.amount)}</span> · {percent(group.share)}
+          </span>
+        </div>
+        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-border-subtle" aria-hidden>
+          {/* Inline width: the bar's length is data (share of pay), which no utility class can express. */}
+          <div
+            className={cn('h-full rounded-full', GROUP_STYLE[group.key].bar)}
+            style={{ width: `${Math.min(group.share, 1) * 100}%` }}
+          />
+        </div>
+        <ul className="mt-3 flex flex-col gap-2 border-l border-border-subtle pl-3">
+          {group.lines.map((line) => (
+            <li key={line.name} className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate text-ink" title={line.name}>
+                {line.name}
+              </span>
+              <span className="numeric shrink-0 text-ink-muted">{currency.format(line.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      </li>
+    ))}
+  </ul>
+);
+
 interface MoneyFlowProps {
   lines: MoneyMapLine[];
   income: number;
 }
 
 const MoneyFlow = ({ lines, income }: MoneyFlowProps) => {
-  const data = useMemo(() => buildFlow(lines, income), [lines, income]);
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const groups = useMemo(() => planFlow(lines, income), [lines, income]);
+  const sankey = useMemo(() => buildSankey(groups, income), [groups, income]);
 
   return (
     <Card
       title="Where a normal month’s pay goes"
-      subtitle="The plan. A band’s width is dollars per month; yearly bills are spread across 12 months."
+      subtitle={
+        isPhone
+          ? 'The plan, per month. Yearly bills are spread across 12 months.'
+          : 'The plan. A band’s width is dollars per month; yearly bills are spread across 12 months.'
+      }
     >
-      <div style={{ height: HEIGHT }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <Sankey
-            data={data}
-            sort={false}
-            nodeWidth={12}
-            nodePadding={14}
-            margin={{ top: 8, right: 230, bottom: 8, left: 130 }}
-            node={(props) => <NodeShape {...(props as unknown as NodeShapeProps)} />}
-            link={(props) => <LinkShape {...(props as unknown as LinkShapeProps)} />}
-          />
-        </ResponsiveContainer>
-      </div>
+      {isPhone ? (
+        <FlowList groups={groups} />
+      ) : (
+        <div style={{ height: HEIGHT }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <Sankey
+              data={sankey}
+              sort={false}
+              nodeWidth={12}
+              nodePadding={14}
+              margin={{ top: 8, right: 230, bottom: 8, left: 130 }}
+              node={(props) => <NodeShape {...(props as unknown as NodeShapeProps)} />}
+              link={(props) => <LinkShape {...(props as unknown as LinkShapeProps)} />}
+            />
+          </ResponsiveContainer>
+        </div>
+      )}
     </Card>
   );
 };

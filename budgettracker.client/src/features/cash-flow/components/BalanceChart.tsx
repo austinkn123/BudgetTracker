@@ -1,13 +1,14 @@
+import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { TooltipContentProps } from 'recharts';
 import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { Card } from '../../../shared/components/ui';
 import { withAlpha } from '../../../shared/theme/tokens';
 import type { CashFlowGrouping, CashFlowPeriod } from '../../../shared/types/api';
-import { currency } from '../../../shared/utils/format';
+import { compactCurrency, currency } from '../../../shared/utils/format';
 import { useCountUp } from '../../../shared/hooks/useCountUp';
 import { chartPalette, semanticColors } from '../../dashboard/utils/chartTheme';
-import { formatPeriod, formatTick } from '../utils/cashFlow';
+import { balanceAxis, formatPeriod, formatTick } from '../utils/cashFlow';
 
 interface BalanceChartProps {
   periods: CashFlowPeriod[];
@@ -38,6 +39,7 @@ const BalanceTooltip = ({
 /** End-of-period balance across checking and savings, less card debt. */
 const BalanceChart = ({ periods, grouping, currentBalance }: BalanceChartProps) => {
   const shown = useCountUp(currentBalance);
+  const axis = useMemo(() => balanceAxis(periods.map((p) => p.balance)), [periods]);
 
   return (
     <Card
@@ -64,9 +66,10 @@ const BalanceChart = ({ periods, grouping, currentBalance }: BalanceChartProps) 
           <YAxis
             axisLine={false}
             tickLine={false}
-            width={72}
-            domain={['auto', 'auto']}
-            tickFormatter={(value: number) => currency.format(value)}
+            width={52}
+            domain={axis?.domain ?? ['auto', 'auto']}
+            ticks={axis?.ticks}
+            tickFormatter={(value: number) => compactCurrency.format(value)}
             tick={AXIS_TICK}
           />
           <Tooltip
