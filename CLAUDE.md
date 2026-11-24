@@ -33,7 +33,11 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **Testing**: Follow TDD (Red-Green-Refactor). Unit test Engines directly. Test Managers with mocked Engines/Accessors. Accessor tests that need a relational provider (e.g. `ExecuteUpdate`) use EF Core SQLite in-memory — the EF InMemory provider can't translate it. Postgres-specific behaviour (Npgsql SQL translation, ILIKE, timestamp precision, row locks, unique-index violations, migrations) is covered by the `[PostgresFact]` tests in `BudgetTracker.Tests/Postgres/`: `PostgresFixture` creates a throwaway `bt_test_<guid>` database on the server in `BUDGETTRACKER_TEST_POSTGRES` (default `Host=localhost;Username=postgres;Password=postgres`), applies the real migrations, and drops it afterwards. Run them with `dotnet test --filter Category=Postgres`. With no server reachable they are reported as Skipped (never passed); set `BUDGETTRACKER_REQUIRE_POSTGRES=1` (or `true`) to make that a failure.
 - **Contracts first**: Define interfaces in `BudgetTracker.Domain/Interfaces/` before implementing.
 
-## Commits & Pull Requests
+## Commits & Merging
+- **No pull requests. Land work straight on `main`** — the owner reviews `main` afterwards. This is standing permission to push to `main` for this repo; it overrides any default to open a PR or to push only to a work branch.
+  - Commit on the work branch, run the fast checks for what changed (client: `npx tsc -b`, `npx eslint src`, `npx vitest run`, and `npx playwright test` for UI changes; server: `dotnet build` + `dotnet test`), then fast-forward `main` onto it and `git push origin HEAD:main`. If `main` moved, merge `origin/main` into the branch first, re-run the checks, then push.
+  - CI (`.github/workflows/ci.yml`) runs after the push, so a red run means `main` is broken: fix it forward right away.
+  - Never force-push `main`. Nothing deploys on push (deploys are manual via SAM), so landing on `main` does not ship to production.
 - **Every commit uses Conventional Commits**: `<type>(<optional scope>): <imperative summary>` — lowercase type, summary ≤ 72 chars, no trailing period.
   - Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `style`, `build`, `ci`, `chore`, `revert`.
   - Scopes (optional, use the area touched): `transactions`, `plaid`, `categories`, `budget`, `cash-flow`, `money-map`, `dashboard`, `webull`, `auth`, `db`, `client`, `server`, `deploy`.
@@ -41,7 +45,7 @@ You are an expert developer working on the BudgetTracker application. This proje
   - Body (optional): what and why, wrapped at 72 chars.
   - Examples: `feat(transactions): add infinite-scroll ledger feed`, `fix(plaid): revert windowed transfer pairing`, `feat(db): add Users.DataVersion change counter`.
 - One logical change per commit; don't mix unrelated types in one commit.
-- **PR titles** follow the same format, since PRs are squash-merged and the title becomes the commit on `main`.
+- Each commit lands on `main` as-is (no squash), so every commit message must meet this format.
 
 ## Context
 - Always check `project-docs/` for architectural decisions before suggesting major changes.
