@@ -42,6 +42,16 @@ const smallTapTargets = (page: Page) =>
 const record = async (page: Page, testInfo: TestInfo, label: string) => {
   // Measure first: in Chromium a full-page screenshot resets the touch emulation, so (pointer: coarse) stops
   // matching for the rest of the test and touch-target sizes would read as their visual size.
+  // Let entrance animations settle: a card still mid rise-in (translateY) reports its controls at
+  // 43.9998px, so the check passed or failed on timing. Infinite ones (spinners) never finish, so skip them.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime))
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   const small = await smallTapTargets(page);
   const taps = small.join('\n');
   const shot = await page.screenshot({ fullPage: true });
