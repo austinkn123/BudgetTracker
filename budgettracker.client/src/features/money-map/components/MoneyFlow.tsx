@@ -23,9 +23,14 @@ interface FlowLink {
 }
 
 const HEIGHT = 520;
-const PHONE_HEIGHT = 300;
 /** Leaf labels get 230px of right margin; longer names are cut and keep the full text in a tooltip. */
 const MAX_LEAF_CHARS = 28;
+/** Phones: ~125px of right margin fits a cut name over its amount. */
+const PHONE_LEAF_CHARS = 16;
+/** Phone leaf labels are two lines (~28px), so leaves sit at least this far apart or labels overlap. */
+const PHONE_GAP = 30;
+/** Height for the bands themselves on phones, on top of the gaps between leaves. */
+const PHONE_BANDS = 220;
 
 const GROUP_STYLE: Record<FlowGroup['key'], { color: string }> = {
   mustPay: { color: cssVar('primary') },
@@ -33,24 +38,27 @@ const GROUP_STYLE: Record<FlowGroup['key'], { color: string }> = {
   saving: { color: cssVar('success') },
 };
 
-/** Paychecks → must-pay / flexible / saving → each plan line. Band width is dollars per month. */
-/** `leaves: false` stops at the three groups: a phone has no room for each plan line's label. */
-const buildSankey = (groups: FlowGroup[], income: number, leaves: boolean) => {
-  const nodes: FlowNode[] = [{ name: 'Paychecks', amount: income, color: cssVar('ink-muted') }];
+/**
+ * Paychecks → must-pay / flexible / saving → each plan line. Band width is dollars per month.
+ * `paychecks: false` (phones) starts at the three groups so the plan lines still fit beside them.
+ */
+const buildSankey = (groups: FlowGroup[], income: number, paychecks: boolean) => {
+  const nodes: FlowNode[] = paychecks ? [{ name: 'Paychecks', amount: income, color: cssVar('ink-muted') }] : [];
   const links: FlowLink[] = [];
-  const add = (node: FlowNode, from: number) => {
-    links.push({ source: from, target: nodes.push(node) - 1, value: node.amount });
-    return nodes.length - 1;
+  const add = (node: FlowNode, from: number | null) => {
+    const index = nodes.push(node) - 1;
+    if (from !== null) links.push({ source: from, target: index, value: node.amount });
+    return index;
   };
   for (const group of groups) {
     const { color } = GROUP_STYLE[group.key];
-    const groupIndex = add({ name: group.label, amount: group.amount, color, share: group.share }, 0);
-    if (leaves) for (const line of group.lines) add({ name: line.name, amount: line.amount, color }, groupIndex);
+    const groupIndex = add({ name: group.label, amount: group.amount, color, share: group.share }, paychecks ? 0 : null);
+    for (const line of group.lines) add({ name: line.name, amount: line.amount, color }, groupIndex);
   }
   return { nodes, links };
 };
 
-const shorten = (name: string) => (name.length > MAX_LEAF_CHARS ? `${name.slice(0, MAX_LEAF_CHARS - 1).trimEnd()}…` : name);
+const shorten = (name: string, max: number) => (name.length > max ? `${name.slice(0, max - 1).trimEnd()}…` : name);
 
 interface NodeShapeProps {
   x: number;
@@ -58,12 +66,35 @@ interface NodeShapeProps {
   width: number;
   height: number;
   payload: FlowNode & { depth: number };
+  compact: boolean;
 }
 
-const NodeShape = ({ x, y, width, height, payload }: NodeShapeProps) => {
+const NodeShape = ({ x, y, width, height, payload, compact }: NodeShapeProps) => {
   const ink = cssVar('ink');
   const muted = cssVar('ink-muted');
   const mid = y + height / 2;
+  // Phones: groups are the first column, so their labels sit on the left like Paychecks' do.
+  if (compact && payload.share !== undefined)
+    return (
+      <g>
+        <rect x={x} y={y} width={width} height={height} rx={3} fill={payload.color} />
+        <text x={x - 8} y={mid - 8} textAnchor="end" fontSize={13} fontWeight={600} fill={ink}>{payload.name}</text>
+        <text x={x - 8} y={mid + 9} textAnchor="end" fontSize={11} fill={muted}>
+          {currency.format(payload.amount)} · {Math.round(payload.share * 100)}%
+        </text>
+      </g>
+    );
+  if (compact)
+    return (
+      <g>
+        <rect x={x} y={y} width={width} height={Math.max(height, 2)} rx={2} fill={payload.color} />
+        <text x={x + width + 8} y={mid - 7} dominantBaseline="middle" fontSize={12} fontWeight={500} fill={ink}>
+          <title>{payload.name}</title>
+          {shorten(payload.name, PHONE_LEAF_CHARS)}
+        </text>
+        <text x={x + width + 8} y={mid + 8} dominantBaseline="middle" fontSize={11} fill={muted}>{currency.format(payload.amount)}</text>
+      </g>
+    );
   if (payload.depth === 0)
     return (
       <g>
@@ -87,7 +118,7 @@ const NodeShape = ({ x, y, width, height, payload }: NodeShapeProps) => {
       <rect x={x} y={y} width={width} height={Math.max(height, 2)} rx={2} fill={payload.color} />
       <text x={x + width + 10} y={mid} dominantBaseline="middle" fontSize={12} fill={ink}>
         <title>{payload.name}</title>
-        <tspan fontWeight={500}>{shorten(payload.name)}</tspan>
+        <tspan fontWeight={500}>{shorten(payload.name, MAX_LEAF_CHARS)}</tspan>
         <tspan fill={muted}>{`  ${currency.format(payload.amount)}`}</tspan>
       </text>
     </g>
@@ -124,21 +155,27 @@ const MoneyFlow = ({ lines, income }: MoneyFlowProps) => {
   const isPhone = useMediaQuery(PHONE_QUERY);
   const groups = useMemo(() => planFlow(lines, income), [lines, income]);
   const sankey = useMemo(() => buildSankey(groups, income, !isPhone), [groups, income, isPhone]);
+  const leaves = groups.reduce((n, g) => n + g.lines.length, 0);
 
   return (
     <Card
       title="Where a normal month’s pay goes"
-      subtitle="The plan. A band’s width is dollars per month; yearly bills are spread across 12 months."
+      subtitle={
+        isPhone
+          ? `${currency.format(income)} of pay, per month. Yearly bills are spread across 12 months.`
+          : 'The plan. A band’s width is dollars per month; yearly bills are spread across 12 months.'
+      }
     >
-      <div style={{ height: isPhone ? PHONE_HEIGHT : HEIGHT }}>
+      {/* Inline height: on phones it grows with the number of plan lines so their two-line labels never overlap. */}
+      <div style={{ height: isPhone ? (leaves - 1) * PHONE_GAP + PHONE_BANDS : HEIGHT }}>
         <ResponsiveContainer width="100%" height="100%">
           <Sankey
             data={sankey}
             sort={false}
             nodeWidth={12}
-            nodePadding={isPhone ? 24 : 14}
-            margin={isPhone ? { top: 8, right: 100, bottom: 8, left: 90 } : { top: 8, right: 230, bottom: 8, left: 130 }}
-            node={(props) => <NodeShape {...(props as unknown as NodeShapeProps)} />}
+            nodePadding={isPhone ? PHONE_GAP : 14}
+            margin={isPhone ? { top: 8, right: 125, bottom: 8, left: 92 } : { top: 8, right: 230, bottom: 8, left: 130 }}
+            node={(props) => <NodeShape {...(props as unknown as NodeShapeProps)} compact={isPhone} />}
             link={(props) => <LinkShape {...(props as unknown as LinkShapeProps)} />}
           />
         </ResponsiveContainer>
