@@ -1,7 +1,8 @@
 # Deploying BudgetTracker to AWS Lambda (personal account)
 
 One Lambda function serves both the API (`/api/*`) and the React SPA (`wwwroot`) behind a public Function URL.
-The database is Neon Postgres. Everything runs in **us-east-2**.
+The database is Neon Postgres. Everything runs in **us-east-2**. Optionally, a free Cloudflare Worker serves the SPA
+and forwards the API to the function (step 6).
 
 | Piece | Choice | Why |
 |---|---|---|
@@ -136,6 +137,42 @@ The stack output `FunctionUrl` is the app's public address, for example `https:/
    HTTPS with no `#`. To test locally on sandbox, also add `https://localhost:53608/plaid-oauth` and set
    `Plaid:RedirectUri` to it in `BudgetTracker.Server/appsettings.Local.json`.
 4. **Smoke test.** Open `<FunctionUrl>`, sign in, link a sandbox bank (`user_good` / `pass_good`), then refresh.
+
+## 6. Cloudflare front door (optional, free)
+
+A Worker on Cloudflare's free plan serves the SPA from Cloudflare's edge and forwards `/api/*` and `/health*` to the
+Function URL. Pages load without waiting on a Lambda cold start, and the app gets a stable address
+(`https://budgettracker.<your-subdomain>.workers.dev`, or your own domain). The Lambda still runs the API, so steps
+1–4 don't change. Only the URLs you give Plaid in step 5 do. Config: `deploy/cloudflare/`.
+
+The free plan meters only forwarded requests (100,000 a day). Static files are free and unmetered. The .NET API
+can't run on Workers itself. Cloudflare Containers could run it, but they need the $5/month Workers Paid plan.
+
+Do this after step 4, so the Function URL exists, and with `.env.production.local` from step 3 in place:
+
+```bash
+cd budgettracker.client && npm ci && npm run build && cd ..   # writes budgettracker.client/dist
+cd deploy/cloudflare
+npx wrangler login                     # once; opens the browser
+npx wrangler deploy                    # prints the Worker URL
+npx wrangler secret put API_ORIGIN     # paste the FunctionUrl from step 4; this redeploys the Worker
+```
+
+Then:
+
+1. **Plaid.** In step 5, use the Worker URL in place of `<FunctionUrl>`. It has no trailing slash, so add one:
+   `WebhookUrl` = `<WorkerUrl>/api/plaid/webhook`, `RedirectUri` = `<WorkerUrl>/plaid-oauth`. Put the same redirect
+   URI in the Plaid dashboard's Allowed redirect URIs.
+2. **Smoke test.** `curl <WorkerUrl>/health` returns 200. Open `<WorkerUrl>`, sign in, and link a sandbox bank.
+   `npx wrangler tail` shows forwarded requests live.
+3. **Shipping client changes.** Rebuild the client and run `npx wrangler deploy`. The Lambda zip still carries its
+   own copy of the SPA at the Function URL, so repackage it too, or that copy goes stale.
+4. **Own domain (optional).** If the domain's DNS is on Cloudflare, add
+   `"routes": [{ "pattern": "budget.example.com", "custom_domain": true }]` to `wrangler.jsonc` and deploy again.
+   Cloudflare creates the DNS record and certificate. Use that hostname for the Plaid URLs.
+
+The Function URL stays public. Cloudflare doesn't hide it, and auth still happens in the app, exactly as without the
+Worker.
 
 ## Sign-up
 

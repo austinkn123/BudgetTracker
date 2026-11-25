@@ -1,0 +1,13 @@
+// Cloudflare Worker in front of the Lambda: serves the React SPA from Cloudflare's edge (free) and forwards the API.
+// Deploy steps: deploy/README.md, "Cloudflare front door". The Lambda URL is the API_ORIGIN secret, not a var,
+// so it stays out of the repo.
+{
+  "name": "budgettracker",
+  "main": "./worker.js",
+  "compatibility_date": "2026-11-24",
+  "assets": {
+    "directory": "../../budgettracker.client/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health", "/health/*"]
+  }
+}
