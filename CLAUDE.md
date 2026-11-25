@@ -10,7 +10,7 @@ You are an expert developer working on the BudgetTracker application. This proje
 - **Database**: PostgreSQL (Neon) via Npgsql (`Npgsql.EntityFrameworkCore.PostgreSQL`)
 - **ORM**: Entity Framework Core (Code-first with Fluent API configurations)
 - **Authentication**: AWS Cognito (In progress)
-- **Hosting**: a single AWS Lambda behind a Function URL, deployed with SAM (`deploy/template.yaml`; see `deploy/README.md`). Logs go to CloudWatch (14-day retention).
+- **Hosting**: a single AWS Lambda behind a Function URL, deployed with SAM (`deploy/template.yaml`; see `deploy/README.md`). Logs go to CloudWatch (14-day retention). A free Cloudflare Worker (`deploy/cloudflare/`) is the public front door: it serves the SPA and forwards `/api/*` and `/health*` to the Lambda. The API stays on Lambda; Cloudflare Containers were rejected to keep hosting at $0.
 
 ## Architecture
 - Follow IDesign methodology with volatility-based decomposition.
