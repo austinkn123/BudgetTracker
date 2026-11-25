@@ -3,9 +3,7 @@ import { ResponsiveContainer, Sankey } from 'recharts';
 import type { MoneyMapLine } from '../../../shared/types/api';
 import { Card } from '../../../shared/components/ui';
 import { cssVar } from '../../../shared/theme/tokens';
-import { currency, percent } from '../../../shared/utils/format';
-import { cn } from '../../../shared/utils/cn';
-import { PHONE_QUERY, useMediaQuery } from '../../../shared/hooks/useMediaQuery';
+import { currency } from '../../../shared/utils/format';
 import { planFlow } from '../utils/moneyMap';
 import type { FlowGroup } from '../utils/moneyMap';
 
@@ -27,10 +25,10 @@ const HEIGHT = 520;
 /** Leaf labels get 230px of right margin; longer names are cut and keep the full text in a tooltip. */
 const MAX_LEAF_CHARS = 28;
 
-const GROUP_STYLE: Record<FlowGroup['key'], { color: string; bar: string }> = {
-  mustPay: { color: cssVar('primary'), bar: 'bg-primary' },
-  flexible: { color: cssVar('secondary'), bar: 'bg-secondary' },
-  saving: { color: cssVar('success'), bar: 'bg-success' },
+const GROUP_STYLE: Record<FlowGroup['key'], { color: string }> = {
+  mustPay: { color: cssVar('primary') },
+  flexible: { color: cssVar('secondary') },
+  saving: { color: cssVar('success') },
 };
 
 /** Paychecks → must-pay / flexible / saving → each plan line. Band width is dollars per month. */
@@ -114,65 +112,23 @@ const LinkShape = ({ sourceX, targetX, sourceY, targetY, sourceControlX, targetC
   />
 );
 
-/** Phone layout: the Sankey's side labels need ~360px of margin, so each group becomes a bar and a list. */
-const FlowList = ({ groups }: { groups: FlowGroup[] }) => (
-  <ul className="flex flex-col gap-5">
-    {groups.map((group) => (
-      <li key={group.key}>
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <span className={cn('h-2.5 w-2.5 rounded-full', GROUP_STYLE[group.key].bar)} aria-hidden />
-            {group.label}
-          </span>
-          <span className="numeric shrink-0 text-sm text-ink-muted">
-            <span className="font-semibold text-ink">{currency.format(group.amount)}</span> · {percent(group.share)}
-          </span>
-        </div>
-        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-border-subtle" aria-hidden>
-          {/* Inline width: the bar's length is data (share of pay), which no utility class can express. */}
-          <div
-            className={cn('h-full rounded-full', GROUP_STYLE[group.key].bar)}
-            style={{ width: `${Math.min(group.share, 1) * 100}%` }}
-          />
-        </div>
-        <ul className="mt-3 flex flex-col gap-2 border-l border-border-subtle pl-3">
-          {group.lines.map((line) => (
-            <li key={line.name} className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate text-ink" title={line.name}>
-                {line.name}
-              </span>
-              <span className="numeric shrink-0 text-ink-muted">{currency.format(line.amount)}</span>
-            </li>
-          ))}
-        </ul>
-      </li>
-    ))}
-  </ul>
-);
-
 interface MoneyFlowProps {
   lines: MoneyMapLine[];
   income: number;
 }
 
 const MoneyFlow = ({ lines, income }: MoneyFlowProps) => {
-  const isPhone = useMediaQuery(PHONE_QUERY);
   const groups = useMemo(() => planFlow(lines, income), [lines, income]);
   const sankey = useMemo(() => buildSankey(groups, income), [groups, income]);
 
   return (
     <Card
       title="Where a normal month’s pay goes"
-      subtitle={
-        isPhone
-          ? 'The plan, per month. Yearly bills are spread across 12 months.'
-          : 'The plan. A band’s width is dollars per month; yearly bills are spread across 12 months.'
-      }
+      subtitle="The plan. A band’s width is dollars per month; yearly bills are spread across 12 months."
     >
-      {isPhone ? (
-        <FlowList groups={groups} />
-      ) : (
-        <div style={{ height: HEIGHT }}>
+      {/* Phones scroll sideways: the side labels need ~640px, so shrinking the chart would make them collide. */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px]" style={{ height: HEIGHT }}>
           <ResponsiveContainer width="100%" height="100%">
             <Sankey
               data={sankey}
@@ -185,7 +141,7 @@ const MoneyFlow = ({ lines, income }: MoneyFlowProps) => {
             />
           </ResponsiveContainer>
         </div>
-      )}
+      </div>
     </Card>
   );
 };
