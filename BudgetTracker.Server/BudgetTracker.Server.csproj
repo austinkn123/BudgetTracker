@@ -27,7 +27,12 @@
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
       <Version>9.*-*</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.22">
+    <!--
+      Design-time only (dotnet ef), so it stays out of the Lambda build. Its System.Text.Json 9.0.22 outranks the
+      self-contained runtime pack's copy, and publish leaves out private packages, so the zip shipped no
+      System.Text.Json at all and the function crashed at startup.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.22" Condition="'$(LambdaCustomRuntime)' != 'true'">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
