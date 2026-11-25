@@ -109,3 +109,18 @@ test('Login fits the screen', async ({ page }, testInfo) => {
   expect(overflow).toBeLessThanOrEqual(0);
   expect(small).toEqual([]);
 });
+
+test('Nav bar follows the theme', async ({ page }, testInfo) => {
+  await signIn(page);
+  await mockApi(page);
+  await page.goto('/');
+  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  await expect(nav).toBeVisible();
+
+  const dark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+  const [r, g, b] = (await nav.evaluate((el) => getComputedStyle(el).backgroundColor)).match(/[\d.]+/g)!.map(Number);
+
+  expect(dark).toBe(testInfo.project.name.endsWith('-dark'));
+  // A light pill in light mode, a dark one in dark mode.
+  expect((r + g + b) / 3 > 128).toBe(!dark);
+});

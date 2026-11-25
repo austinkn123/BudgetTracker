@@ -98,8 +98,8 @@ export default {
           muted: varRef('ink-muted', colorTokens.neutral.textSecondary, darkColorTokens.neutral.textSecondary),
         },
         /**
-         * Neutral ramp. Structural surfaces only (the dark nav rail, chart
-         * gridlines) — for text and borders prefer the semantic tokens above.
+         * Neutral ramp. Structural surfaces only (the sign-in brand panel,
+         * chart gridlines) — for text and borders prefer the semantic tokens above.
          */
         grey: Object.fromEntries(
           Object.entries(colorTokens.grey).map(([step, hex]) => [

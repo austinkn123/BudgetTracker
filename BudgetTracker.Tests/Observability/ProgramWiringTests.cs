@@ -4,6 +4,7 @@ using BudgetTracker.Domain.Interfaces.Managers;
 using BudgetTracker.Domain.Interfaces.Utilities;
 using BudgetTracker.Server.Managers;
 using BudgetTracker.Server.Services;
+using BudgetTracker.Server.Utilities;
 using BudgetTracker.Server.Utilities.Observability;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -28,6 +29,7 @@ namespace BudgetTracker.Tests.Observability;
 public class ProgramWiringTests
 {
     private const string AdminClaim = "test-admin";
+    private const string OriginSecret = "test-origin-secret";
 
     [Fact]
     public async Task Should_ServeHealthAndEchoCorrelationId_When_ProgramIsHosted()
@@ -116,11 +118,53 @@ public class ProgramWiringTests
         Assert.Equal(42, ObservabilityTestHost.ScopeValues(denied)[RequestLogScope.UserIdKey]);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(ICurrentUserProvider currentUser) =>
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/")]
+    [InlineData("/api/categories")]
+    public async Task Should_Return403_When_OriginSecretIsSetAndHeaderIsMissing(string path)
+    {
+        await using var factory = CreateFactory(new Mock<ICurrentUserProvider>().Object, OriginSecret);
+        using var client = CreateClient(factory);
+
+        var response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Should_Return403_When_OriginHeaderIsWrong()
+    {
+        await using var factory = CreateFactory(new Mock<ICurrentUserProvider>().Object, OriginSecret);
+        using var client = CreateClient(factory);
+        using var request = new HttpRequestMessage(HttpMethod.Get, ObservabilityExtensions.HealthPath);
+        request.Headers.Add(CloudflareOriginGuard.HeaderName, OriginSecret + "x");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Should_ServeHealth_When_OriginHeaderMatches()
+    {
+        await using var factory = CreateFactory(new Mock<ICurrentUserProvider>().Object, OriginSecret);
+        using var client = CreateClient(factory);
+        using var request = new HttpRequestMessage(HttpMethod.Get, ObservabilityExtensions.HealthPath);
+        request.Headers.Add(CloudflareOriginGuard.HeaderName, OriginSecret);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(ICurrentUserProvider currentUser, string? originSecret = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment(Environments.Production);
             builder.UseSetting("ConnectionStrings:BudgetTrackerConnection", "Host=unused.invalid;Database=unused");
+            if (originSecret is not null)
+                builder.UseSetting(CloudflareOriginGuard.ConfigKey, originSecret);
             builder.ConfigureTestServices(services =>
             {
                 // Both tick against the database; the real host only runs them outside Lambda.

@@ -11,7 +11,16 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: { baseURL: `http://localhost:${PORT}`, trace: 'off' },
   projects: [
-    { name: 'iphone-se-light', use: { ...devices['iPhone SE (3rd gen)'], browserName: 'chromium', colorScheme: 'light' } },
+    // Dark is the default theme, so the light project saves a light choice the way the Settings toggle would.
+    {
+      name: 'iphone-se-light',
+      use: {
+        ...devices['iPhone SE (3rd gen)'],
+        browserName: 'chromium',
+        colorScheme: 'light',
+        storageState: { cookies: [], origins: [{ origin: `http://localhost:${PORT}`, localStorage: [{ name: 'bud-theme', value: 'light' }] }] },
+      },
+    },
     { name: 'iphone-14-dark', use: { ...devices['iPhone 14'], browserName: 'chromium', colorScheme: 'dark' } },
   ],
   webServer: {

@@ -175,21 +175,38 @@ npx wrangler deploy                    # prints the Worker URL
 npx wrangler secret put API_ORIGIN     # paste the FunctionUrl from step 4; this redeploys the Worker
 ```
 
+**Lock the Function URL to the Worker.** The Worker sends a shared secret in `X-Origin-Auth`, and the Lambda answers
+403 to any request without it (`CloudflareOriginGuard.cs`), so nobody can skip Cloudflare by calling the Function URL.
+Generate the secret once and store it in both places without printing it (Git Bash):
+
+```bash
+secret=$(openssl rand -hex 32)
+printf %s "$secret" | npx wrangler secret put ORIGIN_SECRET    # from deploy/cloudflare
+MSYS_NO_PATHCONV=1 aws ssm put-parameter --region us-east-2 --type SecureString --overwrite \
+  --name /budgettracker/Cloudflare/OriginSecret --value "$secret" >/dev/null
+unset secret
+```
+
+Order matters: deploy the Worker first (an extra header is harmless), then `sam deploy` or restart the Lambda so it
+rereads SSM and starts enforcing. To rotate, repeat all of it. Requests fail with 403 between the two steps.
+Without the SSM parameter (local dev, tests) the check is off.
+
 Then:
 
 1. **Plaid.** In step 5, use the Worker URL in place of `<FunctionUrl>`. It has no trailing slash, so add one:
    `WebhookUrl` = `<WorkerUrl>/api/plaid/webhook`, `RedirectUri` = `<WorkerUrl>/plaid-oauth`. Put the same redirect
    URI in the Plaid dashboard's Allowed redirect URIs.
-2. **Smoke test.** `curl <WorkerUrl>/health` returns 200. Open `<WorkerUrl>`, sign in, and link a sandbox bank.
+2. **Smoke test.** `curl <WorkerUrl>/health` returns 200 and `curl -i <FunctionUrl>health` returns 403. Open
+   `<WorkerUrl>`, sign in, and link a sandbox bank.
    `npx wrangler tail` shows forwarded requests live.
 3. **Shipping client changes.** Rebuild the client and run `npx wrangler deploy`. The Lambda zip still carries its
    own copy of the SPA at the Function URL, so repackage it too, or that copy goes stale.
+   Browser security headers (CSP, HSTS, frame and referrer policies) come from `budgettracker.client/public/_headers`,
+   which Vite copies into `dist`. A new third-party origin (script, API, iframe) must be added to its CSP, or the
+   browser blocks it: check the console for CSP errors after a change.
 4. **Own domain (optional).** If the domain's DNS is on Cloudflare, add
    `"routes": [{ "pattern": "budget.example.com", "custom_domain": true }]` to `wrangler.jsonc` and deploy again.
    Cloudflare creates the DNS record and certificate. Use that hostname for the Plaid URLs.
-
-The Function URL stays public. Cloudflare doesn't hide it, and auth still happens in the app, exactly as without the
-Worker.
 
 ## Sign-up
 

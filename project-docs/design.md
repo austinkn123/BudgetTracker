@@ -161,6 +161,11 @@ near-black in dark, because a navy shadow on a dark ground reads as a smudge.
 In dark mode the page sits *below* the card surface: cards lift by a tone step and a border, because
 a shadow does no work on a dark ground.
 
+**Dark is the default theme.** With no saved choice the app paints dark, whatever the OS says.
+Settings → Appearance offers Light, Dark and System, and the nav's sun/moon button flips light and
+dark. The nav pill and mobile menu follow the theme (`bg-surface`, `ink`); only the sign-in brand
+panel and the modal scrim stay dark in both themes (`grey-900`).
+
 ---
 
 ## 4. Interaction character

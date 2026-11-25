@@ -11,8 +11,8 @@ const OPTIONS: readonly { value: ThemePreference; label: string }[] = [
 /**
  * Theme preference control (BUD-17).
  *
- * `system` is the default and keeps tracking the OS setting for the rest of the
- * session; picking light or dark pins it and persists to localStorage.
+ * Dark is the default. `system` tracks the OS setting for the rest of the
+ * session; every choice persists to localStorage.
  */
 const AppearanceSection = () => {
   const { preference, theme, setPreference } = useTheme();

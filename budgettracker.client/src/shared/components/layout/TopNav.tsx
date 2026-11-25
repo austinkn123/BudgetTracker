@@ -99,9 +99,9 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
       <nav
         aria-label="Main navigation"
         className={cn(
-          'mx-auto flex w-full items-center gap-1.5 rounded-full bg-grey-900/85 backdrop-blur-xl',
+          'mx-auto flex w-full items-center gap-1.5 rounded-full bg-surface/85 backdrop-blur-xl',
           'transition-[max-width,height,padding,box-shadow] duration-240 ease-out-soft motion-reduce:transition-none',
-          compact ? 'px-1.5 shadow-xl ring-1 ring-white/[0.14]' : 'px-2.5 shadow-lg ring-1 ring-white/10',
+          compact ? 'px-1.5 shadow-xl ring-1 ring-ink/[0.14]' : 'px-2.5 shadow-lg ring-1 ring-ink/10',
         )}
         style={{
           height: compact ? NAV_HEIGHT_COMPACT : NAV_HEIGHT_FULL,
@@ -114,13 +114,13 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
           className="focus-ring touch-target flex shrink-0 items-center gap-2 rounded-full px-2 py-1.5"
           aria-label="BudgetTracker home"
         >
-          <span className="flex text-primary-light">
+          <span className="flex text-primary dark:text-primary-light">
             <Wallet size={compact ? 18 : 20} />
           </span>
           {/* Hidden from lg to xl, where the wordmark would push the account cluster off a 1024px screen. */}
           <span
             className={cn(
-              'hidden text-[14.5px] font-semibold tracking-[-0.01em] text-white sm:inline lg:hidden xl:inline',
+              'hidden text-[14.5px] font-semibold tracking-[-0.01em] text-ink sm:inline lg:hidden xl:inline',
               labelClasses,
             )}
           >
@@ -130,7 +130,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
 
         <span
           className={cn(
-            'mx-0.5 hidden h-5 w-px bg-white/10 transition-opacity duration-240 lg:block',
+            'mx-0.5 hidden h-5 w-px bg-ink/10 transition-opacity duration-240 lg:block',
             compact && 'opacity-0',
           )}
           aria-hidden
@@ -150,7 +150,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
           {activeRect && (
             <li
               aria-hidden
-              className="absolute left-0 top-0 -z-10 rounded-full bg-white/[0.12] transition-[transform,width,height] duration-240 ease-out-soft motion-reduce:transition-none"
+              className="absolute left-0 top-0 -z-10 rounded-full bg-ink/[0.12] transition-[transform,width,height] duration-240 ease-out-soft motion-reduce:transition-none"
               // Measured geometry: runtime pixel values no utility class can express.
               style={{
                 transform: `translate(${activeRect.left}px, ${activeRect.top}px)`,
@@ -171,8 +171,8 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
                       'outline-none focus-visible:ring-2 focus-visible:ring-primary-light/60',
                       compact ? 'px-2' : 'px-3.5',
                       isActive
-                        ? 'text-white'
-                        : 'text-white/55 hover:bg-white/[0.06] hover:text-white/90',
+                        ? 'text-ink'
+                        : 'text-ink/55 hover:bg-ink/[0.06] hover:text-ink/90',
                     )
                   }
                 >
@@ -182,7 +182,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
                         size={16}
                         className={cn(
                           'shrink-0',
-                          isActive ? 'text-primary-light' : 'text-white/45',
+                          isActive ? 'text-primary dark:text-primary-light' : 'text-ink/45',
                         )}
                       />
                       <span className={labelClasses}>{item.label}</span>
@@ -205,7 +205,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
               onClick={handleThemeToggle}
               aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               className={cn(
-                'focus-ring touch-target inline-flex items-center justify-center rounded-full text-white/45 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white/90 motion-reduce:transition-none',
+                'focus-ring touch-target inline-flex items-center justify-center rounded-full text-ink/45 transition-all duration-240 ease-out-soft hover:bg-ink/[0.06] hover:text-ink/90 motion-reduce:transition-none',
                 compact ? 'h-8 w-8' : 'h-9 w-9',
               )}
             >
@@ -225,8 +225,8 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
                   cn(
                     'focus-ring touch-target inline-flex items-center justify-center rounded-full transition-all duration-240 ease-out-soft motion-reduce:transition-none',
                     isActive
-                      ? 'bg-white/[0.12] text-primary-light'
-                      : 'text-white/45 hover:bg-white/[0.06] hover:text-white/90',
+                      ? 'bg-ink/[0.12] text-primary dark:text-primary-light'
+                      : 'text-ink/45 hover:bg-ink/[0.06] hover:text-ink/90',
                     compact ? 'h-8 w-8' : 'h-9 w-9',
                   )
                 }
@@ -237,12 +237,12 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
           </Tooltip>
 
           {loadingUser ? (
-            <Skeleton variant="circular" width={28} height={28} className="bg-white/10" />
+            <Skeleton variant="circular" width={28} height={28} className="bg-ink/10" />
           ) : (
             <Tooltip title={accountLabel}>
               <span
                 className={cn(
-                  'flex items-center justify-center rounded-full bg-primary/25 text-[11px] font-semibold text-primary-light transition-all duration-240 ease-out-soft motion-reduce:transition-none',
+                  'flex items-center justify-center rounded-full bg-primary/25 text-[11px] font-semibold text-primary dark:text-primary-light transition-all duration-240 ease-out-soft motion-reduce:transition-none',
                   compact ? 'h-7 w-7' : 'h-[30px] w-[30px]',
                 )}
               >
@@ -258,7 +258,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
               disabled={isSigningOut}
               aria-label="Sign out"
               className={cn(
-                'focus-ring touch-target inline-flex items-center justify-center rounded-full text-white/45 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white/90 disabled:opacity-50 motion-reduce:transition-none',
+                'focus-ring touch-target inline-flex items-center justify-center rounded-full text-ink/45 transition-all duration-240 ease-out-soft hover:bg-ink/[0.06] hover:text-ink/90 disabled:opacity-50 motion-reduce:transition-none',
                 compact ? 'h-8 w-8' : 'h-9 w-9',
               )}
             >
@@ -272,7 +272,7 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
             onClick={onOpenMobileNav}
             aria-label="Open navigation menu"
             className={cn(
-              'focus-ring touch-target inline-flex items-center justify-center rounded-full text-white/70 transition-all duration-240 ease-out-soft hover:bg-white/[0.06] hover:text-white motion-reduce:transition-none lg:hidden',
+              'focus-ring touch-target inline-flex items-center justify-center rounded-full text-ink/70 transition-all duration-240 ease-out-soft hover:bg-ink/[0.06] hover:text-ink motion-reduce:transition-none lg:hidden',
               compact ? 'h-8 w-8' : 'h-9 w-9',
             )}
           >
