@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { endOfMonth, startOfDay, startOfMonth } from 'date-fns';
-import { Alert, Card, Skeleton } from '../../../shared/components/ui';
+import { Link } from 'react-router-dom';
+import { ListChecks } from 'lucide-react';
+import { Alert, Button, Card, Skeleton } from '../../../shared/components/ui';
 import type { CashFlowQuery, MoneyMap, PlanPerformance } from '../../../shared/types/api';
 import { currency, percent } from '../../../shared/utils/format';
 import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
@@ -218,6 +220,19 @@ const MoneyMapPage = () => {
             <Skeleton height={220} className="rounded-xl" />
             <Skeleton height={160} className="rounded-xl" />
           </div>
+        ) : !map.lines.some((l) => l.planMonthly > 0) ? (
+          // No plan (or one with no spending lines): every chart below would show 100% of pay as saving.
+          <Card>
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink">No budget plan yet</p>
+                <p className="mt-1 text-sm text-ink-muted">Make one to see where a normal month’s pay goes.</p>
+              </div>
+              <Button component={Link} to="/budget/guide" startIcon={<ListChecks size={16} />}>
+                Make my budget
+              </Button>
+            </div>
+          </Card>
         ) : (
           <div className="space-y-6">
             <PlanVsActual income={normalIncome(map)} plan={split.plan} actual={split.actual} months={map.months} />
