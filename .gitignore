@@ -438,3 +438,6 @@ BudgetTracker.Server/appsettings.Local.json
 # Playwright output (BUD-29)
 budgettracker.client/test-results/
 budgettracker.client/playwright-report/
+
+# Wrangler local state (wrangler dev)
+.wrangler/
