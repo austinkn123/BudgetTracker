@@ -201,6 +201,9 @@ Then:
    `npx wrangler tail` shows forwarded requests live.
 3. **Shipping client changes.** Rebuild the client and run `npx wrangler deploy`. The Lambda zip still carries its
    own copy of the SPA at the Function URL, so repackage it too, or that copy goes stale.
+   Browser security headers (CSP, HSTS, frame and referrer policies) come from `budgettracker.client/public/_headers`,
+   which Vite copies into `dist`. A new third-party origin (script, API, iframe) must be added to its CSP, or the
+   browser blocks it: check the console for CSP errors after a change.
 4. **Own domain (optional).** If the domain's DNS is on Cloudflare, add
    `"routes": [{ "pattern": "budget.example.com", "custom_domain": true }]` to `wrangler.jsonc` and deploy again.
    Cloudflare creates the DNS record and certificate. Use that hostname for the Plaid URLs.
