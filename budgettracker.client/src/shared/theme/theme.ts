@@ -22,14 +22,17 @@ export const THEME_PREFERENCES: readonly ThemePreference[] = ['light', 'dark', '
 const isPreference = (value: unknown): value is ThemePreference =>
   value === 'light' || value === 'dark' || value === 'system';
 
-/** Reads the saved choice. Falls back to `system` when absent or unreadable. */
+/** Dark unless the user picked otherwise. */
+export const DEFAULT_PREFERENCE: ThemePreference = 'dark';
+
+/** Reads the saved choice. Falls back to {@link DEFAULT_PREFERENCE} when absent or unreadable. */
 export const readStoredPreference = (): ThemePreference => {
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return isPreference(stored) ? stored : 'system';
+    return isPreference(stored) ? stored : DEFAULT_PREFERENCE;
   } catch {
     // Private mode / blocked storage — the preference just doesn't persist.
-    return 'system';
+    return DEFAULT_PREFERENCE;
   }
 };
 

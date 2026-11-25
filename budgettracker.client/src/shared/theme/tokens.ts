@@ -110,8 +110,8 @@ export const colorTokens = {
  *
  * 2. The `grey` ramp is NOT inverted and is therefore absent from this map.
  *    It exists for structural surfaces that are dark in both themes — the
- *    floating nav pill (`bg-grey-900/85`), chart gridlines. Flipping it would
- *    turn the nav white.
+ *    sign-in brand panel, the modal scrim, chart gridlines. Flipping it would
+ *    turn them white. (The nav follows the theme via `bg-surface` and `ink`.)
  */
 export const darkColorTokens = {
   primary: {

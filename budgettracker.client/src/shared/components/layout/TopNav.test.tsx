@@ -59,7 +59,7 @@ describe('TopNav', () => {
     expect(settings).toHaveAttribute('href', '/settings');
     expect(settings).toHaveAttribute('aria-current', 'page');
     // Tooltip's asChild stringifies NavLink's function className; the link must keep real classes.
-    expect(settings).toHaveClass('h-9', 'w-9', 'text-primary-light');
+    expect(settings).toHaveClass('h-9', 'w-9', 'text-primary');
     expect(screen.queryByRole('link', { name: 'Budget Plans' })).not.toBeInTheDocument();
   });
 });

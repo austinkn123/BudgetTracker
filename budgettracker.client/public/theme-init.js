@@ -5,13 +5,15 @@
 (function () {
   try {
     var stored = window.localStorage.getItem('bud-theme');
-    var preference = stored === 'light' || stored === 'dark' ? stored : 'system';
+    var preference =
+      stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'dark';
     var dark =
       preference === 'dark' ||
       (preference === 'system' &&
         window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', dark);
   } catch (e) {
-    // Blocked storage or no matchMedia — fall through to the light default.
+    // Blocked storage or no matchMedia — default to dark.
+    document.documentElement.classList.add('dark');
   }
 })();
