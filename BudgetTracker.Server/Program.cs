@@ -155,6 +155,9 @@ if (isLambda && Environment.GetEnvironmentVariable("BUDGETTRACKER_ENTRY") == Web
 // First in the pipeline: correlation ID + log scope, exception handler, denied-request logging, and /health.
 app.UseBudgetTrackerObservability();
 
+// Only the Cloudflare Worker may call the Function URL. After observability, so a 403 is still logged and correlated.
+app.UseCloudflareOriginGuard();
+
 app.UseDefaultFiles();
 app.MapStaticAssets();
 
