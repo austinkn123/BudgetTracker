@@ -22,7 +22,8 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$Password,
+    # Optional for an existing login: without it the seed reruns and the current password stays.
+    [string]$Password,
     [string]$Email = 'demo@example.com',
     [string]$ConnectionString,
     [string]$UserPoolId = 'us-east-2_SNf5BlMBR',
@@ -42,6 +43,7 @@ function Get-DemoSub {
 # 1. Cognito login
 $sub = Get-DemoSub
 if ($LASTEXITCODE -ne 0) {
+    if (-not $Password) { throw "$Email doesn't exist yet; pass -Password to create it." }
     aws cognito-idp admin-create-user --region $Region --user-pool-id $UserPoolId --username $Email `
         --user-attributes Name=email,Value=$Email Name=email_verified,Value=true --message-action SUPPRESS --output json | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "admin-create-user failed (exit $LASTEXITCODE)." }
@@ -50,9 +52,11 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "Created Cognito user $Email"
 }
 
-aws cognito-idp admin-set-user-password --region $Region --user-pool-id $UserPoolId --username $Email `
-    --password $Password --permanent --output json | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "admin-set-user-password failed (exit $LASTEXITCODE)." }
+if ($Password) {
+    aws cognito-idp admin-set-user-password --region $Region --user-pool-id $UserPoolId --username $Email `
+        --password $Password --permanent --output json | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "admin-set-user-password failed (exit $LASTEXITCODE)." }
+}
 
 # 2. Seed. psql takes libpq settings, so the Npgsql string is mapped onto PG* environment variables.
 if (-not $ConnectionString) {
@@ -64,7 +68,18 @@ $pgVars = @{ 'host' = 'PGHOST'; 'port' = 'PGPORT'; 'database' = 'PGDATABASE'; 'u
 foreach ($pair in $ConnectionString.Split(';', [StringSplitOptions]::RemoveEmptyEntries)) {
     $key, $value = $pair.Split('=', 2)
     $name = $pgVars[$key.Trim().ToLowerInvariant()]
-    if ($name -eq 'PGSSLMODE') { $value = $value.ToLowerInvariant() }
+    # Npgsql spells modes VerifyFull / VerifyCA; libpq wants verify-full / verify-ca.
+    # Verify modes need root CAs, and Windows psql can't read the OS store (sslrootcert=system), so export it as PEM.
+    if ($name -eq 'PGSSLMODE') {
+        $value = $value.Trim().ToLowerInvariant() -replace '^verify', 'verify-'
+        if ($value -like 'verify-*') {
+            $roots = Join-Path ([IO.Path]::GetTempPath()) 'budgettracker-root-cas.pem'
+            Get-ChildItem Cert:\LocalMachine\Root | ForEach-Object {
+                "-----BEGIN CERTIFICATE-----`n$([Convert]::ToBase64String($_.RawData, 'InsertLineBreaks'))`n-----END CERTIFICATE-----"
+            } | Set-Content $roots -Encoding ascii
+            $env:PGSSLROOTCERT = $roots
+        }
+    }
     if ($name) { Set-Item "env:$name" $value.Trim() }
 }
 
