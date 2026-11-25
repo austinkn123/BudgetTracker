@@ -3,6 +3,7 @@ import { ResponsiveContainer, Sankey } from 'recharts';
 import type { MoneyMapLine } from '../../../shared/types/api';
 import { Card } from '../../../shared/components/ui';
 import { cssVar } from '../../../shared/theme/tokens';
+import { PHONE_QUERY, useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { currency } from '../../../shared/utils/format';
 import { planFlow } from '../utils/moneyMap';
 import type { FlowGroup } from '../utils/moneyMap';
@@ -22,6 +23,7 @@ interface FlowLink {
 }
 
 const HEIGHT = 520;
+const PHONE_HEIGHT = 300;
 /** Leaf labels get 230px of right margin; longer names are cut and keep the full text in a tooltip. */
 const MAX_LEAF_CHARS = 28;
 
@@ -32,7 +34,8 @@ const GROUP_STYLE: Record<FlowGroup['key'], { color: string }> = {
 };
 
 /** Paychecks → must-pay / flexible / saving → each plan line. Band width is dollars per month. */
-const buildSankey = (groups: FlowGroup[], income: number) => {
+/** `leaves: false` stops at the three groups: a phone has no room for each plan line's label. */
+const buildSankey = (groups: FlowGroup[], income: number, leaves: boolean) => {
   const nodes: FlowNode[] = [{ name: 'Paychecks', amount: income, color: cssVar('ink-muted') }];
   const links: FlowLink[] = [];
   const add = (node: FlowNode, from: number) => {
@@ -42,7 +45,7 @@ const buildSankey = (groups: FlowGroup[], income: number) => {
   for (const group of groups) {
     const { color } = GROUP_STYLE[group.key];
     const groupIndex = add({ name: group.label, amount: group.amount, color, share: group.share }, 0);
-    for (const line of group.lines) add({ name: line.name, amount: line.amount, color }, groupIndex);
+    if (leaves) for (const line of group.lines) add({ name: line.name, amount: line.amount, color }, groupIndex);
   }
   return { nodes, links };
 };
@@ -66,7 +69,7 @@ const NodeShape = ({ x, y, width, height, payload }: NodeShapeProps) => {
       <g>
         <rect x={x} y={y} width={width} height={height} rx={3} fill={payload.color} />
         <text x={x - 10} y={mid - 8} textAnchor="end" fontSize={14} fontWeight={600} fill={ink}>{payload.name}</text>
-        <text x={x - 10} y={mid + 10} textAnchor="end" fontSize={12} fill={muted}>{currency.format(payload.amount)} a month</text>
+        <text x={x - 10} y={mid + 10} textAnchor="end" fontSize={12} fill={muted}>{currency.format(payload.amount)}</text>
       </g>
     );
   if (payload.share !== undefined)
@@ -118,29 +121,27 @@ interface MoneyFlowProps {
 }
 
 const MoneyFlow = ({ lines, income }: MoneyFlowProps) => {
+  const isPhone = useMediaQuery(PHONE_QUERY);
   const groups = useMemo(() => planFlow(lines, income), [lines, income]);
-  const sankey = useMemo(() => buildSankey(groups, income), [groups, income]);
+  const sankey = useMemo(() => buildSankey(groups, income, !isPhone), [groups, income, isPhone]);
 
   return (
     <Card
       title="Where a normal month’s pay goes"
       subtitle="The plan. A band’s width is dollars per month; yearly bills are spread across 12 months."
     >
-      {/* Phones scroll sideways: the side labels need ~640px, so shrinking the chart would make them collide. */}
-      <div className="overflow-x-auto">
-        <div className="min-w-[640px]" style={{ height: HEIGHT }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <Sankey
-              data={sankey}
-              sort={false}
-              nodeWidth={12}
-              nodePadding={14}
-              margin={{ top: 8, right: 230, bottom: 8, left: 130 }}
-              node={(props) => <NodeShape {...(props as unknown as NodeShapeProps)} />}
-              link={(props) => <LinkShape {...(props as unknown as LinkShapeProps)} />}
-            />
-          </ResponsiveContainer>
-        </div>
+      <div style={{ height: isPhone ? PHONE_HEIGHT : HEIGHT }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <Sankey
+            data={sankey}
+            sort={false}
+            nodeWidth={12}
+            nodePadding={isPhone ? 24 : 14}
+            margin={isPhone ? { top: 8, right: 100, bottom: 8, left: 90 } : { top: 8, right: 230, bottom: 8, left: 130 }}
+            node={(props) => <NodeShape {...(props as unknown as NodeShapeProps)} />}
+            link={(props) => <LinkShape {...(props as unknown as LinkShapeProps)} />}
+          />
+        </ResponsiveContainer>
       </div>
     </Card>
   );
