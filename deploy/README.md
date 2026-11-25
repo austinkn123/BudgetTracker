@@ -47,6 +47,23 @@ aws ssm put-parameter --region $REGION --type String --overwrite \
   --name /budgettracker/Plaid/BaseUrl --value "https://sandbox.plaid.com"   # or https://production.plaid.com
 ```
 
+Webull (optional). The Investments page and the scheduled close snapshot need the OpenAPI app key and secret. Without
+them, no Webull card renders. `BaseUrl` defaults to the sandbox, so for a real account set it to production:
+
+```bash
+aws ssm put-parameter --region $REGION --type SecureString --overwrite \
+  --name /budgettracker/Webull/AppKey --value "<webull-app-key>"
+
+aws ssm put-parameter --region $REGION --type SecureString --overwrite \
+  --name /budgettracker/Webull/AppSecret --value "<webull-app-secret>"
+
+aws ssm put-parameter --region $REGION --type String --overwrite \
+  --name /budgettracker/Webull/BaseUrl --value "https://api.webull.com"
+```
+
+After the next cold start, open Settings → Webull in the app and tap **Verify in Webull app**. Production then asks you
+to approve in the Webull app or by SMS.
+
 Cognito settings (`Region`, `UserPoolId`, `ClientId`, `Authority`) are not secret and already ship in
 `appsettings.json`. To override them without a rebuild, add parameters under `/budgettracker/Cognito/...`,
 for example:
