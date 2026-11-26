@@ -4,6 +4,7 @@ import { Alert, Button, Card, Modal, ModalActions, Spinner } from '../../../shar
 import type { PlaidConnectionView } from '../../../shared/types/api';
 import { cn } from '../../../shared/utils/cn';
 import { useLinkedAccounts } from '../hooks/useLinkedAccounts';
+import FirstBudgetRedirect from './FirstBudgetRedirect';
 import LinkedAccountCard from './LinkedAccountCard';
 import PlaidLinkLauncher from './PlaidLinkLauncher';
 
@@ -26,6 +27,7 @@ const LinkedAccountsSection = () => {
     disconnectingItemId,
     errorMessage,
     lastSync,
+    justLinked,
     prepareLink,
     prepareReconnect,
     clearLinkToken,
@@ -116,6 +118,8 @@ const LinkedAccountsSection = () => {
           </Button>
         </div>
       )}
+
+      {justLinked && <FirstBudgetRedirect />}
 
       {lastSync && (
         <span className="block text-xs text-ink-muted">

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 
 import { Alert, Spinner } from '../../../shared/components/ui';
+import FirstBudgetRedirect from '../components/FirstBudgetRedirect';
 import PlaidLinkLauncher from '../components/PlaidLinkLauncher';
 import { loadPlaidLink, useLinkedAccounts } from '../hooks/useLinkedAccounts';
 
@@ -12,7 +13,7 @@ import { loadPlaidLink, useLinkedAccounts } from '../hooks/useLinkedAccounts';
  */
 const PlaidOAuthPage = () => {
   const [saved] = useState(loadPlaidLink);
-  const { linkToken, errorMessage, handleLinkSuccess, clearLinkToken } = useLinkedAccounts(saved);
+  const { linkToken, errorMessage, handleLinkSuccess, clearLinkToken, justLinked } = useLinkedAccounts(saved);
   const [isDone, setIsDone] = useState(false);
 
   if (!saved) return <Navigate to="/settings" replace />;
@@ -30,7 +31,7 @@ const PlaidOAuthPage = () => {
     );
   }
 
-  if (isDone) return <Navigate to="/settings" replace />;
+  if (isDone) return justLinked ? <FirstBudgetRedirect otherwise="/settings" /> : <Navigate to="/settings" replace />;
 
   return (
     <div className="flex items-center gap-2 text-ink-muted" role="status">
