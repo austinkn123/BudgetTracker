@@ -82,6 +82,16 @@ public interface IPlaidEngine
         PlaidTransactionDto dto, IEnumerable<Category> userCategories, IReadOnlyDictionary<string, int>? categoryByPayee = null);
 
     /// <summary>
+    /// Starter categories for a user who has none yet, so a first bank sync files its rows instead of leaving them all
+    /// uncategorized: one per Plaid primary in <paramref name="plaidCategoryPrimaries"/> that has a plain-language name,
+    /// each claiming that primary. Transfers and OTHER get none, since they say nothing about what the money was for.
+    /// </summary>
+    /// <param name="userId">The owning user.</param>
+    /// <param name="plaidCategoryPrimaries">Plaid primaries seen in the user's transactions; repeats, case and nulls are ignored.</param>
+    /// <returns>Unsaved categories, one per distinct known primary.</returns>
+    IReadOnlyList<Category> StarterCategories(int userId, IEnumerable<string?> plaidCategoryPrimaries);
+
+    /// <summary>
     /// Resolve which BudgetTracker <see cref="Account"/> should host transactions for a Plaid account.
     /// Returns the existing account id if a matching one exists for the user, else null (Manager will create one).
     /// </summary>

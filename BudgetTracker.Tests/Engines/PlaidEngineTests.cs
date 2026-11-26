@@ -167,6 +167,41 @@ public class PlaidEngineTests
         Assert.Null(_sut.ResolveCategoryId(BuildPlaidDebit(), Array.Empty<Category>()));
     }
 
+    // ── Starter categories for a user with none ─────────────────────────────
+
+    [Fact]
+    public void StarterCategories_Should_CreateOneMappedCategoryPerSeenPrimary()
+    {
+        var starters = _sut.StarterCategories(5, ["FOOD_AND_DRINK", "food_and_drink", "RENT_AND_UTILITIES"]);
+
+        Assert.Equal(2, starters.Count);
+        var food = Assert.Single(starters, c => c.PlaidCategoryPrimary == "FOOD_AND_DRINK");
+        Assert.Equal("Food & dining", food.Name);
+        Assert.Equal("Expense", food.CategoryType);
+        Assert.All(starters, c => Assert.Equal(5, c.UserId));
+    }
+
+    [Fact]
+    public void StarterCategories_Should_TypeIncomeAsIncome()
+    {
+        var income = Assert.Single(_sut.StarterCategories(5, ["INCOME"]));
+
+        Assert.Equal("Income", income.CategoryType);
+    }
+
+    [Fact]
+    public void StarterCategories_Should_SkipTransfersOtherAndUnknownPrimaries()
+    {
+        // Venmo, Zelle and cash land here; a starter category can't say what they were for, so they stay unsorted.
+        Assert.Empty(_sut.StarterCategories(5, ["TRANSFER_IN", "TRANSFER_OUT", "OTHER", "SOMETHING_NEW", null, " "]));
+    }
+
+    [Fact]
+    public void StarterCategories_Should_ReturnEmpty_When_NoPrimaries()
+    {
+        Assert.Empty(_sut.StarterCategories(5, []));
+    }
+
     [Fact]
     public void ResolveCategoryId_UsersPickForThePayee_BeatsThePlaidMapping()
     {

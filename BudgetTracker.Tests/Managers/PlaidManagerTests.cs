@@ -1,4 +1,5 @@
 using System.Net;
+using BudgetTracker.Domain.Common;
 using BudgetTracker.Domain.Engines;
 using BudgetTracker.Domain.Interfaces.Accessors;
 using BudgetTracker.Domain.Interfaces.Engines;
@@ -39,6 +40,8 @@ public class PlaidManagerTests
         _categoryAccessor
             .Setup(a => a.GetByUserIdAsync(It.IsAny<int>()))
             .ReturnsAsync(Array.Empty<Category>());
+        // With no categories, a sync that brings rows creates starter categories first; tests that care override this.
+        _categoryAccessor.Setup(a => a.CreateAsync(It.IsAny<Category>())).ReturnsAsync(1);
 
         // Every sync classifies against already-imported rows and then scans for own-account transfers.
         // Default to "nothing imported yet, nothing to pair"; tests that care override these.
@@ -579,7 +582,11 @@ public class PlaidManagerTests
         {
             new() { Id = 77, UserId = userId, Name = "Chase - Plaid Checking (••0000)", AccountType = "depository" }
         });
-        // Default fixture setup: the user has mapped nothing.
+        // The user has categories, but none claims FOOD_AND_DRINK. (A user with none gets starter categories instead.)
+        _categoryAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(new List<Category>
+        {
+            new() { Id = 3, UserId = userId, Name = "Rent" }
+        });
 
         var incoming = new PlaidTransactionDto(
             TransactionId: "plaid-txn-2",
@@ -612,6 +619,93 @@ public class PlaidManagerTests
         Assert.Null(mapped.CategoryId);
         // The suggestion is still persisted so it can be surfaced and accepted later.
         Assert.Equal("FOOD_AND_DRINK", mapped.PlaidCategoryPrimary);
+    }
+
+    /// <summary>One linked checking account whose next sync delivers <paramref name="incoming"/>; returns the upserted rows.</summary>
+    private List<Transaction> SetupOneItemSync(int userId, params PlaidTransactionDto[] incoming)
+    {
+        var plaidItem = new PlaidItem
+        {
+            Id = 11,
+            UserId = userId,
+            PlaidItemId = "plaid-item-1",
+            SyncCursor = "prev-cursor",
+            Accounts = [new PlaidAccount { Id = 1, PlaidAccountId = "plaid-acct-1", Name = "Plaid Checking", Mask = "0000" }]
+        };
+        _itemAccessor.Setup(a => a.GetAllActiveByUserIdAsync(userId)).ReturnsAsync([plaidItem]);
+        _itemAccessor.Setup(a => a.GetAccessTokenByPlaidItemIdAsync("plaid-item-1")).ReturnsAsync(AccessTokenLookup.Found("access-token-xyz"));
+        _accountAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync(new List<Account>
+        {
+            new() { Id = 77, UserId = userId, Name = "Chase - Plaid Checking (••0000)", AccountType = "depository" }
+        });
+        _plaidAccessor.Setup(a => a.SyncTransactionsAsync("access-token-xyz", "prev-cursor", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaidSyncResult(Added: incoming, Modified: [], RemovedTransactionIds: [], NextCursor: "next-cursor"));
+        _itemAccessor.Setup(a => a.UpdateSyncStateAsync(11, "next-cursor", It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+
+        var upserted = new List<Transaction>();
+        _txnAccessor.Setup(a => a.UpsertImportedAsync(It.IsAny<IEnumerable<Transaction>>()))
+            .Callback<IEnumerable<Transaction>>(upserted.AddRange)
+            .ReturnsAsync((incoming.Length, 0));
+        return upserted;
+    }
+
+    private static PlaidTransactionDto FoodPurchase(string id = "plaid-txn-food") => new(
+        TransactionId: id,
+        AccountId: "plaid-acct-1",
+        Amount: 12.75m,
+        Date: new DateTime(2026, 4, 7),
+        MerchantName: "H-E-B",
+        Name: "H-E-B #123",
+        Pending: false,
+        PersonalFinanceCategoryPrimary: "FOOD_AND_DRINK");
+
+    [Fact]
+    public async Task Sync_Should_CreateStarterCategoriesAndFileTheBatch_When_UserHasNoCategories()
+    {
+        const int userId = 5;
+        var upserted = SetupOneItemSync(userId, FoodPurchase());
+        var created = new List<Category>();
+        _categoryAccessor.Setup(a => a.CreateAsync(It.IsAny<Category>())).Callback<Category>(created.Add).ReturnsAsync(8);
+        // None before the starters are created; the new one when the sync re-reads them.
+        _categoryAccessor.SetupSequence(a => a.GetByUserIdAsync(userId))
+            .ReturnsAsync([])
+            .ReturnsAsync([new Category { Id = 8, UserId = userId, Name = "Food & dining", CategoryType = "Expense", PlaidCategoryPrimary = "FOOD_AND_DRINK" }]);
+
+        var result = await BuildSut().SyncAsync(userId);
+
+        Assert.True(result.IsSuccess);
+        var starter = Assert.Single(created);
+        Assert.Equal("FOOD_AND_DRINK", starter.PlaidCategoryPrimary);
+        Assert.Equal(8, Assert.Single(upserted).CategoryId);
+    }
+
+    [Fact]
+    public async Task Sync_Should_StillSucceed_When_AConcurrentSyncCreatedTheStarterFirst()
+    {
+        const int userId = 5;
+        var upserted = SetupOneItemSync(userId, FoodPurchase());
+        _categoryAccessor.Setup(a => a.CreateAsync(It.IsAny<Category>())).ThrowsAsync(new UniqueNameViolationException("IX_Categories_UserId_Name", new Exception()));
+        _categoryAccessor.SetupSequence(a => a.GetByUserIdAsync(userId))
+            .ReturnsAsync([])
+            .ReturnsAsync([new Category { Id = 9, UserId = userId, Name = "Food & dining", CategoryType = "Expense", PlaidCategoryPrimary = "FOOD_AND_DRINK" }]);
+
+        var result = await BuildSut().SyncAsync(userId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(9, Assert.Single(upserted).CategoryId);
+    }
+
+    [Fact]
+    public async Task Sync_Should_NotCreateStarterCategories_When_UserAlreadyHasCategories()
+    {
+        const int userId = 5;
+        SetupOneItemSync(userId, FoodPurchase());
+        _categoryAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync([new Category { Id = 3, UserId = userId, Name = "Rent" }]);
+
+        var result = await BuildSut().SyncAsync(userId);
+
+        Assert.True(result.IsSuccess);
+        _categoryAccessor.Verify(a => a.CreateAsync(It.IsAny<Category>()), Times.Never());
     }
 
     [Fact]

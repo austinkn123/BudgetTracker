@@ -176,6 +176,44 @@ public class PlaidEngine : IPlaidEngine
         return match?.Id;
     }
 
+    // Plaid's primaries that say what the money was for. TRANSFER_IN/OUT (Venmo, Zelle, cash) and OTHER are left out.
+    private static readonly Dictionary<string, (string Name, string Type)> StarterCategoryByPrimary = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["INCOME"] = ("Income", Income),
+        ["RENT_AND_UTILITIES"] = ("Housing & utilities", Expense),
+        ["LOAN_PAYMENTS"] = ("Loan payments", Expense),
+        ["FOOD_AND_DRINK"] = ("Food & dining", Expense),
+        ["GENERAL_MERCHANDISE"] = ("Shopping", Expense),
+        ["TRANSPORTATION"] = ("Transportation", Expense),
+        ["GENERAL_SERVICES"] = ("Services", Expense),
+        ["HOME_IMPROVEMENT"] = ("Home", Expense),
+        ["MEDICAL"] = ("Medical", Expense),
+        ["PERSONAL_CARE"] = ("Personal care", Expense),
+        ["ENTERTAINMENT"] = ("Entertainment", Expense),
+        ["TRAVEL"] = ("Travel", Expense),
+        ["GOVERNMENT_AND_NON_PROFIT"] = ("Taxes & donations", Expense),
+        ["BANK_FEES"] = ("Bank fees", Expense),
+    };
+
+    /// <inheritdoc />
+    public IReadOnlyList<Category> StarterCategories(int userId, IEnumerable<string?> plaidCategoryPrimaries)
+    {
+        ArgumentNullException.ThrowIfNull(plaidCategoryPrimaries);
+
+        return plaidCategoryPrimaries
+            .Where(p => p is not null && StarterCategoryByPrimary.ContainsKey(p))
+            .Select(p => p!.ToUpperInvariant())
+            .Distinct()
+            .Select(p => new Category
+            {
+                UserId = userId,
+                Name = StarterCategoryByPrimary[p].Name,
+                CategoryType = StarterCategoryByPrimary[p].Type,
+                PlaidCategoryPrimary = p
+            })
+            .ToList();
+    }
+
     /// <inheritdoc />
     public int? ResolveBudgetTrackerAccountId(PlaidAccountDto plaidAccount, IEnumerable<Account> userAccounts)
     {
