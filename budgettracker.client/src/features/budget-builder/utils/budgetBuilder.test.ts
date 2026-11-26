@@ -6,7 +6,9 @@ import {
   buildDraft,
   clearSavedDraft,
   newItemKey,
+  OTHER_NAME,
   pickPlan,
+  sortedShare,
   planStamp,
   readSavedDraft,
   toPlan,
@@ -126,16 +128,40 @@ describe('buildDraft', () => {
     expect(draft.everyday.find((i) => i.name === 'Groceries')?.bankMonthly).toBe(612.4);
   });
 
-  it('offers unplanned spending as unticked everyday items, rounded to $10, skipping small and uncategorized spend', () => {
+  it('offers unplanned and unsorted spending as unticked everyday items, rounded to $10, skipping small spend', () => {
     const offered = draft.everyday.filter((i) => !i.on);
-    expect(offered.map((i) => [i.name, i.amount])).toEqual([['Eating out', 210]]);
+    expect(offered.map((i) => [i.name, i.amount])).toEqual([
+      ['Eating out', 210],
+      [OTHER_NAME, 300],
+    ]);
   });
 
-  it('starts from the bank when there is no plan', () => {
+  it('starts from the bank when there is no plan, with every suggestion ticked', () => {
     const fresh = buildDraft(null, map([line(4, 214)], 4748), CATEGORIES);
     expect(fresh.income).toBe(4750);
     expect(fresh.bills).toEqual([]);
-    expect(fresh.everyday.map((i) => [i.name, i.on])).toEqual([['Eating out', false]]);
+    expect(fresh.everyday.map((i) => [i.name, i.on])).toEqual([['Eating out', true]]);
+  });
+
+  it('with no plan, puts housing and loan categories in bills and keeps unsorted spending in the total', () => {
+    const housing: Category = { ...category(8, 'Housing & utilities'), plaidCategoryPrimary: 'RENT_AND_UTILITIES' };
+    const fresh = buildDraft(null, map([line(8, 2100), line(4, 214), line(null, 300)]), [...CATEGORIES, housing]);
+    expect(fresh.bills.map((i) => [i.name, i.amount, i.on])).toEqual([['Housing & utilities', 2100, true]]);
+    expect(fresh.everyday.map((i) => [i.name, i.on])).toEqual([
+      ['Eating out', true],
+      [OTHER_NAME, true],
+    ]);
+  });
+});
+
+describe('sortedShare', () => {
+  it('is the share of spending that has a category', () => {
+    // 3200 + 612.4 + 19 + 214 + 12 sorted of 4357.4 total.
+    expect(sortedShare(MAP)).toBeCloseTo(4057.4 / 4357.4);
+  });
+
+  it('is 1 when there is no spending yet', () => {
+    expect(sortedShare(map([]))).toBe(1);
   });
 });
 

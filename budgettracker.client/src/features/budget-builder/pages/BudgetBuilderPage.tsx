@@ -8,7 +8,7 @@ import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan, Category, MoneyMap } from '../../../shared/types/api';
 import { cn } from '../../../shared/utils/cn';
 import { errorMessage } from '../../../shared/utils/errorMessage';
-import { currency } from '../../../shared/utils/format';
+import { currency, percent } from '../../../shared/utils/format';
 import { invalidatePlanQueries, useBudgetPlans } from '../../budget-plans/hooks/useBudgetPlans';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useMoneyMap } from '../../money-map/hooks/useMoneyMap';
@@ -20,7 +20,9 @@ import {
   buildDraft,
   clearSavedDraft,
   ITEM_STEPS,
+  OTHER_NAME,
   pickPlan,
+  sortedShare,
   planStamp,
   readSavedDraft,
   RESUMABLE_SCREENS,
@@ -260,8 +262,14 @@ const Builder = ({ plan, map, categories }: BuilderProps) => {
               screen === 'everyday' &&
               uncategorized > 0 && (
                 <p className="rounded-2xl bg-warning-subtle p-4 text-lg text-ink">
-                  About <span className="numeric font-semibold">{currency.format(uncategorized)}</span> a month of
-                  spending is not sorted into a category yet, so these amounts may be low.
+                  {percent(sortedShare(map))} of your spending is sorted. The other{' '}
+                  <span className="numeric font-semibold">{currency.format(uncategorized)}</span> a month is in "
+                  {OTHER_NAME}".{' '}
+                  {/* ponytail: plain link; deep-link to the unsorted filter once Transactions reads URL filters. */}
+                  <Link to="/transactions" className="font-semibold text-primary underline">
+                    Sort them in Transactions
+                  </Link>{' '}
+                  and this budget gets more exact.
                 </p>
               )
             }
