@@ -26,6 +26,7 @@ public class PlaidManagerTests
     private readonly Mock<ILogger<PlaidManager>> _logger = TestLoggers.Enabled<PlaidManager>();
     private readonly Mock<IDataVersionAccessor> _dataVersion = new(MockBehavior.Strict);
     private readonly Mock<ICategoryRuleAccessor> _ruleAccessor = new(MockBehavior.Strict);
+    private readonly Mock<IBudgetPlanAccessor> _planAccessor = new(MockBehavior.Strict);
     private readonly List<string> _calls = [];
 
     public PlaidManagerTests()
@@ -55,6 +56,8 @@ public class PlaidManagerTests
             .Setup(a => a.GetLatestCategoryByPayeeAsync(It.IsAny<int>(), It.IsAny<IReadOnlyCollection<string>>()))
             .ReturnsAsync(new Dictionary<string, int>());
         _ruleAccessor.Setup(a => a.GetByUserIdAsync(It.IsAny<int>())).ReturnsAsync([]);
+        // Default to a user who has saved a budget, so their categories are left alone; setup tests override this.
+        _planAccessor.Setup(a => a.GetByUserIdAsync(It.IsAny<int>())).ReturnsAsync([new BudgetPlan { Id = 1 }]);
     }
 
     private PlaidManager BuildSut() => new(
@@ -66,7 +69,7 @@ public class PlaidManagerTests
         _engine,
         _webhookEngine.Object,
         _dataVersion.Object,
-        new Mock<IBudgetPlanAccessor>(MockBehavior.Strict).Object,
+        _planAccessor.Object,
         new BudgetPlanEngine(),
         new Mock<ISandboxSeedEngine>(MockBehavior.Strict).Object,
         _ruleAccessor.Object,
@@ -696,7 +699,7 @@ public class PlaidManagerTests
     }
 
     [Fact]
-    public async Task Sync_Should_NotCreateStarterCategories_When_UserAlreadyHasCategories()
+    public async Task Sync_Should_NotCreateStarterCategories_When_UserHasCategoriesAndABudget()
     {
         const int userId = 5;
         SetupOneItemSync(userId, FoodPurchase());
@@ -706,6 +709,27 @@ public class PlaidManagerTests
 
         Assert.True(result.IsSuccess);
         _categoryAccessor.Verify(a => a.CreateAsync(It.IsAny<Category>()), Times.Never());
+    }
+
+    [Fact]
+    public async Task Sync_Should_AddStartersForNewKindsOfSpending_When_UserHasNoBudgetYet()
+    {
+        // Plaid's history arrives after the first 30 days and can bring spending the first sync had no category for.
+        const int userId = 5;
+        var upserted = SetupOneItemSync(userId, FoodPurchase());
+        _planAccessor.Setup(a => a.GetByUserIdAsync(userId)).ReturnsAsync([]);
+        var created = new List<Category>();
+        _categoryAccessor.Setup(a => a.CreateAsync(It.IsAny<Category>())).Callback<Category>(created.Add).ReturnsAsync(8);
+        var rent = new Category { Id = 3, UserId = userId, Name = "Housing & utilities", PlaidCategoryPrimary = "RENT_AND_UTILITIES" };
+        _categoryAccessor.SetupSequence(a => a.GetByUserIdAsync(userId))
+            .ReturnsAsync([rent])
+            .ReturnsAsync([rent, new Category { Id = 8, UserId = userId, Name = "Food & dining", PlaidCategoryPrimary = "FOOD_AND_DRINK" }]);
+
+        var result = await BuildSut().SyncAsync(userId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("FOOD_AND_DRINK", Assert.Single(created).PlaidCategoryPrimary);
+        Assert.Equal(8, Assert.Single(upserted).CategoryId);
     }
 
     [Fact]

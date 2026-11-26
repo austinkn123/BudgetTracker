@@ -172,7 +172,7 @@ public class PlaidEngineTests
     [Fact]
     public void StarterCategories_Should_CreateOneMappedCategoryPerSeenPrimary()
     {
-        var starters = _sut.StarterCategories(5, ["FOOD_AND_DRINK", "food_and_drink", "RENT_AND_UTILITIES"]);
+        var starters = _sut.StarterCategories(5, ["FOOD_AND_DRINK", "food_and_drink", "RENT_AND_UTILITIES"], []);
 
         Assert.Equal(2, starters.Count);
         var food = Assert.Single(starters, c => c.PlaidCategoryPrimary == "FOOD_AND_DRINK");
@@ -184,7 +184,7 @@ public class PlaidEngineTests
     [Fact]
     public void StarterCategories_Should_TypeIncomeAsIncome()
     {
-        var income = Assert.Single(_sut.StarterCategories(5, ["INCOME"]));
+        var income = Assert.Single(_sut.StarterCategories(5, ["INCOME"], []));
 
         Assert.Equal("Income", income.CategoryType);
     }
@@ -193,13 +193,27 @@ public class PlaidEngineTests
     public void StarterCategories_Should_SkipTransfersOtherAndUnknownPrimaries()
     {
         // Venmo, Zelle and cash land here; a starter category can't say what they were for, so they stay unsorted.
-        Assert.Empty(_sut.StarterCategories(5, ["TRANSFER_IN", "TRANSFER_OUT", "OTHER", "SOMETHING_NEW", null, " "]));
+        Assert.Empty(_sut.StarterCategories(5, ["TRANSFER_IN", "TRANSFER_OUT", "OTHER", "SOMETHING_NEW", null, " "], []));
     }
 
     [Fact]
     public void StarterCategories_Should_ReturnEmpty_When_NoPrimaries()
     {
-        Assert.Empty(_sut.StarterCategories(5, []));
+        Assert.Empty(_sut.StarterCategories(5, [], []));
+    }
+
+    [Fact]
+    public void StarterCategories_Should_SkipPrimariesAlreadyClaimed_AndNamesAlreadyTaken()
+    {
+        Category[] existing =
+        [
+            new() { Id = 1, UserId = 5, Name = "Groceries", PlaidCategoryPrimary = "food_and_drink" },
+            new() { Id = 2, UserId = 5, Name = "shopping" },
+        ];
+
+        var starters = _sut.StarterCategories(5, ["FOOD_AND_DRINK", "GENERAL_MERCHANDISE", "TRAVEL"], existing);
+
+        Assert.Equal(["TRAVEL"], starters.Select(c => c.PlaidCategoryPrimary));
     }
 
     [Fact]

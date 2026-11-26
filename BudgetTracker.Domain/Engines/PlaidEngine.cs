@@ -196,12 +196,19 @@ public class PlaidEngine : IPlaidEngine
     };
 
     /// <inheritdoc />
-    public IReadOnlyList<Category> StarterCategories(int userId, IEnumerable<string?> plaidCategoryPrimaries)
+    public IReadOnlyList<Category> StarterCategories(
+        int userId, IEnumerable<string?> plaidCategoryPrimaries, IEnumerable<Category> existingCategories)
     {
         ArgumentNullException.ThrowIfNull(plaidCategoryPrimaries);
+        ArgumentNullException.ThrowIfNull(existingCategories);
+
+        var existing = existingCategories.ToList();
+        var claimed = existing.Select(c => c.PlaidCategoryPrimary).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var names = existing.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         return plaidCategoryPrimaries
-            .Where(p => p is not null && StarterCategoryByPrimary.ContainsKey(p))
+            .Where(p => p is not null && StarterCategoryByPrimary.TryGetValue(p, out var starter) &&
+                        !claimed.Contains(p) && !names.Contains(starter.Name))
             .Select(p => p!.ToUpperInvariant())
             .Distinct()
             .Select(p => new Category
