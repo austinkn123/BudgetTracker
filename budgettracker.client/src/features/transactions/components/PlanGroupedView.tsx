@@ -64,6 +64,15 @@ const PlanGroupedView = ({
     isBusy,
   };
 
+  // No plan and nothing spent: two "$0, nothing here" buckets would only look broken.
+  if (!grouping.uncategorized && grouping.buckets.every((b) => b.planned === 0 && b.categories.length === 0)) {
+    return (
+      <Card>
+        <p className="py-6 text-center text-sm text-ink-muted">No transactions this month.</p>
+      </Card>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {grouping.uncategorized && (

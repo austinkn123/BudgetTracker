@@ -3,6 +3,7 @@ import type { BadgeColor } from '../../../shared/components/ui';
 import type { WebullState } from '../../../shared/types/api';
 import { errorMessage } from '../../../shared/utils/errorMessage';
 import { localTime } from '../../../shared/utils/format';
+import LoadError from '../../../shared/components/LoadError';
 import { useApprovalPolling, useVerifyWebull, useWebull } from '../hooks/useWebull';
 
 const STATE_BADGE: Record<WebullState, { label: string; color: BadgeColor }> = {
@@ -24,7 +25,7 @@ const Code = ({ children }: { children: string }) => (
  * asking Webull to text an approval code, offered only when the server says it can.
  */
 const WebullSection = () => {
-  const { data: view, isPending, isError } = useWebull();
+  const { data: view, isPending, isError, refetch } = useWebull();
   const verify = useVerifyWebull();
   useApprovalPolling(view);
 
@@ -68,13 +69,18 @@ const WebullSection = () => {
           <span>Checking Webull…</span>
         </div>
       ) : isError && !view ? (
-        <p>We couldn't check your Webull connection. Reload the page to try again.</p>
+        <LoadError what="your Webull connection" onRetry={() => void refetch()} />
       ) : view?.state === 'NotSetUp' ? (
-        <p>
-          <Code>Webull:AppKey</Code> and <Code>Webull:AppSecret</Code> go in{' '}
-          <Code>BudgetTracker.Server/appsettings.Local.json</Code>. This page never asks for
-          them, so they never pass through the browser.
-        </p>
+        // The config-file steps are for whoever runs the server, so only a dev build shows them.
+        import.meta.env.DEV ? (
+          <p>
+            <Code>Webull:AppKey</Code> and <Code>Webull:AppSecret</Code> go in{' '}
+            <Code>BudgetTracker.Server/appsettings.Local.json</Code>. This page never asks for
+            them, so they never pass through the browser.
+          </p>
+        ) : (
+          <p>Webull isn't connected for this account, so your investments don't show here yet.</p>
+        )
       ) : view?.state === 'WaitingForApproval' ? (
         <p>
           Approve this in the Webull app with the SMS code.

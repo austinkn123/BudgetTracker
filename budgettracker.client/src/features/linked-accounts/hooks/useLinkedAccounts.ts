@@ -39,6 +39,9 @@ export const clearPlaidLink = () => localStorage.removeItem(PLAID_LINK_STORAGE_K
 export interface UseLinkedAccountsResult {
   connections: PlaidConnectionView[];
   isLoadingConnections: boolean;
+  /** The connections list could not be read (and none is cached), so "no banks" would be a guess. */
+  connectionsFailed: boolean;
+  refetchConnections: () => void;
   linkToken: string | null;
   isPreparingLink: boolean;
   isExchanging: boolean;
@@ -232,6 +235,8 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
   return {
     connections: connectionsQuery.data ?? [],
     isLoadingConnections: connectionsQuery.isLoading,
+    connectionsFailed: connectionsQuery.isError && !connectionsQuery.data,
+    refetchConnections: () => void connectionsQuery.refetch(),
     linkToken,
     isPreparingLink: prepareLinkMutation.isPending,
     isExchanging: exchangeMutation.isPending,

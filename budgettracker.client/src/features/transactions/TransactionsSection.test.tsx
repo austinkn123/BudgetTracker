@@ -15,6 +15,7 @@ const feed = vi.hoisted(() => ({
   transactions: [] as Transaction[],
 }));
 const catalog = vi.hoisted(() => ({ categories: [] as Category[] }));
+const summary = vi.hoisted(() => ({ failed: false, refetch: (() => undefined) as () => void }));
 
 vi.mock('../linked-accounts/hooks/usePlaidConnections', () => ({
   usePlaidConnections: () => ({ data: plaid.connections }),
@@ -38,7 +39,14 @@ vi.mock('./hooks/useTransactions', () => ({
   useTransactions: () => ({ data: [], isLoading: false, error: null }),
 }));
 vi.mock('./hooks/useTransactionSummary', () => ({
-  useTransactionSummary: () => ({ data: { uncategorizedCount: 0, pendingByAccount: [] } }),
+  useTransactionSummary: () =>
+    summary.failed
+      ? { data: undefined, isError: true, refetch: summary.refetch }
+      : { data: { uncategorizedCount: 0, pendingByAccount: [] }, isError: false, refetch: summary.refetch },
+}));
+// Its own Plaid flow is covered in LinkedAccountsSection; here only whether it shows matters.
+vi.mock('../linked-accounts/components/ConnectBankCard', () => ({
+  default: () => <p>Connect your bank card</p>,
 }));
 vi.mock('../categories/hooks/useCategories', () => ({
   useCategories: () => ({ data: catalog.categories, isLoading: false, error: null }),
@@ -58,6 +66,9 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  summary.failed = false;
+  summary.refetch = vi.fn();
+  plaid.connections = [];
   feed.queries = [];
   feed.transactions = [];
   catalog.categories = [];
@@ -154,5 +165,36 @@ describe('TransactionsSection bulk category picker', () => {
     await user.click(await screen.findByRole('option', { name: 'Groceries' }));
 
     await waitFor(() => expect(setCategoryBulk).toHaveBeenCalledExactlyOnceWith([1, 2], 7));
+  });
+});
+
+describe('TransactionsSection empty and failed states', () => {
+  const renderSection = () =>
+    render(<TransactionsSection isLoading={false} setStatusMessage={vi.fn()} setStatusError={vi.fn()} />, {
+      wrapper: createQueryWrapper(createTestQueryClient()),
+    });
+
+  it('shows a load error with a retry, not empty months, when the ledger summary fails', async () => {
+    summary.failed = true;
+    renderSection();
+
+    expect(screen.getByText("Couldn't load your transactions")).toBeInTheDocument();
+    expect(screen.queryByText('No transactions this month.')).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }));
+    expect(summary.refetch).toHaveBeenCalled();
+  });
+
+  it('asks to connect a bank when none is linked', () => {
+    renderSection();
+
+    expect(screen.getByText('Connect your bank card')).toBeInTheDocument();
+    expect(screen.getByText('No transactions this month.')).toBeInTheDocument();
+  });
+
+  it('does not ask to connect a bank once one is linked', () => {
+    plaid.connections = [CHASE];
+    renderSection();
+
+    expect(screen.queryByText('Connect your bank card')).not.toBeInTheDocument();
   });
 });

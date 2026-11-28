@@ -6,6 +6,7 @@ import { cn } from '../../../shared/utils/cn';
 import { useLinkedAccounts } from '../hooks/useLinkedAccounts';
 import LinkedAccountCard from './LinkedAccountCard';
 import PlaidLinkLauncher from './PlaidLinkLauncher';
+import LoadError from '../../../shared/components/LoadError';
 
 /**
  * Settings-page section that owns bank-link UX across every institution:
@@ -18,6 +19,8 @@ const LinkedAccountsSection = () => {
   const {
     connections,
     isLoadingConnections,
+    connectionsFailed,
+    refetchConnections,
     linkToken,
     isPreparingLink,
     isExchanging,
@@ -90,6 +93,8 @@ const LinkedAccountsSection = () => {
           <Spinner size={16} />
           <span className="text-sm">Checking your connections…</span>
         </div>
+      ) : connectionsFailed ? (
+        <LoadError what="your linked banks" onRetry={refetchConnections} />
       ) : hasConnections ? (
         <ul className="flex flex-col gap-3" aria-label="Linked institutions">
           {connections.map((connection) => (
