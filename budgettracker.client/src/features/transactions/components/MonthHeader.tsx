@@ -1,6 +1,6 @@
 import { addMonths, format, isSameMonth, startOfMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Badge, Button, Card, Progress } from '../../../shared/components/ui';
+import { Badge, Button, Card, ErrorState, Progress } from '../../../shared/components/ui';
 import type { PlanPerformance } from '../../../shared/types/api';
 import { currency, percent } from '../../../shared/utils/format';
 import { semanticColors } from '../../dashboard/utils/chartTheme';
@@ -9,6 +9,11 @@ type MonthHeaderProps = {
   month: Date;
   onMonthChange: (month: Date) => void;
   performance: PlanPerformance | null;
+  /**
+   * Set when the plan-vs-actual read failed. Without it a failure would read as "no plan governs
+   * this month", which is a claim about the person's budget, not about the server.
+   */
+  performanceError?: { onRetry: () => void; isRetrying: boolean } | null;
 };
 
 /**
@@ -17,7 +22,7 @@ type MonthHeaderProps = {
  * Pacing wording is deliberate: the API's `Ahead` means spending *slower* than the calendar, which
  * reads backwards to most people, so the copy states the meaning rather than the enum name.
  */
-const MonthHeader = ({ month, onMonthChange, performance }: MonthHeaderProps) => {
+const MonthHeader = ({ month, onMonthChange, performance, performanceError = null }: MonthHeaderProps) => {
   const now = new Date();
   const isCurrentMonth = isSameMonth(month, now);
   const pacing = performance?.pacing;
@@ -74,7 +79,14 @@ const MonthHeader = ({ month, onMonthChange, performance }: MonthHeaderProps) =>
           </div>
         </div>
 
-        {pacing ? (
+        {performanceError ? (
+          <ErrorState
+            layout="inline"
+            title={`Couldn't load how ${format(month, 'MMMM')} is tracking`}
+            onRetry={performanceError.onRetry}
+            isRetrying={performanceError.isRetrying}
+          />
+        ) : pacing ? (
           <div className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-3">
               <Figure label="Planned" value={currency.format(pacing.plannedExpenses)} />

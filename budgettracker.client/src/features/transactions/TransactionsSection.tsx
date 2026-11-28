@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { endOfMonth, isSameMonth, startOfDay, startOfMonth } from 'date-fns';
-import { Button, Card, InlineSelect, Skeleton, ToggleGroup } from '../../shared/components/ui';
+import { Button, Card, ErrorState, InlineSelect, Skeleton, ToggleGroup } from '../../shared/components/ui';
 import { useTransactions } from './hooks/useTransactions';
 import { useTransactionFeed } from './hooks/useTransactionFeed';
 import { useTransactionSummary } from './hooks/useTransactionSummary';
@@ -9,7 +9,9 @@ import { useCategories } from '../categories/hooks/useCategories';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
 import { useBudgetAnalysis } from '../dashboard/hooks/useBudgetAnalysis';
 import { usePlaidConnections } from '../linked-accounts/hooks/usePlaidConnections';
+import type { UseQueryResult } from '@tanstack/react-query';
 import type { TransactionQuery } from '../../shared/services/transaction.service';
+import type { BudgetPlan, Category, Transaction } from '../../shared/types/api';
 import MonthHeader from './components/MonthHeader';
 import PayeeReview from './components/PayeeReview';
 import PlanGroupedView from './components/PlanGroupedView';
@@ -27,6 +29,25 @@ import {
 } from './utils/transactionFilters';
 import { groupByPlan } from './utils/planGrouping';
 import { buildTransactionDaySummaries, getTransactionDaySummary } from './utils/transactionGroups';
+
+// Stable fallbacks, so a read that has no data yet doesn't hand every memo a new array each render.
+const EMPTY: Transaction[] = [];
+const EMPTY_CATEGORIES: Category[] = [];
+const EMPTY_PLANS: BudgetPlan[] = [];
+
+type Read = Pick<UseQueryResult<unknown>, 'isError' | 'data' | 'isFetching' | 'refetch'>;
+
+/** The reads that failed and have nothing cached to fall back on. */
+const failedReads = (...reads: Read[]) => reads.filter((r) => r.isError && r.data === undefined);
+
+/** One error for a view, whose Try again refetches only the reads that failed. */
+const RetryReads = ({ title, failed }: { title: string; failed: Read[] }) => (
+  <ErrorState
+    title={title}
+    onRetry={() => failed.forEach((r) => void r.refetch())}
+    isRetrying={failed.some((r) => r.isFetching)}
+  />
+);
 
 type TransactionsSectionProps = {
   isLoading: boolean;
@@ -102,21 +123,30 @@ const TransactionsSection = ({
   const feed = useTransactionFeed(feedQuery, { enabled: view === 'list' });
   // Only the Plan view reads these rows: the month header reads the analysis, the counts the
   // summary, and governingPlan the plans.
-  const { data: planTransactions = [] } = useTransactions(planQuery, { enabled: view === 'plan' });
-  const { data: calendarTransactions = [] } = useTransactions(calendarQuery, {
-    enabled: view === 'calendar',
-  });
+  const planRows = useTransactions(planQuery, { enabled: view === 'plan' });
+  const calendarRows = useTransactions(calendarQuery, { enabled: view === 'calendar' });
   // The payee backlog is every uncategorized row, any date: bounded by its filter, not by time.
-  const { data: backlogTransactions = [] } = useTransactions(
-    { uncategorized: true },
-    { enabled: view === 'review' },
-  );
+  const backlogRows = useTransactions({ uncategorized: true }, { enabled: view === 'review' });
   const { data: summary } = useTransactionSummary();
-  const { data: categories = [] } = useCategories();
-  const { data: budgetPlans = [] } = useBudgetPlans();
+  const categoriesQuery = useCategories();
+  const budgetPlansQuery = useBudgetPlans();
 
   // Analysis now follows the requested window, so this is the plan-vs-actual for the month on screen.
-  const { data: analysis } = useBudgetAnalysis(monthStart, monthEnd, 3);
+  const analysisQuery = useBudgetAnalysis(monthStart, monthEnd, 3);
+
+  const { data: planTransactions = EMPTY } = planRows;
+  const { data: calendarTransactions = EMPTY } = calendarRows;
+  const { data: backlogTransactions = EMPTY } = backlogRows;
+  const { data: categories = EMPTY_CATEGORIES } = categoriesQuery;
+  const { data: budgetPlans = EMPTY_PLANS } = budgetPlansQuery;
+  const { data: analysis } = analysisQuery;
+
+  // A failed read must never fall back to an empty list: the Plan view would then total every
+  // line at $0, and the month header would say no plan governs the month. Each view instead shows
+  // what failed, with Try again, until the reads it needs are in.
+  const planFailures = failedReads(planRows, budgetPlansQuery, categoriesQuery);
+  const calendarFailures = failedReads(calendarRows, categoriesQuery);
+  const backlogFailures = failedReads(backlogRows, categoriesQuery);
 
   const maskByPlaidAccountId = useMemo(
     () =>
@@ -250,6 +280,11 @@ const TransactionsSection = ({
           month={monthStart}
           onMonthChange={handleMonthChange}
           performance={analysis?.planMonth ?? null}
+          performanceError={
+            analysisQuery.isError && !analysis
+              ? { onRetry: () => void analysisQuery.refetch(), isRetrying: analysisQuery.isFetching }
+              : null
+          }
         />
       )}
 
@@ -295,9 +330,18 @@ const TransactionsSection = ({
               : 'animate-slide-in-left-sm'
         }
       >
-        {view === 'plan' && <PlanGroupedView grouping={grouping} {...rowProps} />}
+        {view === 'plan' &&
+          (planFailures.length > 0 ? (
+            <RetryReads title="Couldn't load this month's transactions" failed={planFailures} />
+          ) : (
+            <PlanGroupedView grouping={grouping} {...rowProps} />
+          ))}
 
-        {view === 'review' && (
+        {view === 'review' && backlogFailures.length > 0 && (
+          <RetryReads title="Couldn't load the transactions that need a category" failed={backlogFailures} />
+        )}
+
+        {view === 'review' && backlogFailures.length === 0 && (
           <PayeeReview
             transactions={backlogTransactions}
             categoryOptions={categoryOptions}
@@ -341,7 +385,11 @@ const TransactionsSection = ({
           </div>
         )}
 
-        {view === 'calendar' && (
+        {view === 'calendar' && calendarFailures.length > 0 && (
+          <RetryReads title="Couldn't load this month's transactions" failed={calendarFailures} />
+        )}
+
+        {view === 'calendar' && calendarFailures.length === 0 && (
           <Card padding="none">
             <TransactionTable
               categories={categories}

@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { Button, Card, Skeleton, Spinner } from '../../../shared/components/ui';
+import { Button, Card, ErrorState, Skeleton, Spinner } from '../../../shared/components/ui';
 import { useInViewCallback } from '../../../shared/hooks/useInViewCallback';
 import type { Transaction } from '../../../shared/types/api';
 import TransactionRows from './TransactionRows';
@@ -74,16 +74,7 @@ const TransactionFeed = ({
   }
 
   if (isError && count === 0) {
-    return (
-      <Card padding="none">
-        <div className={statusRowClass}>
-          <span>Couldn&apos;t load your transactions.</span>
-          <Button variant="ghost" size="sm" onClick={onRetry}>
-            Try again
-          </Button>
-        </div>
-      </Card>
-    );
+    return <ErrorState title="Couldn't load your transactions" onRetry={onRetry} />;
   }
 
   return (
