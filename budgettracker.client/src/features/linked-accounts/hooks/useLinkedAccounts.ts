@@ -49,6 +49,8 @@ export interface UseLinkedAccountsResult {
   disconnectingItemId: number | null;
   errorMessage: string | null;
   lastSync: PlaidSyncSummary | null;
+  /** True once a new institution has been linked and imported in this session (not a refresh or reconnect). */
+  justLinked: boolean;
   /** Fetch a link token (only when the user clicks "Add institution"). */
   prepareLink: () => Promise<void>;
   /** Fetch an update-mode link token so the person can sign in to this institution again. */
@@ -79,6 +81,7 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<PlaidSyncSummary | null>(null);
+  const [justLinked, setJustLinked] = useState(false);
 
   const connectionsQuery = usePlaidConnections();
 
@@ -87,6 +90,9 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
     void queryClient.invalidateQueries({ queryKey: ['transactions'] });
     void queryClient.invalidateQueries({ queryKey: ['budget-analysis'] });
     void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+    // A first sync can create starter categories, which the money map and budget guide read.
+    void queryClient.invalidateQueries({ queryKey: ['categories'] });
+    void queryClient.invalidateQueries({ queryKey: ['money-map'] });
   }, [queryClient]);
 
   const prepareLinkMutation = useMutation({
@@ -127,6 +133,7 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
     mutationFn: plaidService.exchangePublicToken,
     onSuccess: (summary) => {
       setLastSync(summary);
+      setJustLinked(true);
       setErrorMessage(null);
       invalidateAfterSync();
     },
@@ -242,6 +249,7 @@ export const useLinkedAccounts = (resume?: SavedPlaidLink | null): UseLinkedAcco
       : null,
     errorMessage,
     lastSync,
+    justLinked,
     prepareLink,
     prepareReconnect,
     clearLinkToken,

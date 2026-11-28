@@ -54,8 +54,8 @@ public class MoneyMapEngineTests
         Entries = entries
     };
 
-    private MoneyMap Build(BudgetPlan? plan, IReadOnlyList<Transaction> rows, int months = 12) =>
-        _sut.Build(plan is null ? [] : [plan], rows, Categories, Today, months).Value!;
+    private MoneyMap Build(BudgetPlan? plan, IReadOnlyList<Transaction> rows, int months = 12, DateTime? historyStart = null) =>
+        _sut.Build(plan is null ? [] : [plan], rows, Categories, Today, months, historyStart).Value!;
 
     [Fact]
     public void Lines_FollowThePlanThenUnplannedSpend_EachAveragedOverTheWindow()
@@ -100,7 +100,7 @@ public class MoneyMapEngineTests
         inactiveNewer.IsActive = false;
         var current = Plan();
 
-        var map = _sut.Build([older, inactiveNewer, current], [Row(1, 3000m, new DateTime(2026, 10, 2), "Income")], Categories, Today, 3).Value!;
+        var map = _sut.Build([older, inactiveNewer, current], [Row(1, 3000m, new DateTime(2026, 10, 2), "Income")], Categories, Today, 3, historyStart: null).Value!;
 
         Assert.Equal("Recommended Budget", map.PlanName);
         Assert.Equal(6526m, map.PlannedIncomeMonthly);
@@ -119,12 +119,57 @@ public class MoneyMapEngineTests
         Assert.Empty(map.Upcoming);
     }
 
+    // ── Short history ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void ShortHistory_AveragesOverTheTimeItCovers_NotTheWholeWindow()
+    {
+        // A bank linked 61 days ago (2026-08-31 through 2026-10-30 is 61 days, two months of 30.4375).
+        var start = new DateTime(2026, 8, 31);
+        var rows = new[]
+        {
+            Row(2, -400m, start, payee: "H-E-B"),
+            Row(2, -400m, new DateTime(2026, 10, 1), payee: "H-E-B"),
+            Row(1, 6000m, new DateTime(2026, 9, 15), "Income")
+        };
+
+        var map = Build(null, rows, historyStart: start);
+        var months = 61 / (365.25m / 12);
+
+        Assert.Equal(months, map.MonthsAveraged);
+        Assert.Equal(Math.Round(800m / months, 2, MidpointRounding.AwayFromZero), Assert.Single(map.Lines).ActualMonthly);
+        Assert.Equal(Math.Round(6000m / months, 2, MidpointRounding.AwayFromZero), map.ActualIncomeMonthly);
+    }
+
+    [Fact]
+    public void ShortHistory_UnderAMonth_IsShownAsOneMonth_NotMultipliedUp()
+    {
+        var start = Today.AddDays(-6);
+        var map = Build(null, [Row(5, -120m, start, payee: "Target")], historyStart: start);
+
+        Assert.Equal(1m, map.MonthsAveraged);
+        Assert.Equal(120m, Assert.Single(map.Lines).ActualMonthly);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("2025-11-01")]
+    [InlineData("2024-01-15")]
+    public void HistoryFromTheWindowStartOrEarlier_AveragesOverTheWholeWindow(string? historyStart)
+    {
+        var start = historyStart is null ? (DateTime?)null : DateTime.Parse(historyStart, System.Globalization.CultureInfo.InvariantCulture);
+        var map = Build(null, [Row(5, -120m, new DateTime(2026, 10, 1), payee: "Target")], historyStart: start);
+
+        Assert.Equal(12m, map.MonthsAveraged);
+        Assert.Equal(10m, Assert.Single(map.Lines).ActualMonthly);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(25)]
     public void Months_OutsideOneToTwentyFour_IsAFailure(int months)
     {
-        Assert.False(_sut.Build([], [], Categories, Today, months).IsSuccess);
+        Assert.False(_sut.Build([], [], Categories, Today, months, historyStart: null).IsSuccess);
     }
 
     [Fact]
@@ -238,7 +283,7 @@ public class MoneyMapEngineTests
         nextMonth.PlanMonth = new DateTime(Today.Year, Today.Month, 1).AddMonths(1);
         nextMonth.NetIncomeMonthly = 1m;
 
-        var map = _sut.Build([current, nextMonth], [], Categories, Today, 3).Value!;
+        var map = _sut.Build([current, nextMonth], [], Categories, Today, 3, historyStart: null).Value!;
 
         Assert.Equal("Recommended Budget", map.PlanName);
         Assert.Equal(6526m, map.PlannedIncomeMonthly);
@@ -250,7 +295,7 @@ public class MoneyMapEngineTests
         var thisMonth = Plan();
         thisMonth.PlanMonth = new DateTime(Today.Year, Today.Month, 1);
 
-        var map = _sut.Build([thisMonth], [], Categories, new DateTime(Today.Year, Today.Month, 1), 3).Value!;
+        var map = _sut.Build([thisMonth], [], Categories, new DateTime(Today.Year, Today.Month, 1), 3, historyStart: null).Value!;
 
         Assert.Equal("Recommended Budget", map.PlanName);
     }
@@ -261,7 +306,7 @@ public class MoneyMapEngineTests
         var future = Plan();
         future.PlanMonth = new DateTime(Today.Year, Today.Month, 1).AddMonths(2);
 
-        var map = _sut.Build([future], [], Categories, Today, 3).Value!;
+        var map = _sut.Build([future], [], Categories, Today, 3, historyStart: null).Value!;
 
         Assert.Null(map.PlanName);
         Assert.Empty(map.Upcoming);

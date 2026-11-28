@@ -12,7 +12,8 @@ public interface IPlaidEngine
 {
     /// <summary>
     /// Map a raw Plaid transaction onto a BudgetTracker <see cref="Transaction"/> ready for persistence.
-    /// Inverts Plaid's sign convention (Plaid positive = outflow → BudgetTracker negative Expense).
+    /// Inverts Plaid's sign convention (Plaid positive = outflow → BudgetTracker negative Expense). An uncategorized move
+    /// into savings or investing (by Plaid's detailed category) is an Adjustment, so it is not counted as spending.
     /// </summary>
     /// <param name="dto">Plaid's raw transaction record.</param>
     /// <param name="accountId">BudgetTracker account id the imported transaction is attached to.</param>
@@ -39,7 +40,7 @@ public interface IPlaidEngine
     /// Re-pair own-account transfers from scratch. Two legs pair when they are the same money moving between two of the
     /// user's linked checking/savings/credit accounts: exactly opposite amounts, different Plaid accounts, dated within
     /// five days. Posted rows in <see cref="TransferCategories"/> qualify, whether or not they are already a Transfer;
-    /// Adjustment rows never do. The pairing maximises the number of pairs, each row is used at most once, and the result
+    /// Adjustment rows under a category never do; an uncategorized Adjustment (a savings or investing move) does. The pairing maximises the number of pairs, each row is used at most once, and the result
     /// is deterministic.
     /// </summary>
     /// <param name="candidates">
@@ -80,6 +81,19 @@ public interface IPlaidEngine
     /// </summary>
     int? ResolveCategoryId(
         PlaidTransactionDto dto, IEnumerable<Category> userCategories, IReadOnlyDictionary<string, int>? categoryByPayee = null);
+
+    /// <summary>
+    /// Starter categories for a user still setting up, so a bank sync files its rows instead of leaving them
+    /// uncategorized: one per Plaid primary in <paramref name="plaidCategoryPrimaries"/> that has a plain-language name,
+    /// each claiming that primary. Transfers and OTHER get none, since they say nothing about what the money was for.
+    /// A primary an existing category already claims, or whose name is taken, gets none.
+    /// </summary>
+    /// <param name="userId">The owning user.</param>
+    /// <param name="plaidCategoryPrimaries">Plaid primaries seen in the user's transactions; repeats, case and nulls are ignored.</param>
+    /// <param name="existingCategories">The user's categories.</param>
+    /// <returns>Unsaved categories, one per distinct known primary not yet covered.</returns>
+    IReadOnlyList<Category> StarterCategories(
+        int userId, IEnumerable<string?> plaidCategoryPrimaries, IEnumerable<Category> existingCategories);
 
     /// <summary>
     /// Resolve which BudgetTracker <see cref="Account"/> should host transactions for a Plaid account.

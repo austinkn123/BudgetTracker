@@ -80,6 +80,11 @@ public interface ITransactionAccessor
     Task<IReadOnlyList<Transaction>> GetNewestIncomeAsync(
         int userId, IReadOnlyCollection<int> categoryIds, DateTime onOrBefore, decimal? minAmount, int take);
 
+    /// <summary>The day of the user's oldest row, or null when they have none; how far back their history goes.</summary>
+    /// <param name="userId">The owner.</param>
+    /// <returns>The oldest row's OccurredAt, or null.</returns>
+    Task<DateTime?> GetFirstOccurredAtAsync(int userId);
+
     /// <summary>The rows with these ids that <paramref name="userId"/> owns; ids owned by anyone else are skipped.</summary>
     Task<IReadOnlyList<Transaction>> GetByIdsAsync(IEnumerable<int> ids, int userId);
 

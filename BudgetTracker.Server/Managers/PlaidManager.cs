@@ -744,6 +744,13 @@ public class PlaidManager(
         // imported rows reach BudgetAnalysisEngine, which groups purely by CategoryId (BUD-9).
         var userCategories = (await categoryAccessor.GetByUserIdAsync(userId)).ToList();
 
+        // A new user has no categories, so nothing would file and the budget guide would have nothing to suggest. Until
+        // they save a budget they are still setting up, so Plaid's later history (which can bring new kinds of spending)
+        // gets starters too; after that the categories are theirs and are left alone.
+        var starters = engine.StarterCategories(userId, changes.Select(t => t.PersonalFinanceCategoryPrimary), userCategories);
+        if (starters.Count > 0 && (userCategories.Count == 0 || !(await budgetPlanAccessor.GetByUserIdAsync(userId)).Any()))
+            userCategories = await CreateCategoriesAsync(userId, starters);
+
         // A category the user picked sticks across syncs (the accessor never overwrites it), so a re-delivered row is
         // classified against that category rather than Plaid's suggestion.
         var existingByPlaidId = changes.Count == 0
@@ -813,6 +820,24 @@ public class PlaidManager(
         }
 
         return (Result<PlaidSyncSummary>.Success(new PlaidSyncSummary(inserted, updated, removed, syncedAt)), PlaidSyncOutcome.Completed);
+    }
+
+    /// <summary>Saves the starter categories and returns the user's categories after.</summary>
+    private async Task<List<Category>> CreateCategoriesAsync(int userId, IReadOnlyList<Category> starters)
+    {
+        foreach (var starter in starters)
+        {
+            try
+            {
+                await categoryAccessor.CreateAsync(starter);
+            }
+            catch (UniqueNameViolationException)
+            {
+                // Another bank's sync for this user created it first; the re-read below picks it up.
+            }
+        }
+
+        return (await categoryAccessor.GetByUserIdAsync(userId)).ToList();
     }
 
     /// <summary>

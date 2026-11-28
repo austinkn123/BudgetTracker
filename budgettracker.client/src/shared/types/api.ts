@@ -89,6 +89,8 @@ export interface MoneyMap {
   months: number;
   plannedIncomeMonthly: number;
   actualIncomeMonthly: number;
+  /** The months every actual is averaged over: `months`, or less when the bank history starts inside the window. */
+  monthsAveraged?: number | null;
   /** Plan lines in plan order, then unplanned spend largest first. */
   lines: MoneyMapLine[];
   /** Lump-sum bills and extra paychecks in the next 12 months, soonest first. */

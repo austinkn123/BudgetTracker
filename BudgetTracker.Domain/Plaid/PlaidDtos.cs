@@ -32,7 +32,9 @@ public record PlaidTransactionDto(
     string? MerchantName,
     string Name,
     bool Pending,
-    string? PersonalFinanceCategoryPrimary);
+    string? PersonalFinanceCategoryPrimary,
+    /// <summary>Plaid's <c>personal_finance_category.detailed</c>, e.g. <c>TRANSFER_OUT_SAVINGS</c>; null when absent.</summary>
+    string? PersonalFinanceCategoryDetailed = null);
 
 /// <summary>Aggregated payload from a full /transactions/sync paginated walk.</summary>
 public record PlaidSyncResult(

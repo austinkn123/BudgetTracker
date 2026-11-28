@@ -375,12 +375,15 @@ public class PlaidAccessor : IPlaidAccessor
         var pending = element.TryGetProperty("pending", out var pendingProp) && pendingProp.GetBoolean();
 
         string? pfcPrimary = null;
+        string? pfcDetailed = null;
         if (element.TryGetProperty("personal_finance_category", out var pfcProp) && pfcProp.ValueKind == JsonValueKind.Object)
         {
             if (pfcProp.TryGetProperty("primary", out var primaryProp) && primaryProp.ValueKind == JsonValueKind.String)
                 pfcPrimary = primaryProp.GetString();
+            if (pfcProp.TryGetProperty("detailed", out var detailedProp) && detailedProp.ValueKind == JsonValueKind.String)
+                pfcDetailed = detailedProp.GetString();
         }
 
-        return new PlaidTransactionDto(transactionId, accountId, amount, date, merchantName, name, pending, pfcPrimary);
+        return new PlaidTransactionDto(transactionId, accountId, amount, date, merchantName, name, pending, pfcPrimary, pfcDetailed);
     }
 }

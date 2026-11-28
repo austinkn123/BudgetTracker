@@ -36,8 +36,10 @@ public class MoneyMapManagerTests
         _engine.Setup(e => e.DescribeHistory(plans, Today, 6)).Returns(Result<MoneyMapHistory>.Success(new MoneyMapHistory(from, [], 6)));
         var bounded = new TransactionFilter(From: from, To: Today);
         _txnAccessor.Setup(a => a.GetFilteredAsync(UserId, bounded)).ReturnsAsync(rows);
+        var historyStart = Today.AddDays(-20);
+        _txnAccessor.Setup(a => a.GetFirstOccurredAtAsync(UserId)).ReturnsAsync(historyStart);
         _categoryAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync(categories);
-        _engine.Setup(e => e.Build(plans, It.Is<IReadOnlyList<Transaction>>(t => t.Single().Id == 2), categories, Today, 6))
+        _engine.Setup(e => e.Build(plans, It.Is<IReadOnlyList<Transaction>>(t => t.Single().Id == 2), categories, Today, 6, historyStart))
             .Returns(Result<MoneyMap>.Success(map));
 
         var result = await BuildSut().GetAsync(UserId, 6, clientToday: null);
@@ -56,8 +58,9 @@ public class MoneyMapManagerTests
             .Returns(Result<MoneyMapHistory>.Success(new MoneyMapHistory(localToday.AddMonths(-12), [], 6)));
         var window = new TransactionFilter(From: localToday.AddMonths(-12), To: localToday);
         _txnAccessor.Setup(a => a.GetFilteredAsync(UserId, window)).ReturnsAsync([]);
+        _txnAccessor.Setup(a => a.GetFirstOccurredAtAsync(UserId)).ReturnsAsync((DateTime?)null);
         _categoryAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
-        _engine.Setup(e => e.Build(It.IsAny<IEnumerable<BudgetPlan>>(), It.IsAny<IReadOnlyList<Transaction>>(), It.IsAny<IEnumerable<Category>>(), localToday, 6))
+        _engine.Setup(e => e.Build(It.IsAny<IEnumerable<BudgetPlan>>(), It.IsAny<IReadOnlyList<Transaction>>(), It.IsAny<IEnumerable<Category>>(), localToday, 6, null))
             .Returns(Result<MoneyMap>.Success(map));
 
         var result = await BuildSut().GetAsync(UserId, 6, clientToday: localToday);
@@ -94,10 +97,11 @@ public class MoneyMapManagerTests
             .ReturnsAsync([latest]);
         _txnAccessor.Setup(a => a.GetNewestIncomeAsync(UserId, It.Is<IReadOnlyCollection<int>>(c => c.Single() == 1), Today, 1000m, 6))
             .ReturnsAsync([latest, older]);
+        _txnAccessor.Setup(a => a.GetFirstOccurredAtAsync(UserId)).ReturnsAsync(older.OccurredAt);
         _categoryAccessor.Setup(a => a.GetByUserIdAsync(UserId)).ReturnsAsync([]);
         IReadOnlyList<Transaction>? handed = null;
-        _engine.Setup(e => e.Build(It.IsAny<IEnumerable<BudgetPlan>>(), It.IsAny<IReadOnlyList<Transaction>>(), It.IsAny<IEnumerable<Category>>(), Today, 12))
-            .Callback<IEnumerable<BudgetPlan>, IReadOnlyList<Transaction>, IEnumerable<Category>, DateTime, int>((_, t, _, _, _) => handed = t)
+        _engine.Setup(e => e.Build(It.IsAny<IEnumerable<BudgetPlan>>(), It.IsAny<IReadOnlyList<Transaction>>(), It.IsAny<IEnumerable<Category>>(), Today, 12, older.OccurredAt))
+            .Callback<IEnumerable<BudgetPlan>, IReadOnlyList<Transaction>, IEnumerable<Category>, DateTime, int, DateTime?>((_, t, _, _, _, _) => handed = t)
             .Returns(Result<MoneyMap>.Success(new MoneyMap(null, Today, Today, 12, 0m, 0m, [], [])));
 
         await BuildSut().GetAsync(UserId, 12, clientToday: null);
@@ -120,6 +124,8 @@ public class MoneyMapManagerTests
                 .Where(t => f.From is not DateTime from || t.OccurredAt >= from.Date)
                 .Where(t => f.To is not DateTime to || t.OccurredAt.Date <= to.Date)
                 .ToList());
+        _txnAccessor.Setup(a => a.GetFirstOccurredAtAsync(UserId))
+            .ReturnsAsync(ledger.Count == 0 ? (DateTime?)null : ledger.Min(t => t.OccurredAt));
         _txnAccessor.Setup(a => a.GetNewestIncomeAsync(
                 UserId, It.IsAny<IReadOnlyCollection<int>>(), It.IsAny<DateTime>(), It.IsAny<decimal?>(), It.IsAny<int>()))
             .ReturnsAsync((int _, IReadOnlyCollection<int> ids, DateTime onOrBefore, decimal? min, int take) => ledger
@@ -161,7 +167,7 @@ public class MoneyMapManagerTests
         StubLedger(ledger, plans, PayCategories);
 
         var bounded = await BuildSut(engine).GetAsync(UserId, months, clientToday: null);
-        var whole = engine.Build(plans, ledger, PayCategories, Today, months);
+        var whole = engine.Build(plans, ledger, PayCategories, Today, months, ledger.Count == 0 ? (DateTime?)null : ledger.Min(t => t.OccurredAt));
 
         Assert.True(bounded.IsSuccess, bounded.Error);
         Assert.Equal(JsonSerializer.Serialize(whole.Value), JsonSerializer.Serialize(bounded.Value));

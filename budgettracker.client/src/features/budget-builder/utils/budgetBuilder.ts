@@ -44,6 +44,15 @@ const MIN_SUGGESTION = 25;
 
 const NEW_PLAN_NAME = 'My budget';
 
+/** The line for spending that has no category yet. */
+export const OTHER_NAME = 'Other / not sorted yet';
+
+/**
+ * Plaid categories that are must-pay monthly bills, for a first draft built from the bank alone.
+ * ponytail: lump-sum yearly bills aren't detected here; the money map's projections could feed the yearly step later.
+ */
+const BILL_PRIMARIES = new Set(['RENT_AND_UTILITIES', 'LOAN_PAYMENTS']);
+
 export const roundTo10 = (amount: number) => Math.round(amount / 10) * 10;
 
 export const isExpenseCategory = (category: Category) =>
@@ -85,23 +94,46 @@ export const buildDraft = (plan: BudgetPlan | null, map: MoneyMap, categories: C
     });
   }
 
-  // Spending the plan doesn't cover yet, biggest first (the server's order), offered unticked.
-  const planned = new Set(expenses.map((e) => e.categoryId));
-  const expenseIds = new Set(categories.filter(isExpenseCategory).map((c) => c.id));
+  // Spending the plan doesn't cover yet, biggest first (the server's order). With no plan this IS the draft, so it comes
+  // ticked; otherwise it is offered unticked. Unsorted spending is offered too, so the total never undercounts.
+  const fresh = plan === null;
+  const planned = new Set(expenses.map((e) => e.categoryId ?? null));
+  const expenseById = new Map(categories.filter(isExpenseCategory).map((c) => [c.id, c]));
   for (const line of map.lines) {
-    if (line.categoryId === null || planned.has(line.categoryId) || !expenseIds.has(line.categoryId)) continue;
-    if (line.actualMonthly < MIN_SUGGESTION) continue;
-    draft.everyday.push({
-      key: `category-${line.categoryId}`,
-      categoryId: line.categoryId,
-      name: names.get(line.categoryId) ?? line.name,
-      amount: suggest(line.actualMonthly, 'everyday'),
-      on: false,
+    if (planned.has(line.categoryId) || line.actualMonthly < MIN_SUGGESTION) continue;
+    const category = line.categoryId === null ? null : expenseById.get(line.categoryId);
+    if (category === undefined) continue;
+    const step: StepKey = fresh && BILL_PRIMARIES.has(category?.plaidCategoryPrimary ?? '') ? 'bills' : 'everyday';
+    draft[step].push({
+      key: category ? `category-${category.id}` : 'other',
+      categoryId: category?.id ?? null,
+      name: category?.name ?? OTHER_NAME,
+      amount: suggest(line.actualMonthly, step),
+      on: fresh,
       bankMonthly: line.actualMonthly,
     });
   }
 
   return draft;
+};
+
+/**
+ * How much bank history the averages cover, in words, when it is less than the whole window (a bank linked a few
+ * weeks ago); null when the window is full. Under about six weeks the server counts it as one month, so it is vague.
+ */
+export const shortHistory = (map: MoneyMap): string | null => {
+  const covered = map.monthsAveraged ?? map.months;
+  if (covered >= map.months) return null;
+  if (covered < 1.5) return 'a few weeks';
+  if (covered < 3) return `${Math.round((covered * 365.25) / 12 / 7)} weeks`;
+  return `${Math.round(covered)} months`;
+};
+
+/** The share of spending in the money map that has a category; 1 when there is none yet. */
+export const sortedShare = (map: MoneyMap) => {
+  const total = map.lines.reduce((sum, l) => sum + l.actualMonthly, 0);
+  const sorted = map.lines.reduce((sum, l) => sum + (l.categoryId === null ? 0 : l.actualMonthly), 0);
+  return total > 0 ? sorted / total : 1;
 };
 
 export const totals = (draft: Draft): Totals => {

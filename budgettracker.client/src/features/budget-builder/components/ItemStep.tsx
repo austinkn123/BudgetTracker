@@ -20,7 +20,7 @@ const COPY: Record<StepKey, { title: string; lead: string; add: string; ask: str
   },
   everyday: {
     title: 'How much do you spend on everyday things?',
-    lead: 'These change each month. The bank amount is your monthly average over the last year.',
+    lead: 'These change each month. The bank amount is your monthly average.',
     add: 'Add something else',
     ask: 'How much each month?',
   },

@@ -53,6 +53,52 @@ public class PlaidEngineTests
         Assert.Equal("Income", result.TransactionType);
     }
 
+    // ── Savings and investing moves ─────────────────────────────────────────
+
+    [Theory]
+    [InlineData("TRANSFER_OUT", "TRANSFER_OUT_INVESTMENT_AND_RETIREMENT_FUNDS", 500)]
+    [InlineData("TRANSFER_OUT", "TRANSFER_OUT_SAVINGS", 200)]
+    [InlineData("TRANSFER_IN", "TRANSFER_IN_SAVINGS", -200)]
+    [InlineData("TRANSFER_IN", "transfer_in_investment_and_retirement_funds", -50)]
+    public void Map_UncategorizedSavingsOrInvestingMove_IsAnAdjustment(string primary, string detailed, decimal plaidAmount)
+    {
+        var dto = BuildPlaidDebit(amount: plaidAmount) with
+        {
+            PersonalFinanceCategoryPrimary = primary,
+            PersonalFinanceCategoryDetailed = detailed
+        };
+
+        Assert.Equal("Adjustment", _sut.MapToBudgetTrackerTransaction(dto, accountId: 7).TransactionType);
+    }
+
+    [Fact]
+    public void Map_SavingsMoveTheUserFiled_FollowsTheirCategory()
+    {
+        var dto = BuildPlaidDebit(amount: 500m) with
+        {
+            PersonalFinanceCategoryPrimary = "TRANSFER_OUT",
+            PersonalFinanceCategoryDetailed = "TRANSFER_OUT_SAVINGS"
+        };
+
+        Assert.Equal("Expense", _sut.MapToBudgetTrackerTransaction(dto, accountId: 7, categoryId: 4, categoryType: "Expense").TransactionType);
+    }
+
+    [Theory]
+    [InlineData("TRANSFER_OUT_ACCOUNT_TRANSFER")]
+    [InlineData("TRANSFER_OUT_WITHDRAWAL")]
+    [InlineData(null)]
+    public void Map_OtherUncategorizedTransfers_StayExpense(string? detailed)
+    {
+        // Venmo, Zelle and ATM cash can be real spending, so they stay in "Other" for the user to sort.
+        var dto = BuildPlaidDebit(amount: 60m) with
+        {
+            PersonalFinanceCategoryPrimary = "TRANSFER_OUT",
+            PersonalFinanceCategoryDetailed = detailed
+        };
+
+        Assert.Equal("Expense", _sut.MapToBudgetTrackerTransaction(dto, accountId: 7).TransactionType);
+    }
+
     // ── Field mapping ───────────────────────────────────────────────────────
 
     [Fact]
@@ -165,6 +211,55 @@ public class PlaidEngineTests
     public void ResolveCategoryId_EmptyCategories_ReturnsNull()
     {
         Assert.Null(_sut.ResolveCategoryId(BuildPlaidDebit(), Array.Empty<Category>()));
+    }
+
+    // ── Starter categories for a user with none ─────────────────────────────
+
+    [Fact]
+    public void StarterCategories_Should_CreateOneMappedCategoryPerSeenPrimary()
+    {
+        var starters = _sut.StarterCategories(5, ["FOOD_AND_DRINK", "food_and_drink", "RENT_AND_UTILITIES"], []);
+
+        Assert.Equal(2, starters.Count);
+        var food = Assert.Single(starters, c => c.PlaidCategoryPrimary == "FOOD_AND_DRINK");
+        Assert.Equal("Food & dining", food.Name);
+        Assert.Equal("Expense", food.CategoryType);
+        Assert.All(starters, c => Assert.Equal(5, c.UserId));
+    }
+
+    [Fact]
+    public void StarterCategories_Should_TypeIncomeAsIncome()
+    {
+        var income = Assert.Single(_sut.StarterCategories(5, ["INCOME"], []));
+
+        Assert.Equal("Income", income.CategoryType);
+    }
+
+    [Fact]
+    public void StarterCategories_Should_SkipTransfersOtherAndUnknownPrimaries()
+    {
+        // Venmo, Zelle and cash land here; a starter category can't say what they were for, so they stay unsorted.
+        Assert.Empty(_sut.StarterCategories(5, ["TRANSFER_IN", "TRANSFER_OUT", "OTHER", "SOMETHING_NEW", null, " "], []));
+    }
+
+    [Fact]
+    public void StarterCategories_Should_ReturnEmpty_When_NoPrimaries()
+    {
+        Assert.Empty(_sut.StarterCategories(5, [], []));
+    }
+
+    [Fact]
+    public void StarterCategories_Should_SkipPrimariesAlreadyClaimed_AndNamesAlreadyTaken()
+    {
+        Category[] existing =
+        [
+            new() { Id = 1, UserId = 5, Name = "Groceries", PlaidCategoryPrimary = "food_and_drink" },
+            new() { Id = 2, UserId = 5, Name = "shopping" },
+        ];
+
+        var starters = _sut.StarterCategories(5, ["FOOD_AND_DRINK", "GENERAL_MERCHANDISE", "TRAVEL"], existing);
+
+        Assert.Equal(["TRAVEL"], starters.Select(c => c.PlaidCategoryPrimary));
     }
 
     [Fact]
@@ -804,11 +899,24 @@ public class PlaidEngineTests
         [
             Leg(1, -500m, "chk", 10, pending: true),
             Leg(2, 500m, "sav", 20, 0, "TRANSFER_IN"),
-            Leg(3, -70m, "chk", 10, type: "Adjustment"),
+            Leg(3, -70m, "chk", 10, type: "Adjustment", categoryId: 99),
             Leg(4, 70m, "sav", 20, 0, "TRANSFER_IN")
         ]);
 
         Assert.Empty(updates);
+    }
+
+    [Fact]
+    public void Pair_AnUncategorizedAdjustment_StillPairsWithItsLinkedLeg()
+    {
+        // The import marks an uncategorized savings move as an Adjustment; a linked partner still makes it a Transfer.
+        var updates = Reconcile(
+        [
+            Leg(1, -300m, "chk", 10, type: "Adjustment"),
+            Leg(2, 300m, "sav", 20, 0, "TRANSFER_IN", type: "Adjustment")
+        ]);
+
+        Assert.Equal([(1, 20), (2, 10)], Pairs(updates));
     }
 
     [Fact]
