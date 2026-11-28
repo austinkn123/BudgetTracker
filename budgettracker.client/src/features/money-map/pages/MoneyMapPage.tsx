@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { endOfMonth, startOfDay, startOfMonth } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { ListChecks } from 'lucide-react';
-import { Alert, Button, Card, Skeleton } from '../../../shared/components/ui';
+import { Button, Card, ErrorState, Skeleton } from '../../../shared/components/ui';
 import type { CashFlowQuery, MoneyMap, PlanPerformance } from '../../../shared/types/api';
 import { currency, percent } from '../../../shared/utils/format';
 import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
@@ -138,10 +138,14 @@ const MonthByMonth = () => {
     () => ({ from: bounds.from ? toDateKey(bounds.from) : undefined, to: toDateKey(bounds.to), groupBy: 'Month' }),
     [bounds],
   );
-  const { data: report, isPending, error } = useCashFlow(query);
+  const { data: report, isPending, error, refetch, isFetching } = useCashFlow(query);
 
   if (error && !report) {
-    return <Alert severity="error" title="Couldn't load month by month" message="Check that the server and database are running." />;
+    return (
+      <Section title="The last 12 months">
+        <ErrorState title="Couldn't load the last 12 months" onRetry={() => void refetch()} isRetrying={isFetching} />
+      </Section>
+    );
   }
   if (isPending || !report) return <Skeleton height={380} className="rounded-xl" />;
 
@@ -185,7 +189,7 @@ const MoneyMapPage = () => {
   useSyncOnOpen();
   useWebullRefreshOnOpen();
 
-  const { data: map, isPending, error } = useMoneyMap(AVERAGE_MONTHS);
+  const { data: map, isPending, error, refetch: refetchMap, isFetching: isFetchingMap } = useMoneyMap(AVERAGE_MONTHS);
   const now = new Date();
   const { data: analysis } = useBudgetAnalysis(startOfMonth(now), endOfMonth(now), TREND_MONTHS);
   const { data: connections = [] } = usePlaidConnections();
@@ -214,7 +218,7 @@ const MoneyMapPage = () => {
 
       <Section title="A normal month" detail="Your plan next to what a month really cost, on average, over the last 12 months.">
         {error && !map ? (
-          <Alert severity="error" title="Couldn't load your money map" message="Check that the server and database are running." />
+          <ErrorState title="Couldn't load your money map" onRetry={() => void refetchMap()} isRetrying={isFetchingMap} />
         ) : isPending || !map || !split ? (
           <div className="space-y-6" aria-busy>
             <Skeleton height={220} className="rounded-xl" />

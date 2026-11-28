@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronLeft, Landmark, Wallet } from 'lucide-react';
-import { Alert, Button, Skeleton } from '../../../shared/components/ui';
+import { Alert, Button, ErrorState, Skeleton } from '../../../shared/components/ui';
 import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan, Category, MoneyMap } from '../../../shared/types/api';
 import { cn } from '../../../shared/utils/cn';
@@ -416,9 +416,13 @@ const Builder = ({ plan, map, categories }: BuilderProps) => {
  * from the bank. It edits the same plan the Plan tab does.
  */
 const BudgetBuilderPage = () => {
-  const { data: plans, error: plansError } = useBudgetPlans();
-  const { data: categories, error: categoriesError } = useCategories();
-  const { data: map, error: mapError } = useMoneyMap(AVERAGE_MONTHS);
+  const plansQuery = useBudgetPlans();
+  const categoriesQuery = useCategories();
+  const mapQuery = useMoneyMap(AVERAGE_MONTHS);
+  const { data: plans, error: plansError } = plansQuery;
+  const { data: categories, error: categoriesError } = categoriesQuery;
+  const { data: map, error: mapError } = mapQuery;
+  const failed = [plansQuery, categoriesQuery, mapQuery].filter((q) => q.isError);
   const plan = useMemo(() => pickPlan(plans ?? []), [plans]);
 
   return (
@@ -426,10 +430,11 @@ const BudgetBuilderPage = () => {
       {plans && categories && map ? (
         <Builder plan={plan} map={map} categories={categories} />
       ) : plansError || categoriesError || mapError ? (
-        <Alert
-          severity="error"
+        <ErrorState
           title="Couldn't load your budget"
-          message="Check that the server and database are running."
+          // Only the reads that failed go again; the others are already in the cache.
+          onRetry={() => failed.forEach((q) => void q.refetch())}
+          isRetrying={failed.some((q) => q.isFetching)}
         />
       ) : (
         <div className="space-y-6" aria-busy>

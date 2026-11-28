@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Alert, Card, Skeleton, Table, ToggleGroup } from '../../../shared/components/ui';
+import { Card, ErrorState, Skeleton, Table, ToggleGroup } from '../../../shared/components/ui';
 import type { TableColumn } from '../../../shared/components/ui';
 import type {
   WebullClosedTrade,
@@ -197,7 +197,7 @@ const TradesTab = () => {
   const [range, setRange] = useState<WebullRange>('YTD');
   const isSyncing = useWebullTradeSync();
   // No placeholder data on a range switch: another range's figures under this label would lie.
-  const { data: view, isPending } = useWebullTrades(range);
+  const { data: view, isPending, refetch, isFetching } = useWebullTrades(range);
 
   return (
     <div className="flex flex-col gap-6">
@@ -233,11 +233,7 @@ const TradesTab = () => {
       ) : view ? (
         <Trades view={view} isSyncing={isSyncing} />
       ) : (
-        <Alert
-          severity="error"
-          title="Couldn't load your trades"
-          message="Reload the page to try again."
-        />
+        <ErrorState title="Couldn't load your trades" onRetry={() => void refetch()} isRetrying={isFetching} />
       )}
     </div>
   );

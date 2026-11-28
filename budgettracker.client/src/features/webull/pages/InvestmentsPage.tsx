@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { Alert, Card, PageHeader, Skeleton, Table, Tabs } from '../../../shared/components/ui';
+import { Card, ErrorState, PageHeader, Skeleton, Table, Tabs } from '../../../shared/components/ui';
 import type { TableColumn } from '../../../shared/components/ui';
 import type { WebullAccountHoldings, WebullHolding } from '../../../shared/types/api';
 import {
@@ -237,7 +237,7 @@ const TABS = [
 const InvestmentsPage = () => {
   // Same silent refresh as the Dashboard; the server decides whether one is due.
   useWebullRefreshOnOpen();
-  const { data: view, isPending } = useWebullHoldings();
+  const { data: view, isPending, refetch, isFetching } = useWebullHoldings();
   // Holdings is the bare /investments.
   const [tab, selectTab] = useTabParam(['holdings', 'trades']);
 
@@ -253,11 +253,7 @@ const InvestmentsPage = () => {
 
   if (!view) {
     return (
-      <Alert
-        severity="error"
-        title="Couldn't load your holdings"
-        message="Reload the page to try again."
-      />
+      <ErrorState title="Couldn't load your holdings" onRetry={() => void refetch()} isRetrying={isFetching} />
     );
   }
 

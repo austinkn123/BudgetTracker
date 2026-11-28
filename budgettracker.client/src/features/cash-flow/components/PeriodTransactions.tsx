@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { X } from 'lucide-react';
-import { Button, Card, Skeleton } from '../../../shared/components/ui';
+import { Button, Card, ErrorState, Skeleton } from '../../../shared/components/ui';
 import type { CashFlowGrouping, CashFlowPeriod, Category } from '../../../shared/types/api';
 import { currency, signedAmount } from '../../../shared/utils/format';
 import { cn } from '../../../shared/utils/cn';
@@ -40,7 +40,7 @@ const PeriodTransactions = ({
   categories,
   onClear,
 }: PeriodTransactionsProps) => {
-  const { data = [], isLoading, error } = useTransactions({
+  const { data = [], isLoading, error, refetch, isFetching } = useTransactions({
     from: toDateKey(bounds.from),
     to: toDateKey(bounds.to),
     plaidAccountId: plaidAccountId ?? undefined,
@@ -84,7 +84,12 @@ const PeriodTransactions = ({
           ))}
         </div>
       ) : error ? (
-        <p className="text-sm text-ink-muted">Couldn't load these transactions. Please try again.</p>
+        <ErrorState
+          layout="inline"
+          title="Couldn't load these transactions"
+          onRetry={() => void refetch()}
+          isRetrying={isFetching}
+        />
       ) : rows.length === 0 ? (
         <p className="text-sm text-ink-muted">
           Nothing settled in this period matches your filters.
