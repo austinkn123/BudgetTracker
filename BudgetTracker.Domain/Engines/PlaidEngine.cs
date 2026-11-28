@@ -23,6 +23,14 @@ public class PlaidEngine : IPlaidEngine
     // category only nominates candidates; a matching leg on another linked account is what makes it a transfer.
     private static readonly HashSet<string> TransferCategorySet = ["TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS"];
 
+    // Plaid's detailed categories for money the user moves into savings or investing (a Webull deposit, savings at
+    // another bank). It is still the user's money, so an uncategorized row of these is not spending or income.
+    private static readonly HashSet<string> SavingsOrInvestingDetailed = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "TRANSFER_OUT_SAVINGS", "TRANSFER_OUT_INVESTMENT_AND_RETIREMENT_FUNDS",
+        "TRANSFER_IN_SAVINGS", "TRANSFER_IN_INVESTMENT_AND_RETIREMENT_FUNDS"
+    };
+
     /// <inheritdoc />
     public Transaction MapToBudgetTrackerTransaction(PlaidTransactionDto dto, int accountId, int? categoryId = null, string? categoryType = null)
     {
@@ -32,7 +40,11 @@ public class PlaidEngine : IPlaidEngine
         return new Transaction
         {
             AccountId = accountId,
-            TransactionType = ClassifyTransactionType(dto.PersonalFinanceCategoryPrimary, categoryType),
+            // An uncategorized move into savings or investing is an Adjustment, like a Transfer-typed category makes it;
+            // if its other leg is on a linked account, pairing still turns it into a Transfer.
+            TransactionType = categoryId is null && IsSavingsOrInvesting(dto.PersonalFinanceCategoryDetailed)
+                ? Adjustment
+                : ClassifyTransactionType(dto.PersonalFinanceCategoryPrimary, categoryType),
             Amount = -dto.Amount,
             OccurredAt = dto.Date,
             Payee = PayeeOf(dto),
@@ -44,6 +56,9 @@ public class PlaidEngine : IPlaidEngine
             IsPending = dto.Pending
         };
     }
+
+    private static bool IsSavingsOrInvesting(string? plaidCategoryDetailed) =>
+        plaidCategoryDetailed is not null && SavingsOrInvestingDetailed.Contains(plaidCategoryDetailed);
 
     private static string PayeeOf(PlaidTransactionDto dto) =>
         !string.IsNullOrWhiteSpace(dto.MerchantName) ? dto.MerchantName : dto.Name;
@@ -79,8 +94,11 @@ public class PlaidEngine : IPlaidEngine
             .ToHashSet();
         var categoryTypeById = userCategories.ToDictionary(c => c.Id, c => c.CategoryType);
 
+        // A user's Adjustment (filed under a Transfer-typed category) is left alone; an uncategorized one is a savings or
+        // investing move the import marked, and still pairs when its other leg is linked.
+        // ponytail: such a row that loses its pair reverts to Expense, since the row doesn't keep Plaid's detailed category.
         var pool = candidates
-            .Where(t => !t.IsPending && t.TransactionType != Adjustment &&
+            .Where(t => !t.IsPending && (t.TransactionType != Adjustment || t.CategoryId is null) &&
                         t.PlaidCategoryPrimary is not null && TransferCategorySet.Contains(t.PlaidCategoryPrimary))
             .ToList();
 

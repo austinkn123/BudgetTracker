@@ -12,7 +12,8 @@ public interface IPlaidEngine
 {
     /// <summary>
     /// Map a raw Plaid transaction onto a BudgetTracker <see cref="Transaction"/> ready for persistence.
-    /// Inverts Plaid's sign convention (Plaid positive = outflow → BudgetTracker negative Expense).
+    /// Inverts Plaid's sign convention (Plaid positive = outflow → BudgetTracker negative Expense). An uncategorized move
+    /// into savings or investing (by Plaid's detailed category) is an Adjustment, so it is not counted as spending.
     /// </summary>
     /// <param name="dto">Plaid's raw transaction record.</param>
     /// <param name="accountId">BudgetTracker account id the imported transaction is attached to.</param>
@@ -39,7 +40,7 @@ public interface IPlaidEngine
     /// Re-pair own-account transfers from scratch. Two legs pair when they are the same money moving between two of the
     /// user's linked checking/savings/credit accounts: exactly opposite amounts, different Plaid accounts, dated within
     /// five days. Posted rows in <see cref="TransferCategories"/> qualify, whether or not they are already a Transfer;
-    /// Adjustment rows never do. The pairing maximises the number of pairs, each row is used at most once, and the result
+    /// Adjustment rows under a category never do; an uncategorized Adjustment (a savings or investing move) does. The pairing maximises the number of pairs, each row is used at most once, and the result
     /// is deterministic.
     /// </summary>
     /// <param name="candidates">
