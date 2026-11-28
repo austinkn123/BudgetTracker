@@ -4,9 +4,9 @@ import { Alert, Button, Card, ErrorState, Modal, ModalActions, Spinner } from '.
 import type { PlaidConnectionView } from '../../../shared/types/api';
 import { cn } from '../../../shared/utils/cn';
 import { useLinkedAccounts } from '../hooks/useLinkedAccounts';
-import { usePlaidConnections } from '../hooks/usePlaidConnections';
 import LinkedAccountCard from './LinkedAccountCard';
 import PlaidLinkLauncher from './PlaidLinkLauncher';
+import { usePlaidConnections } from '../hooks/usePlaidConnections';
 
 /**
  * Settings-page section that owns bank-link UX across every institution:
