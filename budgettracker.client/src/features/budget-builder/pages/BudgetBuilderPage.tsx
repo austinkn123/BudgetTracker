@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +26,7 @@ import {
   planStamp,
   readSavedDraft,
   RESUMABLE_SCREENS,
+  shortHistory,
   toPlan,
   totals,
   writeSavedDraft,
@@ -110,6 +111,15 @@ const Builder = ({ plan, map, categories }: BuilderProps) => {
   // Answers left part way through this version of the plan, offered on the start screen.
   const [saved, setSaved] = useState(() => readSavedDraft(stamp));
   const sums = totals(draft);
+  const history = shortHistory(map);
+
+  // Plaid sends older history a while after the first sync. Until the user first leaves the start screen, the draft
+  // follows the newest numbers; after that their answers are theirs.
+  const answering = useRef(false);
+  useEffect(() => {
+    if (screen !== 'start') answering.current = true;
+    else if (!answering.current) setDraft(buildDraft(plan, map, categories));
+  }, [screen, plan, map, categories]);
 
   // Each screen starts at the top, as a new page would.
   useEffect(() => {
@@ -161,6 +171,12 @@ const Builder = ({ plan, map, categories }: BuilderProps) => {
               </li>
             ))}
           </ol>
+          {history && (
+            <p className="rounded-2xl bg-warning-subtle p-4 text-lg text-ink">
+              Your bank has sent {history} of history so far, so the amounts we fill in are a first guess. They get
+              better as more comes in.
+            </p>
+          )}
           <p className="text-lg text-ink-muted">
             {saved
               ? 'You started this before. Your answers so far are kept.'
@@ -231,7 +247,7 @@ const Builder = ({ plan, map, categories }: BuilderProps) => {
                 <p>
                   Your bank: about{' '}
                   <span className="numeric font-semibold">{currency.format(map.actualIncomeMonthly)}</span> came in
-                  each month over the last year.
+                  each month {history ? 'so far' : 'over the last year'}.
                 </p>
               </div>
             )}

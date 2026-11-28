@@ -158,6 +158,15 @@ public class TransactionAccessor(BudgetTrackerDbContext context) : ITransactionA
             .ToListAsync();
     }
 
+    /// <inheritdoc />
+    public async Task<DateTime?> GetFirstOccurredAtAsync(int userId)
+    {
+        return await context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Account.UserId == userId)
+            .MinAsync(t => (DateTime?)t.OccurredAt);
+    }
+
     /// <summary>The user's rows narrowed by <paramref name="filter"/>, unordered and untracked.</summary>
     private IQueryable<Transaction> Filtered(int userId, TransactionFilter filter)
     {

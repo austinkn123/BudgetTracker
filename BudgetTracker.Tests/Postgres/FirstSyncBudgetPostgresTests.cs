@@ -17,7 +17,8 @@ namespace BudgetTracker.Tests.Postgres;
 /// <summary>
 /// A brand-new user's first bank, end to end on real PostgreSQL: only Plaid's HTTP calls are faked. The first sync
 /// creates starter categories and files its rows; Plaid's later history sync files against them without adding more;
-/// the money map then has a line per category plus one for the unsorted transfers the budget guide drafts from.
+/// the money map then has a line per category plus one for the unsorted transfers the budget guide drafts from,
+/// averaged over the weeks the history covers. A move into investing is left out of spending.
 /// </summary>
 [Collection(PostgresCollection.Name)]
 [Trait("Category", "Postgres")]
@@ -60,7 +61,8 @@ public sealed class FirstSyncBudgetPostgresTests(PostgresFixture fixture)
                 Row("t3", today.AddDays(-6), 182.40m, "H-E-B", "FOOD_AND_DRINK"),
                 Row("t4", today.AddDays(-8), 140m, "City Utilities", "RENT_AND_UTILITIES"),
                 Row("t5", today.AddDays(-9), 60m, "Zelle payment to a friend", "TRANSFER_OUT"),
-                Row("t6", today.AddDays(-10), 45m, "Amazon", "GENERAL_MERCHANDISE")))
+                Row("t6", today.AddDays(-10), 45m, "Amazon", "GENERAL_MERCHANDISE"),
+                Row("t11", today.AddDays(-12), 500m, "Webull", "TRANSFER_OUT", "TRANSFER_OUT_INVESTMENT_AND_RETIREMENT_FUNDS")))
             // HISTORICAL_UPDATE: older months arrive later, after the categories exist.
             .ReturnsAsync(Sync("c2",
                 Row("t7", today.AddDays(-40), 210.10m, "H-E-B", "FOOD_AND_DRINK"),
@@ -85,13 +87,16 @@ public sealed class FirstSyncBudgetPostgresTests(PostgresFixture fixture)
         var rows = await check.Transactions.AsNoTracking()
             .Where(t => t.Account.UserId == user.Id)
             .ToDictionaryAsync(t => t.PlaidTransactionId![(_run.Length + 1)..]);
-        Assert.Equal(10, rows.Count);
+        Assert.Equal(11, rows.Count);
         Assert.Equal(byPrimary["FOOD_AND_DRINK"].Id, rows["t7"].CategoryId);
         Assert.Equal(byPrimary["INCOME"].Id, rows["t8"].CategoryId);
         Assert.Equal("Income", rows["t8"].TransactionType);
         // Venmo and Zelle say nothing about what the money was for, so they stay unsorted.
         Assert.Null(rows["t5"].CategoryId);
         Assert.Null(rows["t9"].CategoryId);
+        // Money moved to investing is still the user's money: unsorted, but not spending.
+        Assert.Null(rows["t11"].CategoryId);
+        Assert.Equal("Adjustment", rows["t11"].TransactionType);
 
         await using var mapContext = fixture.CreateContext();
         var map = await new MoneyMapManager(
@@ -100,9 +105,12 @@ public sealed class FirstSyncBudgetPostgresTests(PostgresFixture fixture)
         Assert.True(map.IsSuccess);
         Assert.Null(map.Value!.PlanName);
         Assert.Contains(map.Value.Lines, l => l.CategoryId == byPrimary["LOAN_PAYMENTS"].Id);
+        // The history covers 48 days (the oldest row is 47 days back), so the averages are over that, not 12 months.
+        var months = 48 / (365.25m / 12);
+        Assert.Equal(months, map.Value.MonthsAveraged);
         var unsorted = Assert.Single(map.Value.Lines, l => l.CategoryId is null);
-        Assert.Equal(Math.Round(135m / 12, 2), unsorted.ActualMonthly);
-        Assert.Equal(Math.Round(4800m / 12, 2), map.Value.ActualIncomeMonthly);
+        Assert.Equal(Math.Round(135m / months, 2, MidpointRounding.AwayFromZero), unsorted.ActualMonthly);
+        Assert.Equal(Math.Round(4800m / months, 2, MidpointRounding.AwayFromZero), map.Value.ActualIncomeMonthly);
     }
 
     private async Task LinkCheckingAsync(int userId)
@@ -154,7 +162,8 @@ public sealed class FirstSyncBudgetPostgresTests(PostgresFixture fixture)
         new(Added: added, Modified: [], RemovedTransactionIds: [], NextCursor: cursor);
 
     /// <summary>A Plaid row: positive amounts are money out, negative money in.</summary>
-    private PlaidTransactionDto Row(string id, DateTime date, decimal amount, string payee, string primary) =>
+    private PlaidTransactionDto Row(string id, DateTime date, decimal amount, string payee, string primary, string? detailed = null) =>
         new(TransactionId: $"{_run}-{id}", AccountId: AccountId, Amount: amount, Date: date,
-            MerchantName: payee, Name: payee, Pending: false, PersonalFinanceCategoryPrimary: primary);
+            MerchantName: payee, Name: payee, Pending: false, PersonalFinanceCategoryPrimary: primary,
+            PersonalFinanceCategoryDetailed: detailed);
 }

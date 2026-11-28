@@ -40,7 +40,9 @@ public class MoneyMapManager(
             }
         }
 
+        // A bank linked a few weeks ago has only that much history, so the averages must not spread it over the window.
+        var historyStart = await transactionAccessor.GetFirstOccurredAtAsync(userId);
         var categories = await categoryAccessor.GetByUserIdAsync(userId);
-        return engine.Build(plans, transactions, categories, today, months);
+        return engine.Build(plans, transactions, categories, today, months, historyStart);
     }
 }

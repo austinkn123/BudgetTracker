@@ -11,6 +11,7 @@ import {
   sortedShare,
   planStamp,
   readSavedDraft,
+  shortHistory,
   toPlan,
   totals,
   writeSavedDraft,
@@ -162,6 +163,20 @@ describe('sortedShare', () => {
 
   it('is 1 when there is no spending yet', () => {
     expect(sortedShare(map([]))).toBe(1);
+  });
+});
+
+describe('shortHistory', () => {
+  it('is null when the averages cover the whole window', () => {
+    expect(shortHistory(MAP)).toBeNull();
+    expect(shortHistory({ ...MAP, monthsAveraged: 12 })).toBeNull();
+  });
+
+  it('says how much history a newly linked bank has sent', () => {
+    expect(shortHistory({ ...MAP, monthsAveraged: 1 })).toBe('a few weeks');
+    // 48 days.
+    expect(shortHistory({ ...MAP, monthsAveraged: 48 / (365.25 / 12) })).toBe('7 weeks');
+    expect(shortHistory({ ...MAP, monthsAveraged: 4.2 })).toBe('4 months');
   });
 });
 

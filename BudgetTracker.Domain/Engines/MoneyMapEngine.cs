@@ -19,6 +19,7 @@ public class MoneyMapEngine : IMoneyMapEngine
     private const int BiweeklyDays = 14;
     private const int RecentPaychecks = 6;
     private const string ExtraPaycheckLabel = "Extra paycheck";
+    private const decimal DaysPerMonth = 365.25m / 12;
 
     // A payment is the bill itself, not a fee or top-up, when it is at least this share of the plan's yearly amount.
     private const decimal BillShareOfAnnual = 0.25m;
@@ -26,7 +27,8 @@ public class MoneyMapEngine : IMoneyMapEngine
 
     /// <inheritdoc />
     public Result<MoneyMap> Build(
-        IEnumerable<BudgetPlan> plans, IReadOnlyList<Transaction> transactions, IEnumerable<Category> categories, DateTime today, int months)
+        IEnumerable<BudgetPlan> plans, IReadOnlyList<Transaction> transactions, IEnumerable<Category> categories, DateTime today, int months,
+        DateTime? historyStart)
     {
         ArgumentNullException.ThrowIfNull(plans);
         ArgumentNullException.ThrowIfNull(transactions);
@@ -40,6 +42,7 @@ public class MoneyMapEngine : IMoneyMapEngine
         var plan = EffectivePlan(plans, today);
         var names = categories.ToDictionary(c => c.Id, c => c.Name);
         var window = transactions.Where(t => t.OccurredAt.Date >= from && t.OccurredAt.Date <= today).ToList();
+        var divisor = MonthsAveraged(historyStart, from, today, months);
 
         var upcoming = plan is null
             ? []
@@ -51,9 +54,23 @@ public class MoneyMapEngine : IMoneyMapEngine
             today,
             months,
             plan?.NetIncomeMonthly ?? 0m,
-            Round(window.Where(t => t.TransactionType == Income).Sum(t => t.Amount) / months),
-            BuildLines(plan, window.Where(t => t.TransactionType == Expense).ToList(), names, months),
-            upcoming));
+            Round(window.Where(t => t.TransactionType == Income).Sum(t => t.Amount) / divisor),
+            BuildLines(plan, window.Where(t => t.TransactionType == Expense).ToList(), names, divisor),
+            upcoming,
+            divisor));
+    }
+
+    /// <summary>
+    /// The months to average over: the whole window, or, when the history starts inside it, the time it covers. Never
+    /// below one month, so a first week of data is shown as it is rather than multiplied up.
+    /// </summary>
+    private static decimal MonthsAveraged(DateTime? historyStart, DateTime from, DateTime today, int months)
+    {
+        if (historyStart?.Date is not DateTime start || start <= from)
+            return months;
+
+        var covered = ((today - start).Days + 1) / DaysPerMonth;
+        return Math.Clamp(covered, 1m, months);
     }
 
     /// <inheritdoc />
@@ -100,7 +117,7 @@ public class MoneyMapEngine : IMoneyMapEngine
         plans.Where(p => p.IsActive && p.PlanMonth <= today).OrderByDescending(p => p.PlanMonth).FirstOrDefault();
 
     /// <summary>Plan lines in plan order, then unplanned spend largest first. A category in several plan lines is one line.</summary>
-    private static List<MoneyMapLine> BuildLines(BudgetPlan? plan, List<Transaction> spend, Dictionary<int, string> names, int months)
+    private static List<MoneyMapLine> BuildLines(BudgetPlan? plan, List<Transaction> spend, Dictionary<int, string> names, decimal months)
     {
         var rowsByCategory = spend.ToLookup(t => t.CategoryId);
         var planned = (plan?.Entries ?? [])
@@ -210,7 +227,7 @@ public class MoneyMapEngine : IMoneyMapEngine
         return BillingPeriods.MinBy(p => Math.Abs(p - months));
     }
 
-    private static decimal Average(List<Transaction> rows, int months) => Round(-rows.Sum(t => t.Amount) / months);
+    private static decimal Average(List<Transaction> rows, decimal months) => Round(-rows.Sum(t => t.Amount) / months);
 
     private static IReadOnlyList<string> TopPayees(List<Transaction> rows) => rows
         .Where(t => !string.IsNullOrWhiteSpace(t.Payee))

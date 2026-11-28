@@ -117,6 +117,18 @@ export const buildDraft = (plan: BudgetPlan | null, map: MoneyMap, categories: C
   return draft;
 };
 
+/**
+ * How much bank history the averages cover, in words, when it is less than the whole window (a bank linked a few
+ * weeks ago); null when the window is full. Under about six weeks the server counts it as one month, so it is vague.
+ */
+export const shortHistory = (map: MoneyMap): string | null => {
+  const covered = map.monthsAveraged ?? map.months;
+  if (covered >= map.months) return null;
+  if (covered < 1.5) return 'a few weeks';
+  if (covered < 3) return `${Math.round((covered * 365.25) / 12 / 7)} weeks`;
+  return `${Math.round(covered)} months`;
+};
+
 /** The share of spending in the money map that has a category; 1 when there is none yet. */
 export const sortedShare = (map: MoneyMap) => {
   const total = map.lines.reduce((sum, l) => sum + l.actualMonthly, 0);

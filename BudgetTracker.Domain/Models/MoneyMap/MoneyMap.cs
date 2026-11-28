@@ -7,9 +7,13 @@ namespace BudgetTracker.Domain.Models.MoneyMap;
 /// <param name="PlanName">The newest active plan, or null when the user has none.</param>
 /// <param name="From">First day of the window the actuals average over.</param>
 /// <param name="To">Last day of the window (today).</param>
-/// <param name="Months">Calendar months in the window; every actual is a monthly average over this many.</param>
+/// <param name="Months">Calendar months in the window.</param>
 /// <param name="PlannedIncomeMonthly">A normal month's pay, per the plan.</param>
 /// <param name="ActualIncomeMonthly">Income that actually landed, averaged over the window.</param>
+/// <param name="MonthsAveraged">
+/// How many months every actual is divided by: <paramref name="Months"/>, or less when the history starts inside the
+/// window (never below 1).
+/// </param>
 public record MoneyMap(
     string? PlanName,
     DateTime From,
@@ -18,7 +22,8 @@ public record MoneyMap(
     decimal PlannedIncomeMonthly,
     decimal ActualIncomeMonthly,
     IReadOnlyList<MoneyMapLine> Lines,
-    IReadOnlyList<UpcomingItem> Upcoming);
+    IReadOnlyList<UpcomingItem> Upcoming,
+    decimal? MonthsAveraged = null);
 
 /// <summary>
 /// One plan line or spending category. Unplanned spending has a null <paramref name="Bucket"/>; uncategorized spending
@@ -27,7 +32,7 @@ public record MoneyMap(
 /// <param name="Bucket">Core (must-pay) or Buffer (flexible), from the plan.</param>
 /// <param name="Cadence">Monthly or Annual, from the plan; Annual lines are lump-sum bills set aside monthly.</param>
 /// <param name="PlanMonthly">Monthly equivalent planned; 0 when unplanned.</param>
-/// <param name="ActualMonthly">Net spend over the window divided by its months; refunds net against it.</param>
+/// <param name="ActualMonthly">Net spend over the window divided by the months averaged; refunds net against it.</param>
 /// <param name="TopPayees">The biggest payees by spend in the window, largest first, at most three.</param>
 public record MoneyMapLine(
     int? CategoryId,
