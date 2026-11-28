@@ -2,6 +2,7 @@ import { PageHeader } from '../../../shared/components/ui';
 import CategoryRulesSection from '../../categories/components/CategoryRulesSection';
 import LinkedAccountsSection from '../../linked-accounts/components/LinkedAccountsSection';
 import WebullSection from '../../webull/components/WebullSection';
+import AdminSection from '../components/AdminSection';
 import AppearanceSection from '../components/AppearanceSection';
 
 const SettingsPage = () => {
@@ -16,6 +17,8 @@ const SettingsPage = () => {
       <CategoryRulesSection />
 
       <WebullSection />
+
+      <AdminSection />
     </div>
   );
 };

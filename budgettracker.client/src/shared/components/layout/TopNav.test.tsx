@@ -62,4 +62,23 @@ describe('TopNav', () => {
     expect(settings).toHaveClass('h-9', 'w-9', 'text-primary');
     expect(screen.queryByRole('link', { name: 'Budget Plans' })).not.toBeInTheDocument();
   });
+
+  it('opens Send feedback from the account controls', async () => {
+    vi.mocked(webullService.get).mockResolvedValue(webullView({ state: 'Connected' }));
+    const onOpenFeedback = vi.fn();
+    const Wrapper = createQueryWrapper(createTestQueryClient());
+
+    render(
+      <MemoryRouter>
+        <Wrapper>
+          <TooltipProvider>
+            <TopNav onOpenMobileNav={() => undefined} onOpenFeedback={onOpenFeedback} />
+          </TooltipProvider>
+        </Wrapper>
+      </MemoryRouter>,
+    );
+
+    screen.getByRole('button', { name: 'Send feedback' }).click();
+    expect(onOpenFeedback).toHaveBeenCalledOnce();
+  });
 });

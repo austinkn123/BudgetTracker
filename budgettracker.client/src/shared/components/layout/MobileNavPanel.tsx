@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LogOut, Moon, Settings, Sun, User, Wallet } from 'lucide-react';
+import { LogOut, MessageSquare, Moon, Settings, Sun, User, Wallet } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../../features/user/hooks/useUser';
 import { useSignOut } from '../../hooks/useSignOut';
@@ -11,10 +11,12 @@ import { getAccountLabel, getInitials } from './userIdentity';
 
 export interface MobileNavPanelProps {
   onNavigate: () => void;
+  /** Opens the Send feedback dialog (the shell closes this sheet first). */
+  onOpenFeedback?: () => void;
 }
 
 /** Contents of the mobile navigation sheet (BUD-20). */
-const MobileNavPanel = ({ onNavigate }: MobileNavPanelProps) => {
+const MobileNavPanel = ({ onNavigate, onOpenFeedback }: MobileNavPanelProps) => {
   const { data: user, isLoading: loadingUser } = useUser();
   const { user: cognitoUser } = useAuth();
   const { signOut, isSigningOut, error } = useSignOut();
@@ -103,6 +105,17 @@ const MobileNavPanel = ({ onNavigate }: MobileNavPanelProps) => {
             </>
           )}
         </NavLink>
+
+        {onOpenFeedback && (
+          <button
+            type="button"
+            onClick={onOpenFeedback}
+            className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] font-medium text-ink/55 outline-none transition-colors duration-120 hover:bg-ink/[0.05] hover:text-ink/90 focus-visible:ring-2 focus-visible:ring-primary-light/60"
+          >
+            <MessageSquare size={18} className="shrink-0 text-ink/45" />
+            Send feedback
+          </button>
+        )}
 
         <button
           type="button"

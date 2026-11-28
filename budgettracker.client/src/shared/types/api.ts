@@ -439,3 +439,18 @@ export interface CategoryRuleCreated {
   id: number;
   appliedCount: number;
 }
+
+/** Body of a feedback submission: what the user wrote and the app path they were on. */
+export interface FeedbackRequest {
+  message: string;
+  page?: string;
+}
+
+/** A feedback entry as the admin inbox shows it. `createdAt` is a UTC instant. */
+export interface FeedbackEntry {
+  id: number;
+  userId: number;
+  message: string;
+  page: string | null;
+  createdAt: string;
+}
