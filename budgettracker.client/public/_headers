@@ -1,11 +1,17 @@
 # Browser security headers for the SPA. Cloudflare Workers static assets apply these to every file it serves,
 # index.html and the SPA fallback included (not to /api/* or /health*, which the Worker forwards to the Lambda).
 # Origins: Cognito sign-in (cognito-idp), Plaid Link (cdn.plaid.com script and iframe, production.plaid.com API).
+# manifest-src and worker-src let the installable-app manifest and /sw.js load (they would fall back to
+# default-src and script-src anyway; named so a later tightening can't break install).
 # style-src needs 'unsafe-inline' because Plaid Link injects inline styles (plaid.com/docs/link/web, CSP directives).
 /*
-  Content-Security-Policy: default-src 'self' https://cdn.plaid.com; script-src 'self' https://cdn.plaid.com/link/v2/stable/link-initialize.js; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.plaid.com; font-src 'self' data:; connect-src 'self' https://cognito-idp.us-east-2.amazonaws.com https://production.plaid.com; frame-src https://cdn.plaid.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self' https://cdn.plaid.com; script-src 'self' https://cdn.plaid.com/link/v2/stable/link-initialize.js; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.plaid.com; font-src 'self' data:; connect-src 'self' https://cognito-idp.us-east-2.amazonaws.com https://production.plaid.com; frame-src https://cdn.plaid.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+# The service worker script must never be served stale, or a new deploy can't replace it.
+/sw.js
+  Cache-Control: no-cache

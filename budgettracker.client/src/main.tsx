@@ -17,6 +17,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { ThemeProvider } from './shared/theme/ThemeProvider'
 import ErrorBoundary from './shared/components/ErrorBoundary'
 import App from './App.tsx'
+import { registerServiceWorker } from './pwa/registerServiceWorker'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,3 +47,5 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
 )
+
+registerServiceWorker()
