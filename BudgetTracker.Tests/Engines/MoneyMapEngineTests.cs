@@ -295,7 +295,7 @@ public class MoneyMapEngineTests
         var thisMonth = Plan();
         thisMonth.PlanMonth = new DateTime(Today.Year, Today.Month, 1);
 
-        var map = _sut.Build([thisMonth], [], Categories, new DateTime(Today.Year, Today.Month, 1), 3).Value!;
+        var map = _sut.Build([thisMonth], [], Categories, new DateTime(Today.Year, Today.Month, 1), 3, historyStart: null).Value!;
 
         Assert.Equal("Recommended Budget", map.PlanName);
     }
