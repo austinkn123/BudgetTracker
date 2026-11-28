@@ -272,6 +272,42 @@ namespace BudgetTracker.Domain.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BudgetTracker.Domain.Models.Feedback", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("(now() AT TIME ZONE 'utc')");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Page")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt")
+                        .HasDatabaseName("IX_Feedback_UserId_CreatedAt");
+
+                    b.ToTable("Feedback", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Feedback_Message", "btrim(\"Message\") <> ''");
+                        });
+                });
+
             modelBuilder.Entity("BudgetTracker.Domain.Models.PlaidAccount", b =>
                 {
                     b.Property<int>("Id")
@@ -869,6 +905,17 @@ namespace BudgetTracker.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("BudgetTracker.Domain.Models.Feedback", b =>
+                {
+                    b.HasOne("BudgetTracker.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
