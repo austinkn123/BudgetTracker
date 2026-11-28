@@ -33,6 +33,9 @@ export type { CollapsibleProps } from './Collapsible';
 export { default as ConfirmModal } from './ConfirmModal';
 export type { ConfirmModalProps } from './ConfirmModal';
 
+export { default as EmptyState, ErrorState } from './EmptyState';
+export type { EmptyStateProps, ErrorStateProps } from './EmptyState';
+
 export { default as Gauge } from './Gauge';
 export type { GaugeProps } from './Gauge';
 
