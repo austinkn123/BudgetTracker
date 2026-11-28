@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import FeedbackDialog from '../../../features/feedback/components/FeedbackDialog';
 import ErrorBoundary from '../ErrorBoundary';
 import { Sheet } from '../ui';
 import { useDataVersionSync } from '../../hooks/useDataVersionSync';
@@ -17,6 +18,7 @@ import { MOBILE_NAV_WIDTH, NAV_HEIGHT_FULL, NAV_TOP_OFFSET } from './constants';
  */
 const AppShell = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const location = useLocation();
   const { direction, atTop } = useScrollDirection();
   // One cheap check keeps every authenticated page's budget data fresh (replaces per-query polling).
@@ -32,7 +34,11 @@ const AppShell = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <TopNav compact={navCompact} onOpenMobileNav={() => setMobileOpen(true)} />
+      <TopNav
+        compact={navCompact}
+        onOpenMobileNav={() => setMobileOpen(true)}
+        onOpenFeedback={() => setFeedbackOpen(true)}
+      />
 
       <Sheet
         open={mobileOpen}
@@ -40,8 +46,17 @@ const AppShell = () => {
         title="Navigation"
         width={MOBILE_NAV_WIDTH}
       >
-        <MobileNavPanel onNavigate={() => setMobileOpen(false)} />
+        <MobileNavPanel
+          onNavigate={() => setMobileOpen(false)}
+          onOpenFeedback={() => {
+            setMobileOpen(false);
+            setFeedbackOpen(true);
+          }}
+        />
       </Sheet>
+
+      {/* Sent with the path the user is on, so the feedback says what they were looking at. */}
+      <FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} page={location.pathname} />
 
       {/*
         min-w-0 keeps intrinsically wide descendants (the calendar, the plan

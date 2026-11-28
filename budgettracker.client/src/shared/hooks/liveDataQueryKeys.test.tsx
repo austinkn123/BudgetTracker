@@ -8,6 +8,7 @@ import { useCategories } from '../../features/categories/hooks/useCategories';
 import { useCategoryRules } from '../../features/categories/hooks/useCategoryRules';
 import { useCategoryUsage } from '../../features/categories/hooks/useCategoryUsage';
 import { useBudgetAnalysis } from '../../features/dashboard/hooks/useBudgetAnalysis';
+import { useFeedbackInbox } from '../../features/feedback/hooks/useFeedback';
 import { usePlaidConnections } from '../../features/linked-accounts/hooks/usePlaidConnections';
 import { useMoneyMap } from '../../features/money-map/hooks/useMoneyMap';
 import { useTransactionFeed } from '../../features/transactions/hooks/useTransactionFeed';
@@ -58,6 +59,8 @@ const SINGLE_KEY_UNTOUCHED_HOOKS: [string, () => unknown][] = [
   ['useWebullHoldings', useWebullHoldings],
   ['useWebullTrades', () => useWebullTrades('1M')],
   ['useDataVersionSync', useDataVersionSync],
+  // Every user's feedback, not this user's budget data: a data-version bump says nothing about it.
+  ['useFeedbackInbox', () => useFeedbackInbox()],
 ];
 
 describe('isLiveDataQuery against the keys the hooks build', () => {
@@ -103,6 +106,7 @@ describe('isLiveDataQuery against the keys the hooks build', () => {
       'useCategories.ts',
       'useCategoryRules.ts',
       'useCategoryUsage.ts',
+      'useFeedback.ts',
       'useMoneyMap.ts',
       'usePlaidConnections.ts',
       'useTransactionFeed.ts',

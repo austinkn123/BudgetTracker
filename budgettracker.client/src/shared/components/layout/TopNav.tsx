@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LogOut, Menu, Moon, Settings, Sun, User, Wallet } from 'lucide-react';
+import { LogOut, Menu, MessageSquare, Moon, Settings, Sun, User, Wallet } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import { useUser } from '../../../features/user/hooks/useUser';
 import { useSignOut } from '../../hooks/useSignOut';
@@ -23,6 +23,8 @@ export interface TopNavProps {
   /** Contracted to a compact icon pill (driven by scroll direction). */
   compact?: boolean;
   onOpenMobileNav: () => void;
+  /** Opens the Send feedback dialog. The button shows from lg up; below that it lives in the mobile menu. */
+  onOpenFeedback?: () => void;
 }
 
 /**
@@ -58,7 +60,7 @@ const CompactTip = ({
  * It stays reachable the whole time — contracting rather than hiding means
  * navigation is always one click away.
  */
-const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
+const TopNav = ({ compact = false, onOpenMobileNav, onOpenFeedback }: TopNavProps) => {
   const { data: user, isLoading: loadingUser } = useUser();
   const { user: cognitoUser } = useAuth();
   const { signOut, isSigningOut } = useSignOut();
@@ -214,6 +216,22 @@ const TopNav = ({ compact = false, onOpenMobileNav }: TopNavProps) => {
               </span>
             </button>
           </Tooltip>
+
+          {onOpenFeedback && (
+            <Tooltip title="Send feedback">
+              <button
+                type="button"
+                onClick={onOpenFeedback}
+                aria-label="Send feedback"
+                className={cn(
+                  'focus-ring touch-target hidden items-center justify-center rounded-full text-ink/45 transition-all duration-240 ease-out-soft hover:bg-ink/[0.06] hover:text-ink/90 motion-reduce:transition-none lg:inline-flex',
+                  compact ? 'h-8 w-8' : 'h-9 w-9',
+                )}
+              >
+                <MessageSquare size={16} />
+              </button>
+            </Tooltip>
+          )}
 
           <Tooltip title="Settings">
             {/* Span, not the NavLink, is the trigger — see CompactTip. */}

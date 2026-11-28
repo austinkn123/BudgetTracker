@@ -14,6 +14,7 @@ const InvestmentsPage = lazy(() => import('./features/webull/pages/InvestmentsPa
 const PlaidOAuthPage = lazy(() => import('./features/linked-accounts/pages/PlaidOAuthPage'));
 const BudgetPage = lazy(() => import('./features/budget-plans/pages/BudgetPage'));
 const BudgetBuilderPage = lazy(() => import('./features/budget-builder/pages/BudgetBuilderPage'));
+const FeedbackInboxPage = lazy(() => import('./features/feedback/pages/FeedbackInboxPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 
@@ -89,6 +90,15 @@ function App() {
             element={
               <Page>
                 <SettingsPage />
+              </Page>
+            }
+          />
+          {/* Admin only (Cognito group "admin"); the page sends anyone else home and the API returns 403. */}
+          <Route
+            path="/admin/feedback"
+            element={
+              <Page>
+                <FeedbackInboxPage />
               </Page>
             }
           />
