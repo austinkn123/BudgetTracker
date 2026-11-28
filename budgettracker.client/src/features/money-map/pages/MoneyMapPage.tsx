@@ -3,12 +3,14 @@ import type { ReactNode } from 'react';
 import { endOfMonth, startOfDay, startOfMonth } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { ListChecks } from 'lucide-react';
-import { Alert, Button, Card, Skeleton } from '../../../shared/components/ui';
+import { Button, Card, Skeleton } from '../../../shared/components/ui';
+import LoadError from '../../../shared/components/LoadError';
 import type { CashFlowQuery, MoneyMap, PlanPerformance } from '../../../shared/types/api';
 import { currency, percent } from '../../../shared/utils/format';
 import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
 import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
 import ReconnectAlert from '../../linked-accounts/components/ReconnectAlert';
+import ConnectBankCard from '../../linked-accounts/components/ConnectBankCard';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactionSummary } from '../../transactions/hooks/useTransactionSummary';
 import { useWebull, useWebullRefreshOnOpen } from '../../webull/hooks/useWebull';
@@ -138,11 +140,9 @@ const MonthByMonth = () => {
     () => ({ from: bounds.from ? toDateKey(bounds.from) : undefined, to: toDateKey(bounds.to), groupBy: 'Month' }),
     [bounds],
   );
-  const { data: report, isPending, error } = useCashFlow(query);
+  const { data: report, isPending, error, refetch } = useCashFlow(query);
 
-  if (error && !report) {
-    return <Alert severity="error" title="Couldn't load month by month" message="Check that the server and database are running." />;
-  }
+  if (error && !report) return <LoadError what="the last 12 months" onRetry={() => void refetch()} />;
   if (isPending || !report) return <Skeleton height={380} className="rounded-xl" />;
 
   const { net, moneyIn } = report.totals;
@@ -185,17 +185,20 @@ const MoneyMapPage = () => {
   useSyncOnOpen();
   useWebullRefreshOnOpen();
 
-  const { data: map, isPending, error } = useMoneyMap(AVERAGE_MONTHS);
+  const { data: map, isPending, error, refetch } = useMoneyMap(AVERAGE_MONTHS);
   const now = new Date();
   const { data: analysis } = useBudgetAnalysis(startOfMonth(now), endOfMonth(now), TREND_MONTHS);
-  const { data: connections = [] } = usePlaidConnections();
+  const { data: connections = [], isSuccess: connectionsLoaded } = usePlaidConnections();
+  // Only once the list is read: a failed or pending read is not proof of no bank.
+  const noBank = connectionsLoaded && connections.length === 0;
   const { data: webull } = useWebull();
   const { data: summary } = useTransactionSummary();
 
-  const cash = useMemo(
-    () => summarizeNetWorth(connections, webull?.balances ?? [], summary?.pendingByAccount)?.cash ?? null,
+  const netWorth = useMemo(
+    () => summarizeNetWorth(connections, webull?.balances ?? [], summary?.pendingByAccount),
     [connections, webull, summary],
   );
+  const cash = netWorth?.cash ?? null;
   const split = useMemo(() => (map ? splitMonth(map) : null), [map]);
   const uncategorizedCount = summary?.uncategorizedCount ?? 0;
 
@@ -206,6 +209,7 @@ const MoneyMapPage = () => {
       <h1 className="sr-only">Home</h1>
 
       <div className="space-y-4 empty:hidden">
+        {noBank && <ConnectBankCard />}
         <ReconnectAlert />
         <UncategorizedNudge count={uncategorizedCount} />
       </div>
@@ -214,7 +218,7 @@ const MoneyMapPage = () => {
 
       <Section title="A normal month" detail="Your plan next to what a month really cost, on average, over the last 12 months.">
         {error && !map ? (
-          <Alert severity="error" title="Couldn't load your money map" message="Check that the server and database are running." />
+          <LoadError what="your normal month" onRetry={() => void refetch()} />
         ) : isPending || !map || !split ? (
           <div className="space-y-6" aria-busy>
             <Skeleton height={220} className="rounded-xl" />
@@ -243,11 +247,14 @@ const MoneyMapPage = () => {
         )}
       </Section>
 
-      <MonthByMonth />
+      {/* With no bank both would be empty: a blank chart and a heading over nothing. */}
+      {!noBank && <MonthByMonth />}
 
-      <Section title="What you have">
-        <NetWorthCard />
-      </Section>
+      {netWorth && (
+        <Section title="What you have">
+          <NetWorthCard />
+        </Section>
+      )}
     </div>
   );
 };

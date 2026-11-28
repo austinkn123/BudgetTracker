@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronLeft, Landmark, Wallet } from 'lucide-react';
 import { Alert, Button, Skeleton } from '../../../shared/components/ui';
+import LoadError from '../../../shared/components/LoadError';
 import { budgetPlanService } from '../../../shared/services/budgetPlan.service';
 import type { BudgetPlan, Category, MoneyMap } from '../../../shared/types/api';
 import { cn } from '../../../shared/utils/cn';
@@ -416,9 +417,9 @@ const Builder = ({ plan, map, categories }: BuilderProps) => {
  * from the bank. It edits the same plan the Plan tab does.
  */
 const BudgetBuilderPage = () => {
-  const { data: plans, error: plansError } = useBudgetPlans();
-  const { data: categories, error: categoriesError } = useCategories();
-  const { data: map, error: mapError } = useMoneyMap(AVERAGE_MONTHS);
+  const { data: plans, error: plansError, refetch: refetchPlans } = useBudgetPlans();
+  const { data: categories, error: categoriesError, refetch: refetchCategories } = useCategories();
+  const { data: map, error: mapError, refetch: refetchMap } = useMoneyMap(AVERAGE_MONTHS);
   const plan = useMemo(() => pickPlan(plans ?? []), [plans]);
 
   return (
@@ -426,11 +427,19 @@ const BudgetBuilderPage = () => {
       {plans && categories && map ? (
         <Builder plan={plan} map={map} categories={categories} />
       ) : plansError || categoriesError || mapError ? (
-        <Alert
-          severity="error"
-          title="Couldn't load your budget"
-          message="Check that the server and database are running."
-        />
+        <div className="space-y-4">
+          <LoadError
+            what="your budget"
+            onRetry={() => {
+              void refetchPlans();
+              void refetchCategories();
+              void refetchMap();
+            }}
+          />
+          <Button component={Link} to="/budget" variant="ghost" startIcon={<ChevronLeft size={16} />}>
+            Back to Budget
+          </Button>
+        </div>
       ) : (
         <div className="space-y-6" aria-busy>
           <Skeleton height={96} width={96} className="rounded-full" />

@@ -49,6 +49,17 @@ describe('LinkedAccountsSection', () => {
     vi.resetAllMocks();
   });
 
+  it('shows a load error, not the first-bank prompt, when the connections read fails', async () => {
+    apiMock.get.mockRejectedValueOnce(new Error('500')).mockResolvedValueOnce({ data: [CHASE] });
+
+    renderSection();
+
+    expect(await screen.findByText("Couldn't load your linked banks")).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Connect a bank' })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Chase')).toBeInTheDocument();
+  });
+
   it('renders one card per connection', async () => {
     apiMock.get.mockResolvedValue({ data: [CHASE, ALLY] });
 

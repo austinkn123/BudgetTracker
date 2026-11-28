@@ -5,13 +5,19 @@ import { Button, Card } from '../../shared/components/ui';
 import { useBudgetPlans } from './hooks/useBudgetPlans';
 import { useCategories } from '../categories/hooks/useCategories';
 import StatusBanner from '../../shared/components/StatusBanner';
+import LoadError from '../../shared/components/LoadError';
 import BudgetPlansSection from './BudgetPlansSection';
 import CategoriesSection from '../categories/CategoriesSection';
 
 /** The Budget page's editing half: what you intend to spend each month, and the categories it is measured in. */
 const PlanTab = () => {
-  const { data: plans = [], isLoading: loadingPlans } = useBudgetPlans();
-  const { isLoading: loadingCategories } = useCategories();
+  const plansQuery = useBudgetPlans();
+  const categoriesQuery = useCategories();
+  const plans = plansQuery.data ?? [];
+  const loadingPlans = plansQuery.isLoading;
+  const loadingCategories = categoriesQuery.isLoading;
+  // Either read failing would make both sections below say "none yet", which is a guess, not the truth.
+  const failed = (plansQuery.isError && !plansQuery.data) || (categoriesQuery.isError && !categoriesQuery.data);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
 
@@ -37,17 +43,29 @@ const PlanTab = () => {
         </div>
       </Card>
 
-      <BudgetPlansSection
-        isLoading={isLoading}
-        setStatusMessage={setStatusMessage}
-        setStatusError={setStatusError}
-      />
+      {failed ? (
+        <LoadError
+          what="your plans and categories"
+          onRetry={() => {
+            void plansQuery.refetch();
+            void categoriesQuery.refetch();
+          }}
+        />
+      ) : (
+        <>
+          <BudgetPlansSection
+            isLoading={isLoading}
+            setStatusMessage={setStatusMessage}
+            setStatusError={setStatusError}
+          />
 
-      <CategoriesSection
-        isLoading={isLoading}
-        setStatusMessage={setStatusMessage}
-        setStatusError={setStatusError}
-      />
+          <CategoriesSection
+            isLoading={isLoading}
+            setStatusMessage={setStatusMessage}
+            setStatusError={setStatusError}
+          />
+        </>
+      )}
     </div>
   );
 };

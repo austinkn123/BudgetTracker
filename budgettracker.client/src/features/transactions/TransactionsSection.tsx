@@ -9,6 +9,8 @@ import { useCategories } from '../categories/hooks/useCategories';
 import { useBudgetPlans } from '../budget-plans/hooks/useBudgetPlans';
 import { useBudgetAnalysis } from '../dashboard/hooks/useBudgetAnalysis';
 import { usePlaidConnections } from '../linked-accounts/hooks/usePlaidConnections';
+import ConnectBankCard from '../linked-accounts/components/ConnectBankCard';
+import LoadError from '../../shared/components/LoadError';
 import type { TransactionQuery } from '../../shared/services/transaction.service';
 import MonthHeader from './components/MonthHeader';
 import PayeeReview from './components/PayeeReview';
@@ -77,6 +79,8 @@ const TransactionsSection = ({
   // resolve a Plaid account mask for each imported row, whichever institution it came from, and
   // offer the account filter.
   const { data: connections } = usePlaidConnections();
+  // Only once the list is read: a failed or pending read is not proof of no bank.
+  const noBank = connections !== undefined && connections.length === 0;
 
   const accountOptions = useMemo(() => accountOptionsFrom(connections), [connections]);
   // A disconnected bank's account drops out of the options, and the filter falls back to all
@@ -102,16 +106,16 @@ const TransactionsSection = ({
   const feed = useTransactionFeed(feedQuery, { enabled: view === 'list' });
   // Only the Plan view reads these rows: the month header reads the analysis, the counts the
   // summary, and governingPlan the plans.
-  const { data: planTransactions = [] } = useTransactions(planQuery, { enabled: view === 'plan' });
-  const { data: calendarTransactions = [] } = useTransactions(calendarQuery, {
-    enabled: view === 'calendar',
-  });
+  const planRead = useTransactions(planQuery, { enabled: view === 'plan' });
+  const calendarRead = useTransactions(calendarQuery, { enabled: view === 'calendar' });
+  const planTransactions = useMemo(() => planRead.data ?? [], [planRead.data]);
+  const calendarTransactions = useMemo(() => calendarRead.data ?? [], [calendarRead.data]);
   // The payee backlog is every uncategorized row, any date: bounded by its filter, not by time.
   const { data: backlogTransactions = [] } = useTransactions(
     { uncategorized: true },
     { enabled: view === 'review' },
   );
-  const { data: summary } = useTransactionSummary();
+  const { data: summary, isError: summaryError, refetch: refetchSummary } = useTransactionSummary();
   const { data: categories = [] } = useCategories();
   const { data: budgetPlans = [] } = useBudgetPlans();
 
@@ -218,8 +222,15 @@ const TransactionsSection = ({
     );
   }
 
+  // Every view reads the summary, so if it failed the views below would show $0 and "nothing here" as if true.
+  if (summaryError && !summary) {
+    return <LoadError what="your transactions" onRetry={() => void refetchSummary()} />;
+  }
+
   return (
     <div className="flex flex-col gap-5">
+      {noBank && <ConnectBankCard />}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ToggleGroup
           value={view}
@@ -295,7 +306,12 @@ const TransactionsSection = ({
               : 'animate-slide-in-left-sm'
         }
       >
-        {view === 'plan' && <PlanGroupedView grouping={grouping} {...rowProps} />}
+        {view === 'plan' &&
+          (planRead.isError && !planRead.data ? (
+            <LoadError what="this month's transactions" onRetry={() => void planRead.refetch()} />
+          ) : (
+            <PlanGroupedView grouping={grouping} {...rowProps} />
+          ))}
 
         {view === 'review' && (
           <PayeeReview
@@ -341,7 +357,11 @@ const TransactionsSection = ({
           </div>
         )}
 
-        {view === 'calendar' && (
+        {view === 'calendar' && calendarRead.isError && !calendarRead.data && (
+          <LoadError what="this month's transactions" onRetry={() => void calendarRead.refetch()} />
+        )}
+
+        {view === 'calendar' && !(calendarRead.isError && !calendarRead.data) && (
           <Card padding="none">
             <TransactionTable
               categories={categories}
