@@ -9,6 +9,7 @@ import { currency, percent } from '../../../shared/utils/format';
 import { usePlaidConnections } from '../../linked-accounts/hooks/usePlaidConnections';
 import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
 import ReconnectAlert from '../../linked-accounts/components/ReconnectAlert';
+import ConnectBankPrompt from '../../linked-accounts/components/ConnectBankPrompt';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useTransactionSummary } from '../../transactions/hooks/useTransactionSummary';
 import { useWebull, useWebullRefreshOnOpen } from '../../webull/hooks/useWebull';
@@ -210,6 +211,7 @@ const MoneyMapPage = () => {
       <h1 className="sr-only">Home</h1>
 
       <div className="space-y-4 empty:hidden">
+        <ConnectBankPrompt description="Link the bank you spend from and this page fills in with your spending, income and balances." />
         <ReconnectAlert />
         <UncategorizedNudge count={uncategorizedCount} />
       </div>

@@ -3,6 +3,7 @@ import { PageHeader } from '../../../shared/components/ui';
 import { useTransactionSummary } from '../hooks/useTransactionSummary';
 import StatusBanner from '../../../shared/components/StatusBanner';
 import TransactionsSection from '../TransactionsSection';
+import ConnectBankPrompt from '../../linked-accounts/components/ConnectBankPrompt';
 import { useSyncOnOpen } from '../../linked-accounts/hooks/useSyncOnOpen';
 
 const TransactionsPage = () => {
@@ -22,6 +23,8 @@ const TransactionsPage = () => {
         title="Transactions"
         description="Review what your bank imported and give each transaction a category."
       />
+
+      <ConnectBankPrompt description="Transactions import from your bank once it's linked, and you can categorize them here." />
 
       <StatusBanner statusMessage={statusMessage} statusError={statusError} />
 

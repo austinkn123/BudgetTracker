@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { ErrorState, PageHeader, Skeleton } from '../../../shared/components/ui';
+import ConnectBankPrompt from '../../linked-accounts/components/ConnectBankPrompt';
 import { useMoneyMap } from '../../money-map/hooks/useMoneyMap';
 import { AVERAGE_MONTHS, normalIncome, splitMonth } from '../../money-map/utils/moneyMap';
 import BudgetTable from '../../money-map/components/BudgetTable';
@@ -14,6 +15,8 @@ const BudgetPage = () => {
   return (
     <div className="stagger-in space-y-6">
       <PageHeader title="Budget" description="Your plan for each month, next to what you usually spend." />
+
+      <ConnectBankPrompt description="Link your bank so each line shows what it really costs in a normal month." />
 
       {error && !map ? (
         <ErrorState title="Couldn't load your budget" onRetry={() => void refetch()} isRetrying={isFetching} />
