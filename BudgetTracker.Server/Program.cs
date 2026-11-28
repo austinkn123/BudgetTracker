@@ -137,7 +137,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+// Admin-only endpoints (the feedback inbox): members of the Cognito user pool group "admin".
+builder.Services.AddAuthorization(options =>
+    options.AddPolicy(FeedbackEndpoints.AdminPolicy, policy => policy
+        .RequireAuthenticatedUser()
+        .RequireClaim(FeedbackEndpoints.GroupsClaim, FeedbackEndpoints.AdminGroup)));
 
 var app = builder.Build();
 
@@ -219,6 +223,10 @@ cashFlowGroup.MapCashFlowEndpoints();
 var webullGroup = apiGroup.MapGroup("/webull")
     .WithTags("Webull");
 webullGroup.MapWebullEndpoints();
+
+apiGroup.MapGroup("/feedback")
+    .WithTags("Feedback")
+    .MapFeedbackEndpoints();
 
 apiGroup.MapGroup("/data-version")
     .WithTags("Data Version")
