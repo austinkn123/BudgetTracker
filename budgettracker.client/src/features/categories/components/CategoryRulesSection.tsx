@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Button, Card, ConfirmModal, Skeleton } from '../../../shared/components/ui';
+import { Alert, Button, Card, ConfirmModal, ErrorState, Skeleton } from '../../../shared/components/ui';
 import type { CategoryRule } from '../../../shared/types/api';
 import type { CategoryRuleFormInput } from '../../../shared/validation/categoryRuleSchema';
 import { errorMessage } from '../../../shared/utils/errorMessage';
@@ -37,7 +37,14 @@ const CategoryRulesSection = () => {
           <Alert severity="error" message={errorMessage(remove.error, "Couldn't delete the rule. Please try again.")} />
         )}
         {rules.isPending && <Skeleton className="h-16 w-full" />}
-        {rules.isError && <Alert severity="error" message="Couldn't load your rules." />}
+        {rules.isError && !rules.data && (
+          <ErrorState
+            layout="inline"
+            title="Couldn't load your rules"
+            onRetry={() => void rules.refetch()}
+            isRetrying={rules.isFetching}
+          />
+        )}
         {rules.data?.length === 0 && (
           <p className="text-sm text-ink-muted">
             No rules yet. On a transaction, choose “Always categorize…” to file that payee automatically.

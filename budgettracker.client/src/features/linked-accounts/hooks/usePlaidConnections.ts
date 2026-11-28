@@ -15,4 +15,7 @@ export const usePlaidConnections = () =>
     queryKey: PLAID_CONNECTIONS_QUERY_KEY,
     queryFn: plaidService.getConnections,
     staleTime: 30_000,
+    // One retry, like the other reads: the default three keep Settings on its spinner for seconds
+    // before the failure can show.
+    retry: 1,
   });

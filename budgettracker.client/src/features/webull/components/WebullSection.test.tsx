@@ -298,3 +298,24 @@ describe('WebullSection', () => {
     });
   });
 });
+
+describe('WebullSection when the read fails', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('offers Try again instead of asking for a reload, and recovers', async () => {
+    getMock.mockRejectedValue(new Error('500'));
+    renderSection();
+
+    const alert = await screen.findByRole('alert', {}, { timeout: 4000 });
+    expect(alert).toHaveTextContent("Couldn't check your Webull connection");
+    expect(screen.queryByText(/Reload the page/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking Webull…')).not.toBeInTheDocument();
+
+    getMock.mockResolvedValue(webullView({ state: 'Connected' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+  });
+});

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 
-import { Alert, Button, Card, Modal, ModalActions, Spinner } from '../../../shared/components/ui';
+import { Alert, Button, Card, ErrorState, Modal, ModalActions, Spinner } from '../../../shared/components/ui';
 import type { PlaidConnectionView } from '../../../shared/types/api';
 import { cn } from '../../../shared/utils/cn';
 import { useLinkedAccounts } from '../hooks/useLinkedAccounts';
+import { usePlaidConnections } from '../hooks/usePlaidConnections';
 import LinkedAccountCard from './LinkedAccountCard';
 import PlaidLinkLauncher from './PlaidLinkLauncher';
 
@@ -35,6 +36,8 @@ const LinkedAccountsSection = () => {
     clearError,
   } = useLinkedAccounts();
 
+  // Same cache entry the hook reads: here only to tell a failed read from an empty one.
+  const connectionsQuery = usePlaidConnections();
   const [pendingDisconnect, setPendingDisconnect] = useState<PlaidConnectionView | null>(null);
   // Keep is the default: it is the reversible choice, since a bank can be linked again.
   const [deleteTransactions, setDeleteTransactions] = useState(false);
@@ -90,6 +93,14 @@ const LinkedAccountsSection = () => {
           <Spinner size={16} />
           <span className="text-sm">Checking your connections…</span>
         </div>
+      ) : connectionsQuery.isError && !hasConnections ? (
+        // A failed read is not "no banks": offering to link a first bank here would be wrong.
+        <ErrorState
+          layout="inline"
+          title="Couldn't load your linked banks"
+          onRetry={() => void connectionsQuery.refetch()}
+          isRetrying={connectionsQuery.isFetching}
+        />
       ) : hasConnections ? (
         <ul className="flex flex-col gap-3" aria-label="Linked institutions">
           {connections.map((connection) => (

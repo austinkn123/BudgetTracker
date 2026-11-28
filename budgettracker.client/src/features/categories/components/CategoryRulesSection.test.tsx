@@ -81,3 +81,26 @@ describe('CategoryRulesSection (BUD-24)', () => {
     expect(await screen.findByText('Rule deleted.')).toBeInTheDocument();
   });
 });
+
+describe('CategoryRulesSection when the rules fail to load', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    categories.getCurrentUserCategories.mockResolvedValue([]);
+  });
+
+  it('says so with Try again, which loads them', async () => {
+    rules.getAll.mockRejectedValue(new Error('500'));
+    renderSection();
+
+    // The hook retries once before giving up.
+    const alert = await screen.findByRole('alert', {}, { timeout: 4000 });
+    expect(alert).toHaveTextContent("Couldn't load your rules");
+    expect(screen.queryByText(/No rules yet/)).not.toBeInTheDocument();
+
+    rules.getAll.mockResolvedValue([UBER]);
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByText(/Payee contains “uber”/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});

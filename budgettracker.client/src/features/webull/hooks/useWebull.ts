@@ -42,6 +42,8 @@ export const useWebull = () =>
   useQuery<WebullConnectionView, Error>({
     queryKey: WEBULL_QUERY_KEY,
     queryFn: webullService.get,
+    // One retry: the default three hold the Settings spinner for seconds before a failure shows.
+    retry: 1,
   });
 
 /** Last known positions per account, for the Investments page. */

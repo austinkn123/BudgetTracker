@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Card, Spinner } from '../../../shared/components/ui';
+import { Alert, Badge, Button, Card, ErrorState, Spinner } from '../../../shared/components/ui';
 import type { BadgeColor } from '../../../shared/components/ui';
 import type { WebullState } from '../../../shared/types/api';
 import { errorMessage } from '../../../shared/utils/errorMessage';
@@ -24,7 +24,7 @@ const Code = ({ children }: { children: string }) => (
  * asking Webull to text an approval code, offered only when the server says it can.
  */
 const WebullSection = () => {
-  const { data: view, isPending, isError } = useWebull();
+  const { data: view, isPending, isError, isFetching, refetch } = useWebull();
   const verify = useVerifyWebull();
   useApprovalPolling(view);
 
@@ -68,7 +68,12 @@ const WebullSection = () => {
           <span>Checking Webull…</span>
         </div>
       ) : isError && !view ? (
-        <p>We couldn't check your Webull connection. Reload the page to try again.</p>
+        <ErrorState
+          layout="inline"
+          title="Couldn't check your Webull connection"
+          onRetry={() => void refetch()}
+          isRetrying={isFetching}
+        />
       ) : view?.state === 'NotSetUp' ? (
         <p>
           <Code>Webull:AppKey</Code> and <Code>Webull:AppSecret</Code> go in{' '}

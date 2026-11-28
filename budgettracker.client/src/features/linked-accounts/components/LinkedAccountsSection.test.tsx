@@ -240,3 +240,29 @@ describe('LinkedAccountsSection', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
+
+describe('LinkedAccountsSection when the connections read fails', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('shows the failure with Try again, never the "link your first bank" empty state', async () => {
+    const user = userEvent.setup();
+    apiMock.get.mockRejectedValue(new Error('Network Error'));
+
+    renderSection();
+
+    // usePlaidConnections retries once, then the spinner gives way to the error.
+    const alert = await screen.findByRole('alert', {}, { timeout: 4000 });
+    expect(alert).toHaveTextContent("Couldn't load your linked banks");
+    expect(screen.queryByText('Checking your connections…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Connect a bank' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Link your first bank/)).not.toBeInTheDocument();
+
+    apiMock.get.mockResolvedValue({ data: [CHASE] });
+    await user.click(within(alert).getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByRole('list', { name: 'Linked institutions' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
